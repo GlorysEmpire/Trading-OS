@@ -1,0 +1,148 @@
+@import "tailwindcss";
+
+/* Ash & Light Eye-Friendly Operating System Theme */
+:root {
+  --color-canvas-ash: #edf0f5;
+  --color-surface-white: #ffffff;
+  --color-surface-muted: #f4f6fa;
+  --color-surface-subtle: #e8ecf3;
+  --color-border-ash: #dbe1ea;
+  --color-border-strong: #cbd5e1;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #334155;
+  --color-text-muted: #64748b;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Ash Theme Specific Color Overrides */
+.ash-theme {
+  background-color: #edf0f5 !important;
+  color: #0f172a !important;
+}
+
+.ash-theme header,
+.ash-theme nav {
+  background-color: #ffffff !important;
+  border-color: #dbe1ea !important;
+}
+
+/* Base surface mapping */
+.ash-theme .bg-\[\#080c14\],
+.ash-theme .bg-\[\#0c1017\],
+.ash-theme .bg-\[\#0c1119\],
+.ash-theme .bg-\[\#0d141f\],
+.ash-theme .bg-\[\#0f141d\],
+.ash-theme .bg-\[\#101722\],
+.ash-theme .bg-\[\#121926\],
+.ash-theme .bg-\[\#131a26\],
+.ash-theme .bg-\[\#131b26\],
+.ash-theme .bg-\[\#141d2a\] {
+  background-color: #ffffff !important;
+}
+
+.ash-theme .bg-\[\#162130\],
+.ash-theme .bg-\[\#182335\],
+.ash-theme .bg-\[\#1c2638\],
+.ash-theme .bg-slate-900,
+.ash-theme .bg-slate-900\/50,
+.ash-theme .bg-slate-900\/60,
+.ash-theme .bg-slate-900\/80,
+.ash-theme .bg-slate-900\/90 {
+  background-color: #f4f6fa !important;
+}
+
+.ash-theme .bg-slate-800,
+.ash-theme .bg-slate-800\/60,
+.ash-theme .bg-slate-800\/80,
+.ash-theme .bg-slate-800\/90 {
+  background-color: #e8ecf3 !important;
+}
+
+.ash-theme .border-slate-800,
+.ash-theme .border-slate-800\/80,
+.ash-theme .border-slate-700,
+.ash-theme .border-slate-700\/60,
+.ash-theme .border-\[\#1f2937\],
+.ash-theme .border-\[\#1b2332\],
+.ash-theme .border-\[\#233044\] {
+  border-color: #dbe1ea !important;
+}
+
+.ash-theme .text-slate-100,
+.ash-theme .text-slate-200 {
+  color: #0f172a !important;
+}
+
+.ash-theme .text-slate-300 {
+  color: #334155 !important;
+}
+
+.ash-theme .text-slate-400 {
+  color: #64748b !important;
+}
+
+.ash-theme .text-slate-500 {
+  color: #8392a5 !important;
+}
+
+/* Input fields & Select elements in Ash Theme */
+.ash-theme input,
+.ash-theme select,
+.ash-theme textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+.ash-theme input:focus,
+.ash-theme select:focus,
+.ash-theme textarea:focus {
+  border-color: #0284c7 !important;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15) !important;
+}
+
+.ash-theme input::placeholder,
+.ash-theme textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Table styling in Ash Theme */
+.ash-theme th {
+  background-color: #f1f4f9 !important;
+  color: #475569 !important;
+  border-color: #dbe1ea !important;
+}
+
+.ash-theme tr:hover td {
+  background-color: #f8fafc !important;
+}
+
+/* Active navigation item */
+.ash-theme .nav-active {
+  background-color: #e0e7f1 !important;
+  color: #0284c7 !important;
+  border-color: #0284c7 !important;
+}
+
+/* Modals backdrop */
+.ash-theme .modal-backdrop {
+  background-color: rgba(15, 23, 42, 0.45) !important;
+}

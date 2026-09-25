@@ -1,0 +1,6 @@
+{
+  "name": "Trading OS",
+  "description": "A personal operating system for discretionary traders: Trading HQ, Asset Desks, Trade Journal, Research & Backtesting, Operational Calendar, and Psychology.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
