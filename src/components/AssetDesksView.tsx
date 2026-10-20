@@ -11,8 +11,12 @@ import {
   Edit3,
   Shield,
   Activity,
+  Camera,
+  ImagePlus,
 } from 'lucide-react';
-import { BiasType, Scenario, LiquidityZone } from '../types';
+import { BiasType, Scenario, LiquidityZone, AssetChartScreenshot } from '../types';
+import { ImageUploadDropzone } from './ImageUploadDropzone';
+import { ImageViewerModal, LightboxImage } from './ImageViewerModal';
 
 const inputClass = 'bg-[#162130] border border-slate-700 rounded px-2.5 py-1.5 text-slate-200 outline-none focus:border-cyan-500 font-sans';
 
@@ -21,7 +25,7 @@ export const AssetDesksView: React.FC = () => {
 
   const currentDesk = assets.find(a => a.id === selectedAssetId) || assets[0];
 
-  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'liquidity' | 'wyckoff' | 'external' | 'scenarios'>('overview');
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'liquidity' | 'wyckoff' | 'external' | 'scenarios' | 'charts'>('overview');
 
   // Narrative edit
   const [editingNarrative, setEditingNarrative] = useState(false);
@@ -52,6 +56,12 @@ export const AssetDesksView: React.FC = () => {
   const [scenarioThesis, setScenarioThesis] = useState('');
   const [scenarioConfirm, setScenarioConfirm] = useState('');
   const [scenarioInvalidate, setScenarioInvalidate] = useState('');
+
+  // Chart/screenshot attachments
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [newChartTitle, setNewChartTitle] = useState('');
+  const [pendingChartUrl, setPendingChartUrl] = useState('');
 
   if (desksLoading) {
     return (
@@ -115,6 +125,24 @@ export const AssetDesksView: React.FC = () => {
     updateAssetDesk(currentDesk.id, {
       wyckoffDevelopment: { ...currentDesk.wyckoffDevelopment, eventsIdentified: currentDesk.wyckoffDevelopment.eventsIdentified.filter((_, i) => i !== idx) },
     });
+  };
+
+  const addChart = () => {
+    if (!pendingChartUrl) return;
+    const chart: AssetChartScreenshot = {
+      id: `chart-${Date.now()}`,
+      title: newChartTitle.trim() || `${currentDesk.symbol} Chart`,
+      timeframe: '',
+      url: pendingChartUrl,
+      uploadedAt: new Date().toISOString(),
+      category: 'GENERAL',
+    };
+    updateAssetDesk(currentDesk.id, { charts: [...(currentDesk.charts || []), chart] });
+    setPendingChartUrl('');
+    setNewChartTitle('');
+  };
+  const removeChart = (chartId: string) => {
+    updateAssetDesk(currentDesk.id, { charts: (currentDesk.charts || []).filter(c => c.id !== chartId) });
   };
 
   const startEditExternal = () => {
@@ -258,6 +286,7 @@ export const AssetDesksView: React.FC = () => {
           { id: 'wyckoff', label: '3. Wyckoff Development' },
           { id: 'scenarios', label: '4. Scenarios' },
           { id: 'external', label: '5. External Context' },
+          { id: 'charts', label: '6. Charts & Screenshots' },
         ].map(tab => (
           <button
             key={tab.id}
@@ -583,6 +612,77 @@ export const AssetDesksView: React.FC = () => {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* 6. Charts & Screenshots */}
+      {activeSubTab === 'charts' && (
+        <div className="bg-[#101722] border border-slate-800 rounded-lg p-5 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span className="font-mono text-xs font-bold text-slate-200 uppercase flex items-center gap-2">
+              <Camera className="w-4 h-4 text-cyan-400" />
+              DESK CHARTS & SCREENSHOTS
+            </span>
+            <span className="text-[11px] font-mono text-slate-500">{(currentDesk.charts || []).length} attached</span>
+          </div>
+
+          <div className="p-3 bg-[#131b26] border border-slate-800 rounded-md space-y-2">
+            <label className="text-[11px] font-mono font-bold text-slate-400 block">ADD CHART / SCREENSHOT</label>
+            <input
+              value={newChartTitle}
+              onChange={e => setNewChartTitle(e.target.value)}
+              placeholder={`Title (defaults to \"${currentDesk.symbol} Chart\")`}
+              className={`${inputClass} w-full`}
+            />
+            <ImageUploadDropzone
+              value={pendingChartUrl}
+              onChange={url => setPendingChartUrl(url)}
+              sublabel="Drag & drop, click to upload, or paste screenshot (Ctrl+V)"
+            />
+            {pendingChartUrl && (
+              <button
+                onClick={addChart}
+                className="w-full flex items-center justify-center gap-2 py-2 rounded bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-mono font-bold"
+              >
+                <ImagePlus className="w-3.5 h-3.5" />
+                Attach to {currentDesk.symbol} Desk
+              </button>
+            )}
+          </div>
+
+          {(currentDesk.charts || []).length === 0 ? (
+            <p className="text-xs font-mono text-slate-500">No charts attached yet.</p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {(currentDesk.charts || []).map((chart, idx) => (
+                <div key={chart.id} className="relative group rounded-md border border-slate-800 overflow-hidden bg-[#162130]">
+                  <img
+                    src={chart.url}
+                    alt={chart.title}
+                    className="w-full h-32 object-cover cursor-pointer"
+                    onClick={() => {
+                      setLightboxIndex(idx);
+                      setLightboxOpen(true);
+                    }}
+                  />
+                  <div className="p-2 flex items-center justify-between">
+                    <span className="text-[11px] font-mono text-slate-300 truncate">{chart.title}</span>
+                    <button onClick={() => removeChart(chart.id)} className="text-rose-400 hover:text-rose-300">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <ImageViewerModal
+            images={(currentDesk.charts || []).map((c): LightboxImage => ({ url: c.url, title: c.title, timeframe: c.timeframe }))}
+            currentIndex={lightboxIndex}
+            isOpen={lightboxOpen}
+            onClose={() => setLightboxOpen(false)}
+            onNavigate={setLightboxIndex}
+          />
         </div>
       )}
     </div>

@@ -1,5 +1,20 @@
 @import "tailwindcss";
 
+/* Prevent horizontal overflow (e.g. from browser zoom-out / sub-pixel
+   rounding exposing blank space beside the app) from ever becoming a
+   page-level scrollbar. Inner panels still scroll horizontally on their
+   own (e.g. the nav bar, wide tables) via their own overflow-x-auto. */
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
+}
+#root {
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+
 /* Ash & Light Eye-Friendly Operating System Theme */
 :root {
   --color-canvas-ash: #edf0f5;
