@@ -27,6 +27,7 @@ export const BacktestingView: React.FC = () => {
     deleteBacktestSample,
     researchQuestions,
     performanceStats,
+    assets,
   } = useTrading();
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -58,7 +59,10 @@ export const BacktestingView: React.FC = () => {
   };
 
   // Form states
-  const [asset, setAsset] = useState('ETH');
+  const [asset, setAsset] = useState('');
+  React.useEffect(() => {
+    if (!asset && assets.length > 0) setAsset(assets[0].symbol);
+  }, [asset, assets]);
   const [date, setDate] = useState('2024-11-12');
   const [regime, setRegime] = useState('Range');
   const [narrative, setNarrative] = useState('Phase B range testing AR boundary');
@@ -468,11 +472,10 @@ export const BacktestingView: React.FC = () => {
                     onChange={(e) => setAsset(e.target.value)}
                     className="w-full bg-[#162130] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 outline-none"
                   >
-                    <option value="BTC">BTC</option>
-                    <option value="ETH">ETH</option>
-                    <option value="NQ">NQ</option>
-                    <option value="XAU">XAU</option>
-                    <option value="EUR/USD">EUR/USD</option>
+                    {assets.length === 0 && <option value="">No configured instruments yet</option>}
+                    {assets.map(a => (
+                      <option key={a.id} value={a.symbol}>{a.symbol}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
