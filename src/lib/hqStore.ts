@@ -2,10 +2,16 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { toSupabaseError } from './supabaseErrors';
 import type { ExecutionModel, MistakeCode, RiskRules, SessionWindow, SetupGradeRule, TradingHQConfig } from '../types';
 
-/** Matches the `trading_hq_configs.category` check constraint already deployed
- * to Supabase (shared with the Next.js build). One row per category, versioned:
- * editing never overwrites — it deactivates the old row and inserts the next
- * version, so historical trades keep referencing what was active when taken. */
+/** One row per category, versioned: editing never overwrites — it
+ * deactivates the old row and inserts the next version, so historical
+ * trades keep referencing what was active when taken.
+ *
+ * Matches `trading_hq_configs.category`'s check constraint in Supabase —
+ * but that constraint was deployed with only 6 of these 7 values (missing
+ * `process_score`), which caused every HQ load to fail seeding it with a
+ * 23514 violation until supabase/migrations/20261021_widen_hq_category_check.sql
+ * was run. If you add another HQCategory value here, the DB constraint
+ * needs a matching migration — it does not grow on its own. */
 export type HQCategory = 'risk' | 'setup_quality' | 'execution_model' | 'session' | 'process_score' | 'research_framework' | 'mistake_code';
 
 export const HQ_CATEGORIES: HQCategory[] = ['risk', 'setup_quality', 'execution_model', 'session', 'process_score', 'mistake_code', 'research_framework'];
