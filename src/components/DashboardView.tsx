@@ -21,6 +21,7 @@ import {
   Zap,
   Settings2,
   Check,
+  X,
 } from 'lucide-react';
 
 /** Which of the Dashboard's secondary panels are shown. The point of a
@@ -132,6 +133,20 @@ export const DashboardView: React.FC = () => {
   }, [widgetPrefs]);
   const toggleWidget = (key: DashboardWidgetKey) => setWidgetPrefs((prev) => ({ ...prev, [key]: !prev[key] }));
 
+  // Tapping a Market Watch card opens a quick-look modal in place — a
+  // trader scanning the watch shouldn't be bounced into Asset Desks just
+  // to see what's going on with an asset; that full-detail view is a
+  // deliberate "I need to edit this" trip, not the default glance.
+  const [expandedAssetId, setExpandedAssetId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!expandedAssetId) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setExpandedAssetId(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [expandedAssetId]);
+
   const openTrades = trades.filter((t) => t.status === 'OPEN');
   const todayStr = traderDateString();
   const todayEvents = calendarEvents.filter((e) => e.date === todayStr);
@@ -178,7 +193,10 @@ export const DashboardView: React.FC = () => {
     }
   };
 
+  const expandedAsset = watchedAssets.find((a) => a.id === expandedAssetId);
+
   return (
+    <>
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
       {/* Top Banner: Operational Posture & Risk Halt Banner */}
       {performanceStats.riskStatus === 'MAX_LOSS_HALT' ? (
@@ -466,10 +484,7 @@ export const DashboardView: React.FC = () => {
             return (
               <div
                 key={asset.id}
-                onClick={() => {
-                  setSelectedAssetId(asset.id);
-                  setActiveTab('asset-desks');
-                }}
+                onClick={() => setExpandedAssetId(asset.id)}
                 className={`group relative snap-start shrink-0 w-[300px] sm:w-[340px] ${
                   watchedAssets.length === 1 ? 'sm:w-full lg:max-w-xl' : ''
                 } bg-[#101722] hover:bg-[#141d2a] border border-slate-800 hover:border-slate-700 rounded-lg cursor-pointer transition flex flex-col overflow-hidden`}
@@ -518,15 +533,7 @@ export const DashboardView: React.FC = () => {
                     </span>
                   </div>
 
-                  {/* The one number a trader glances for: the key level */}
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-[10px] font-mono text-slate-500 uppercase">Key Level</span>
-                    <span className="font-mono text-cyan-300 font-bold text-sm">
-                      {asset.quickLevels.keySustainedLevel || '—'}
-                    </span>
-                  </div>
-
-                  <div className="text-[11px] text-slate-400 line-clamp-2 font-sans border-t border-slate-800/80 pt-1.5">
+                  <div className="text-[11px] text-slate-400 line-clamp-2 font-sans pt-0.5">
                     {asset.currentNarrative || 'No narrative logged yet.'}
                   </div>
 
@@ -741,5 +748,116 @@ export const DashboardView: React.FC = () => {
       </section>
       )}
     </div>
+
+    {/* Market Watch quick-look modal — a bigger look at one asset without
+        leaving the Dashboard. Asset Desks stays the place to actually edit
+        anything; this is the "what's going on with this?" glance. */}
+    {expandedAsset && (() => {
+      const isBullish = expandedAsset.currentBias === 'BULLISH' || expandedAsset.currentBias === 'ACCUMULATION' || expandedAsset.currentBias === 'RE-ACCUMULATION';
+      const isBearish = expandedAsset.currentBias === 'BEARISH' || expandedAsset.currentBias === 'DISTRIBUTION';
+      const accent = isBullish ? 'emerald' : isBearish ? 'rose' : 'slate';
+      const BiasIcon = isBullish ? TrendingUp : isBearish ? TrendingDown : Minus;
+      const chart = getBestChartScreenshot(expandedAsset);
+      const primaryScenario = getPrimaryScenario(expandedAsset);
+      const externalContextLine = getExternalContextSummary(expandedAsset);
+
+      return (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          onClick={() => setExpandedAssetId(null)}
+        >
+          <div
+            className="relative w-full max-w-lg max-h-[88vh] overflow-y-auto bg-[#0d141e] border border-slate-700 rounded-xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setExpandedAssetId(null)}
+              className="absolute top-3 right-3 z-10 p-1.5 rounded-full bg-black/50 hover:bg-black/70 text-slate-300 hover:text-white transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Bigger chart screenshot — the whole point of tapping in */}
+            <div className="relative h-56 sm:h-64 w-full bg-[#0a0f16] rounded-t-xl overflow-hidden">
+              {chart ? (
+                <img
+                  src={chart.url}
+                  alt={`${expandedAsset.symbol} ${chart.timeframe} chart`}
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <span className="text-xs font-mono text-slate-600 uppercase">No chart screenshot yet</span>
+                </div>
+              )}
+              {chart && (
+                <span className="absolute bottom-2 right-2.5 text-[10px] font-mono font-bold text-slate-200 bg-black/60 px-1.5 py-0.5 rounded">
+                  {chart.timeframe} · {chart.title}
+                </span>
+              )}
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="font-mono font-bold text-slate-100 text-xl tracking-wide">{expandedAsset.symbol}</span>
+                <span
+                  className={`flex items-center gap-1.5 text-xs font-mono font-bold px-2 py-1 rounded ${
+                    accent === 'emerald'
+                      ? 'text-emerald-300 bg-emerald-500/10'
+                      : accent === 'rose'
+                      ? 'text-rose-300 bg-rose-500/10'
+                      : 'text-slate-400 bg-slate-500/10'
+                  }`}
+                >
+                  <BiasIcon className="w-4 h-4" />
+                  {expandedAsset.currentBias}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-mono text-slate-500 uppercase">Narrative</span>
+                <p className="text-sm text-slate-300 font-sans mt-1">
+                  {expandedAsset.currentNarrative || 'No narrative logged yet.'}
+                </p>
+              </div>
+
+              <div className="border-t border-slate-800 pt-3">
+                <span className="text-[10px] font-mono text-slate-500 uppercase">Primary Scenario</span>
+                {primaryScenario ? (
+                  <div className="mt-1 space-y-1">
+                    <span className="inline-block text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                      {primaryScenario.label}
+                    </span>
+                    <p className="text-sm text-slate-300 font-sans">{primaryScenario.thesis}</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-600 font-sans mt-1">No primary scenario set yet.</p>
+                )}
+              </div>
+
+              {externalContextLine && (
+                <div className="border-t border-slate-800 pt-3">
+                  <span className="text-[10px] font-mono text-slate-500 uppercase">External Context</span>
+                  <p className="text-sm text-slate-300 font-mono mt-1">{externalContextLine}</p>
+                </div>
+              )}
+
+              <button
+                onClick={() => {
+                  setSelectedAssetId(expandedAsset.id);
+                  setActiveTab('asset-desks');
+                  setExpandedAssetId(null);
+                }}
+                className="w-full mt-2 flex items-center justify-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white font-mono text-xs font-bold uppercase tracking-wide py-2.5 rounded-lg transition"
+              >
+                <span>Open Full Analysis in Asset Desks</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    })()}
+    </>
   );
 };
