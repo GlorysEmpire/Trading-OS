@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { toSupabaseError } from './supabaseErrors';
 import type { ExecutionModel, MistakeCode, RiskRules, SessionWindow, SetupGradeRule, TradingHQConfig } from '../types';
 
 /** Matches the `trading_hq_configs.category` check constraint already deployed
@@ -150,7 +151,7 @@ export async function loadHQConfigRows(supabase: SupabaseClient, userId: string)
     .select('id, category, version, content, changed_reason, updated_at')
     .eq('user_id', userId)
     .eq('is_active', true);
-  if (error) throw error;
+  if (error) throw toSupabaseError(error);
   return (data ?? []) as HQConfigRow[];
 }
 
@@ -171,7 +172,7 @@ export async function seedMissingHQCategories(supabase: SupabaseClient, userId: 
     is_active: true,
   }));
   const { error } = await supabase.from('trading_hq_configs').insert(rows);
-  if (error) throw error;
+  if (error) throw toSupabaseError(error);
 }
 
 /** Deactivates the current row for a category and inserts the next version.

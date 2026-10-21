@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { toSupabaseError } from './supabaseErrors';
 import type { ActivePOI, AssetChartScreenshot, AssetCategory, AssetDeskData, LiquidityZone, Scenario } from '../types';
 
 /** The 5 primary assets/platforms from the context handoff. Configurable in
@@ -107,7 +108,7 @@ export async function loadAssetDesks(supabase: SupabaseClient, userId: string): 
     .eq('user_id', userId)
     .is('archived_at', null)
     .order('symbol');
-  if (error) throw error;
+  if (error) throw toSupabaseError(error);
   return (data ?? []).map(row => rowToDesk(row as DeskRow));
 }
 
@@ -125,24 +126,24 @@ export async function seedAssetDesksIfMissing(supabase: SupabaseClient, userId: 
     bias: 'NEUTRAL', canonical_symbol: a.symbol, category: a.category, tradingview_symbol: a.tradingViewSymbol,
   }));
   const { error } = await supabase.from('asset_desks').upsert(rows, { onConflict: 'user_id,symbol', ignoreDuplicates: true });
-  if (error) throw error;
+  if (error) throw toSupabaseError(error);
 }
 
 export type InstrumentInput = { symbol: string; name: string; canonicalSymbol: string; category: AssetCategory; tradingViewSymbol?: string };
 
 export async function createAssetDesk(supabase: SupabaseClient, userId: string, input: InstrumentInput) {
   const { error } = await supabase.from('asset_desks').insert({ user_id: userId, symbol: input.symbol.trim().toUpperCase(), name: input.name.trim(), canonical_symbol: input.canonicalSymbol.trim().toUpperCase(), category: input.category, tradingview_symbol: input.tradingViewSymbol?.trim() || null, bias: 'NEUTRAL' });
-  if (error) throw error;
+  if (error) throw toSupabaseError(error);
 }
 
 export async function updateInstrument(supabase: SupabaseClient, deskId: string, input: InstrumentInput) {
   const { error } = await supabase.from('asset_desks').update({ symbol: input.symbol.trim().toUpperCase(), name: input.name.trim(), canonical_symbol: input.canonicalSymbol.trim().toUpperCase(), category: input.category, tradingview_symbol: input.tradingViewSymbol?.trim() || null }).eq('id', deskId);
-  if (error) throw error;
+  if (error) throw toSupabaseError(error);
 }
 
 export async function archiveAssetDesk(supabase: SupabaseClient, deskId: string) {
   const { error } = await supabase.from('asset_desks').update({ archived_at: new Date().toISOString() }).eq('id', deskId);
-  if (error) throw error;
+  if (error) throw toSupabaseError(error);
 }
 
 /** Translates a partial AssetDeskData patch into the underlying columns and
@@ -182,5 +183,5 @@ export async function saveAssetDeskPatch(supabase: SupabaseClient, deskId: strin
 
   if (Object.keys(update).length === 0) return;
   const { error } = await supabase.from('asset_desks').update(update).eq('id', deskId);
-  if (error) throw error;
+  if (error) throw toSupabaseError(error);
 }

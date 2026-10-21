@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { toSupabaseError } from './supabaseErrors';
 import type { BacktestSample } from '../types';
 
 type Row = { id: string; sample_data: BacktestSample; created_at: string };
@@ -9,7 +10,7 @@ export async function loadBacktestSamples(supabase: SupabaseClient, userId: stri
     .select('id, sample_data, created_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
-  if (error) throw error;
+  if (error) throw toSupabaseError(error);
   return (data as Row[] ?? []).map(row => ({ ...row.sample_data, id: row.id }));
 }
 
@@ -20,12 +21,12 @@ export async function saveBacktestSample(supabase: SupabaseClient, userId: strin
       { id: sample.id, user_id: userId, research_question_id: sample.researchQuestionId || null, sample_data: sample, updated_at: new Date().toISOString() },
       { onConflict: 'id' }
     );
-  if (error) throw error;
+  if (error) throw toSupabaseError(error);
 }
 
 export async function removeBacktestSample(supabase: SupabaseClient, id: string) {
   const { error } = await supabase.from('trading_os_backtest_samples').delete().eq('id', id);
-  if (error) throw error;
+  if (error) throw toSupabaseError(error);
 }
 
 export async function importBacktestSamplesOnce(supabase: SupabaseClient, userId: string, samples: BacktestSample[]) {
