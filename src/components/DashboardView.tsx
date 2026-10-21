@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTrading } from '../context/TradingContext';
 import { getAuthHeaders } from '../lib/supabaseClient';
 import { traderDateString, traderNowMinutes, isSessionActiveNow } from '../utils/traderTime';
+import type { AssetDeskData } from '../types';
 import {
   Activity,
   AlertTriangle,
@@ -58,6 +59,40 @@ function loadDashboardWidgetPrefs(): Record<DashboardWidgetKey, boolean> {
   } catch {
     return defaults;
   }
+}
+
+
+/** Best single chart screenshot to represent an asset at a glance: prefer
+ * the most recently uploaded BIAS-category chart (that's the one meant to
+ * summarize current directional read), otherwise just the most recent
+ * screenshot of any category. Returns undefined when the desk has none. */
+function getBestChartScreenshot(asset: AssetDeskData) {
+  const charts = asset.charts ?? [];
+  if (charts.length === 0) return undefined;
+  const byRecency = [...charts].sort(
+    (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+  );
+  return byRecency.find((c) => c.category === 'BIAS') ?? byRecency[0];
+}
+
+/** The scenario currently marked PRIMARY for this desk, if any. */
+function getPrimaryScenario(asset: AssetDeskData) {
+  return asset.scenarios.find((s) => s.probability === 'PRIMARY');
+}
+
+/** A short, glanceable external-context line — only the fields that are
+ * actually filled in, so an empty desk doesn't show a row of em-dashes. */
+function getExternalContextSummary(asset: AssetDeskData): string {
+  const ctx = asset.externalContext;
+  const parts: string[] = [];
+  if (ctx.dxy) parts.push(`DXY ${ctx.dxy}`);
+  if (ctx.yields10Y) parts.push(`10Y ${ctx.yields10Y}`);
+  if (ctx.fundingRate) parts.push(`Funding ${ctx.fundingRate}`);
+  if (ctx.openInterest) parts.push(`OI ${ctx.openInterest}`);
+  if (ctx.etfFlows) parts.push(`ETF ${ctx.etfFlows}`);
+  if (ctx.liquidations) parts.push(`Liq ${ctx.liquidations}`);
+  if (parts.length === 0 && ctx.macroNews) parts.push(ctx.macroNews);
+  return parts.join(' · ');
 }
 
 export const DashboardView: React.FC = () => {
@@ -412,12 +447,21 @@ export const DashboardView: React.FC = () => {
             </button>
           </div>
         ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div
+          className={
+            watchedAssets.length > 1
+              ? 'flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 -mx-1 px-1 scroll-smooth'
+              : 'flex gap-3'
+          }
+        >
           {watchedAssets.map((asset) => {
             const isBullish = asset.currentBias === 'BULLISH' || asset.currentBias === 'ACCUMULATION' || asset.currentBias === 'RE-ACCUMULATION';
             const isBearish = asset.currentBias === 'BEARISH' || asset.currentBias === 'DISTRIBUTION';
             const accent = isBullish ? 'emerald' : isBearish ? 'rose' : 'slate';
             const BiasIcon = isBullish ? TrendingUp : isBearish ? TrendingDown : Minus;
+            const chart = getBestChartScreenshot(asset);
+            const primaryScenario = getPrimaryScenario(asset);
+            const externalContextLine = getExternalContextSummary(asset);
 
             return (
               <div
@@ -426,41 +470,89 @@ export const DashboardView: React.FC = () => {
                   setSelectedAssetId(asset.id);
                   setActiveTab('asset-desks');
                 }}
-                className={`relative bg-[#101722] hover:bg-[#141d2a] border border-slate-800 hover:border-slate-700 rounded-lg pl-4 pr-3.5 py-3 cursor-pointer transition flex flex-col gap-2 overflow-hidden`}
+                className={`group relative snap-start shrink-0 w-[300px] sm:w-[340px] ${
+                  watchedAssets.length === 1 ? 'sm:w-full lg:max-w-xl' : ''
+                } bg-[#101722] hover:bg-[#141d2a] border border-slate-800 hover:border-slate-700 rounded-lg cursor-pointer transition flex flex-col overflow-hidden`}
               >
                 <span
-                  className={`absolute left-0 top-0 bottom-0 w-1 ${
+                  className={`absolute left-0 top-0 bottom-0 w-1 z-10 ${
                     accent === 'emerald' ? 'bg-emerald-500' : accent === 'rose' ? 'bg-rose-500' : 'bg-slate-600'
                   }`}
                 />
 
-                {/* Symbol + bias — the only two things that need to register instantly */}
-                <div className="flex items-center justify-between">
-                  <span className="font-mono font-bold text-slate-100 text-base tracking-wide">{asset.symbol}</span>
-                  <span
-                    className={`flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                      accent === 'emerald'
-                        ? 'text-emerald-300'
-                        : accent === 'rose'
-                        ? 'text-rose-300'
-                        : 'text-slate-400'
-                    }`}
-                  >
-                    <BiasIcon className="w-3.5 h-3.5" />
-                    {asset.currentBias}
-                  </span>
+                {/* Chart screenshot — the fastest visual read of current price action */}
+                <div className="relative h-28 w-full bg-[#0a0f16] border-b border-slate-800 overflow-hidden">
+                  {chart ? (
+                    <img
+                      src={chart.url}
+                      alt={`${asset.symbol} ${chart.timeframe} chart`}
+                      className="w-full h-full object-cover group-hover:opacity-90 transition"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <span className="text-[10px] font-mono text-slate-600 uppercase">No chart screenshot yet</span>
+                    </div>
+                  )}
+                  {chart && (
+                    <span className="absolute bottom-1 right-1.5 text-[9px] font-mono font-bold text-slate-200 bg-black/60 px-1 py-0.5 rounded">
+                      {chart.timeframe}
+                    </span>
+                  )}
                 </div>
 
-                {/* The one number a trader glances for: the key level */}
-                <div className="flex items-baseline justify-between">
-                  <span className="text-[10px] font-mono text-slate-500 uppercase">Key Level</span>
-                  <span className="font-mono text-cyan-300 font-bold text-sm">
-                    {asset.quickLevels.keySustainedLevel || '—'}
-                  </span>
-                </div>
+                <div className="pl-4 pr-3.5 py-3 flex flex-col gap-2">
+                  {/* Symbol + bias — the only two things that need to register instantly */}
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-bold text-slate-100 text-base tracking-wide">{asset.symbol}</span>
+                    <span
+                      className={`flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                        accent === 'emerald'
+                          ? 'text-emerald-300'
+                          : accent === 'rose'
+                          ? 'text-rose-300'
+                          : 'text-slate-400'
+                      }`}
+                    >
+                      <BiasIcon className="w-3.5 h-3.5" />
+                      {asset.currentBias}
+                    </span>
+                  </div>
 
-                <div className="text-[11px] text-slate-400 truncate font-sans border-t border-slate-800/80 pt-1.5">
-                  {asset.currentNarrative || 'No narrative logged yet.'}
+                  {/* The one number a trader glances for: the key level */}
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-[10px] font-mono text-slate-500 uppercase">Key Level</span>
+                    <span className="font-mono text-cyan-300 font-bold text-sm">
+                      {asset.quickLevels.keySustainedLevel || '—'}
+                    </span>
+                  </div>
+
+                  <div className="text-[11px] text-slate-400 line-clamp-2 font-sans border-t border-slate-800/80 pt-1.5">
+                    {asset.currentNarrative || 'No narrative logged yet.'}
+                  </div>
+
+                  {/* Primary scenario — the one path this desk is actually trading toward */}
+                  {primaryScenario ? (
+                    <div className="border-t border-slate-800/80 pt-1.5 space-y-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-mono font-bold text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded">
+                          PRIMARY
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-500">{primaryScenario.label}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 line-clamp-2 font-sans">{primaryScenario.thesis}</p>
+                    </div>
+                  ) : (
+                    <div className="border-t border-slate-800/80 pt-1.5">
+                      <span className="text-[10px] font-mono text-slate-600">No primary scenario set</span>
+                    </div>
+                  )}
+
+                  {/* External context — only shown when the desk actually has data logged */}
+                  {externalContextLine && (
+                    <div className="text-[10px] font-mono text-slate-500 truncate border-t border-slate-800/80 pt-1.5">
+                      {externalContextLine}
+                    </div>
+                  )}
                 </div>
               </div>
             );
