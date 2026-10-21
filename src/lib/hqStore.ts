@@ -157,22 +157,44 @@ export async function loadHQConfigRows(supabase: SupabaseClient, userId: string)
 
 /** Inserts any category the user doesn't have an active row for yet, using
  * only the real, already-confirmed values above. Never touches a category
- * that already has data. */
+ * that already has data.
+ *
+ * Inserted ONE ROW AT A TIME rather than as a single bulk insert: if the
+ * live `trading_hq_configs_category_check` constraint doesn't actually
+ * accept one of HQ_CATEGORIES' values (e.g. the DB was deployed with a
+ * different category vocabulary than this code assumes — there's no
+ * migration file to verify this against, only the live constraint), a
+ * bulk insert fails ALL of them, including the ones that are perfectly
+ * valid, and masks which value is the actual offender. Seeding every
+ * category that does succeed, and naming exactly which one(s) didn't,
+ * makes this fixable instead of a permanent, undiagnosable 400. */
 export async function seedMissingHQCategories(supabase: SupabaseClient, userId: string, existing: HQConfigRow[]) {
   const have = new Set(existing.map(r => r.category));
   const missing = HQ_CATEGORIES.filter(c => !have.has(c));
   if (missing.length === 0) return;
-  const rows = missing.map(category => ({
-    user_id: userId,
-    category,
-    slug: category.replace(/_/g, '-'),
-    title: category,
-    content: REAL_DEFAULTS[category],
-    version: 1,
-    is_active: true,
-  }));
-  const { error } = await supabase.from('trading_hq_configs').insert(rows);
-  if (error) throw toSupabaseError(error);
+
+  const rejected: { category: HQCategory; message: string }[] = [];
+  for (const category of missing) {
+    const { error } = await supabase.from('trading_hq_configs').insert({
+      user_id: userId,
+      category,
+      slug: category.replace(/_/g, '-'),
+      title: category,
+      content: REAL_DEFAULTS[category],
+      version: 1,
+      is_active: true,
+    });
+    if (error) rejected.push({ category, message: toSupabaseError(error).message });
+  }
+
+  if (rejected.length > 0) {
+    const detail = rejected.map((r) => `"${r.category}" (${r.message})`).join('; ');
+    throw new Error(
+      `Trading HQ category check constraint rejected: ${detail}. The database's ` +
+        `trading_hq_configs_category_check doesn't accept one or more of this app's ` +
+        `category values — the check constraint needs updating in Supabase to allow: ${HQ_CATEGORIES.join(', ')}.`
+    );
+  }
 }
 
 /** Deactivates the current row for a category and inserts the next version.
