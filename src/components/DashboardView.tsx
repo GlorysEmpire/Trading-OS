@@ -14,6 +14,7 @@ import {
   Sparkles,
   TrendingDown,
   TrendingUp,
+  Minus,
   Zap,
 } from 'lucide-react';
 
@@ -287,10 +288,12 @@ export const DashboardView: React.FC = () => {
             </button>
           </div>
         ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {watchedAssets.map((asset) => {
             const isBullish = asset.currentBias === 'BULLISH' || asset.currentBias === 'ACCUMULATION' || asset.currentBias === 'RE-ACCUMULATION';
             const isBearish = asset.currentBias === 'BEARISH' || asset.currentBias === 'DISTRIBUTION';
+            const accent = isBullish ? 'emerald' : isBearish ? 'rose' : 'slate';
+            const BiasIcon = isBullish ? TrendingUp : isBearish ? TrendingDown : Minus;
 
             return (
               <div
@@ -299,39 +302,41 @@ export const DashboardView: React.FC = () => {
                   setSelectedAssetId(asset.id);
                   setActiveTab('asset-desks');
                 }}
-                className="bg-[#101722] hover:bg-[#151f2e] border border-slate-800 hover:border-slate-700 rounded-lg p-3.5 cursor-pointer transition flex flex-col justify-between space-y-3"
+                className={`relative bg-[#101722] hover:bg-[#141d2a] border border-slate-800 hover:border-slate-700 rounded-lg pl-4 pr-3.5 py-3 cursor-pointer transition flex flex-col gap-2 overflow-hidden`}
               >
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono font-bold text-slate-100 text-sm tracking-wider">{asset.symbol}</span>
-                    <span
-                      className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded border ${
-                        isBullish
-                          ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300'
-                          : isBearish
-                          ? 'bg-rose-950/60 border-rose-800 text-rose-300'
-                          : 'bg-slate-800 border-slate-700 text-slate-300'
-                      }`}
-                    >
-                      {asset.currentBias}
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-slate-400 mt-1 truncate">{asset.name}</div>
+                <span
+                  className={`absolute left-0 top-0 bottom-0 w-1 ${
+                    accent === 'emerald' ? 'bg-emerald-500' : accent === 'rose' ? 'bg-rose-500' : 'bg-slate-600'
+                  }`}
+                />
+
+                {/* Symbol + bias — the only two things that need to register instantly */}
+                <div className="flex items-center justify-between">
+                  <span className="font-mono font-bold text-slate-100 text-base tracking-wide">{asset.symbol}</span>
+                  <span
+                    className={`flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                      accent === 'emerald'
+                        ? 'text-emerald-300'
+                        : accent === 'rose'
+                        ? 'text-rose-300'
+                        : 'text-slate-400'
+                    }`}
+                  >
+                    <BiasIcon className="w-3.5 h-3.5" />
+                    {asset.currentBias}
+                  </span>
                 </div>
 
-                <div className="text-xs text-slate-300 line-clamp-2 font-sans bg-[#0c1119] p-2 rounded border border-slate-800/80">
-                  {asset.currentNarrative}
+                {/* The one number a trader glances for: the key level */}
+                <div className="flex items-baseline justify-between">
+                  <span className="text-[10px] font-mono text-slate-500 uppercase">Key Level</span>
+                  <span className="font-mono text-cyan-300 font-bold text-sm">
+                    {asset.quickLevels.keySustainedLevel || '—'}
+                  </span>
                 </div>
 
-                <div className="space-y-1 pt-2 border-t border-slate-800/80 text-[10px] font-mono text-slate-400">
-                  <div className="flex justify-between">
-                    <span>24h Range:</span>
-                    <span className="text-slate-300">{asset.quickLevels.low24h} – {asset.quickLevels.high24h}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Key Level:</span>
-                    <span className="text-cyan-400 font-semibold">{asset.quickLevels.keySustainedLevel}</span>
-                  </div>
+                <div className="text-[11px] text-slate-400 truncate font-sans border-t border-slate-800/80 pt-1.5">
+                  {asset.currentNarrative || 'No narrative logged yet.'}
                 </div>
               </div>
             );
