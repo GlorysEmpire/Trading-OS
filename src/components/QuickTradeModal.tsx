@@ -18,7 +18,7 @@ export const QuickTradeModal: React.FC = () => {
   const [asset, setAsset] = useState('BTC');
   const [direction, setDirection] = useState<'LONG' | 'SHORT'>('LONG');
   const [timeframe, setTimeframe] = useState('15M');
-  const [session, setSession] = useState(tradingHQ.sessions[0]?.name || 'NY AM Session');
+  const [session, setSession] = useState(tradingHQ.sessions[0]?.name || 'New York');
   const [modelId, setModelId] = useState(tradingHQ.executionModels[0]?.id || 'model-slp');
   const [setupGrade, setSetupGrade] = useState('A+');
   const [entryPrice, setEntryPrice] = useState<string>('');

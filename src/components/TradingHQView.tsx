@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useTrading } from '../context/TradingContext';
 import { Sliders, ShieldCheck, Clock, AlertOctagon, Save, Tag, Info, Layers, History } from 'lucide-react';
 import type { HQCategory } from '../lib/hqStore';
+import { REAL_SESSIONS } from '../lib/hqStore';
+import type { SessionWindow } from '../types';
 
 function CategoryVersionBadge({ label }: { label: string }) {
   return (
@@ -46,6 +48,25 @@ export const TradingHQView: React.FC = () => {
       scratchCountsAsLoss,
       ...(maxOpenTrades !== undefined ? { maxOpenTrades: Number(maxOpenTrades) } : {}),
     });
+
+  const resetSessionsToStandard = () => saveCategory('session', REAL_SESSIONS);
+
+  const editSession = (id: string) => {
+    const sess = tradingHQ.sessions.find(s => s.id === id);
+    if (!sess) return;
+    const nyStart = window.prompt(`${sess.name} — NY start time (HH:MM)`, sess.nyStart);
+    if (nyStart === null) return;
+    const nyEnd = window.prompt(`${sess.name} — NY end time (HH:MM)`, sess.nyEnd);
+    if (nyEnd === null) return;
+    const lagosStart = window.prompt(`${sess.name} — Lagos start time (HH:MM)`, sess.lagosStart);
+    if (lagosStart === null) return;
+    const lagosEnd = window.prompt(`${sess.name} — Lagos end time (HH:MM)`, sess.lagosEnd);
+    if (lagosEnd === null) return;
+    const updated: SessionWindow[] = tradingHQ.sessions.map(s =>
+      s.id === id ? { ...s, nyStart, nyEnd, lagosStart, lagosEnd } : s
+    );
+    saveCategory('session', updated);
+  };
 
   const editModel = (id: string) => {
     const model = tradingHQ.executionModels.find(m => m.id === id);
@@ -236,11 +257,22 @@ export const TradingHQView: React.FC = () => {
             <Clock className="w-4 h-4 text-emerald-400" />
             <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">4. OPERATIONAL SESSION WINDOWS</h3>
           </div>
+          <button
+            onClick={resetSessionsToStandard}
+            disabled={savingCategory === 'session'}
+            className="text-[10px] font-mono text-cyan-300 hover:text-cyan-200 border border-slate-700 rounded px-2 py-1"
+            title="Reset to London / New York / Afternoon / Tokyo, each mapped to Lagos time"
+          >
+            {savingCategory === 'session' ? 'SAVING…' : 'RESET TO STANDARD 4-SESSION DAY'}
+          </button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {tradingHQ.sessions.map(sess => (
             <div key={sess.id} className="p-4 rounded bg-[#162130] border border-slate-800 space-y-2">
-              <span className="font-mono font-bold text-sm text-slate-100">{sess.name}</span>
+              <div className="flex items-center justify-between">
+                <span className="font-mono font-bold text-sm text-slate-100">{sess.name}</span>
+                <button onClick={() => editSession(sess.id)} className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300">EDIT</button>
+              </div>
               <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
                 <div className="p-2 rounded bg-[#0f1622] border border-slate-800">
                   <span className="text-slate-400 text-[10px] block">NEW YORK TIME:</span>

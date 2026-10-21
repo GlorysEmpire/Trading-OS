@@ -64,26 +64,51 @@ const REAL_EXECUTION_MODELS: ExecutionModel[] = [
   },
 ];
 
-const REAL_SESSIONS: SessionWindow[] = [
+/** Four back-to-back sessions tiling the full 24h day in NY time, each
+ * mapped to Lagos time at the standard +5h offset (NY EDT / UTC-4 to
+ * Lagos WAT / UTC+1). Corrected 2026-10-21 per the trader's own confirmed
+ * windows — this is the single source of truth for both NY and Lagos
+ * times; don't let the two drift independently again. */
+export const REAL_SESSIONS: SessionWindow[] = [
   {
-    id: 'sess-ny-early',
-    name: 'NY Early / London Overlap',
-    nyStart: '01:00',
+    id: 'sess-london',
+    name: 'London',
+    nyStart: '00:00',
     nyEnd: '05:00',
-    lagosStart: '06:00',
+    lagosStart: '05:00',
     lagosEnd: '10:00',
     activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
     notes: 'Sub-5m execution only within this window. 15m+ setups have no window restriction.',
   },
   {
-    id: 'sess-ny-am',
-    name: 'NY AM Session',
-    nyStart: '07:00',
-    nyEnd: '11:00',
-    lagosStart: '12:00',
-    lagosEnd: '16:00',
+    id: 'sess-new-york',
+    name: 'New York',
+    nyStart: '05:00',
+    nyEnd: '12:00',
+    lagosStart: '10:00',
+    lagosEnd: '17:00',
     activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
     notes: 'Sub-5m execution only within this window. 15m+ setups have no window restriction.',
+  },
+  {
+    id: 'sess-afternoon',
+    name: 'Afternoon',
+    nyStart: '12:00',
+    nyEnd: '18:00',
+    lagosStart: '17:00',
+    lagosEnd: '23:00',
+    activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+    notes: 'Sub-5m execution only within this window. 15m+ setups have no window restriction.',
+  },
+  {
+    id: 'sess-tokyo',
+    name: 'Tokyo',
+    nyStart: '18:00',
+    nyEnd: '00:00',
+    lagosStart: '23:00',
+    lagosEnd: '05:00',
+    activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+    notes: 'Crosses midnight NY time (18:00–00:00). Sub-5m execution only within this window. 15m+ setups have no window restriction.',
   },
 ];
 
