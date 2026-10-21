@@ -1,23 +1,11 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { GoogleGenAI } from "@google/genai";
-
-let genAIClient: GoogleGenAI | null = null;
-function getGenAIClient(): GoogleGenAI | null {
-  if (!process.env.GEMINI_API_KEY) {
-    return null;
-  }
-  if (!genAIClient) {
-    genAIClient = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        },
-      },
-    });
-  }
-  return genAIClient;
-}
+import {
+  checkRateLimit,
+  getGenAIClient,
+  logServerError,
+  requireAuthenticatedUser,
+  validateAnalyzeInput,
+} from "../_lib/ai";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -25,15 +13,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  const auth = await requireAuthenticatedUser(req.headers as Record<string, string | string[] | undefined>);
+  if (!auth.ok) {
+    return res.status(auth.status).json({ error: auth.message });
+  }
+
+  if (!checkRateLimit(auth.userId)) {
+    return res.status(429).json({ error: "Too many AI requests. Please wait a moment and try again." });
+  }
+
+  const validated = validateAnalyzeInput(req.body);
+  if ("error" in validated) {
+    return res.status(400).json({ error: validated.error });
+  }
+  const { trade, rules } = validated;
+
   try {
-    const { trade, rules } = req.body ?? {};
     const ai = getGenAIClient();
 
     if (!ai) {
+      const t = trade as Record<string, any>;
       return res.json({
-        critique: `Rule-based Process Evaluation for ${trade?.asset || "Asset"} (${trade?.direction || "LONG"}):
-• Planned R: ${trade?.plannedR || "N/A"}R | Realized: ${trade?.realizedR || "0"}R
-• Process Score: ${trade?.processScore?.score || 0}/5
+        critique: `Rule-based Process Evaluation for ${t?.asset || "Asset"} (${t?.direction || "LONG"}):
+• Planned R: ${t?.plannedR || "N/A"}R | Realized: ${t?.realizedR || "0"}R
+• Process Score: ${t?.processScore?.score || 0}/5
 • Key Takeaway: Focus on strict adherence to the 5 process checks (Session, Grade, Risk, Management, Structure) regardless of PnL outcome.`,
       });
     }
@@ -58,8 +61,8 @@ Keep it concise, rigorous, and direct.`;
     });
 
     return res.json({ critique: response.text });
-  } catch (error: any) {
-    console.error("Trade analysis error:", error);
-    return res.status(500).json({ error: error?.message });
+  } catch (error) {
+    logServerError("ai/analyze-trade", error);
+    return res.status(500).json({ error: "Trade analysis encountered an error. Please try again shortly." });
   }
 }

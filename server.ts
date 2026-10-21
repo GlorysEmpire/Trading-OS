@@ -1,34 +1,22 @@
 import express from "express";
 import path from "path";
 import dotenv from "dotenv";
-import { GoogleGenAI } from "@google/genai";
 import { createServer as createViteServer } from "vite";
+import {
+  checkRateLimit,
+  getGenAIClient,
+  logServerError,
+  requireAuthenticatedUser,
+  validateAnalyzeInput,
+  validateChatInput,
+} from "./api/_lib/ai";
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
 
-app.use(express.json({ limit: "10mb" }));
-
-// Lazy GoogleGenAI client initialization
-let genAIClient: GoogleGenAI | null = null;
-function getGenAIClient(): GoogleGenAI | null {
-  if (!process.env.GEMINI_API_KEY) {
-    return null;
-  }
-  if (!genAIClient) {
-    genAIClient = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        },
-      },
-    });
-  }
-  return genAIClient;
-}
+app.use(express.json({ limit: "1mb" }));
 
 // Health check
 app.get("/api/health", (_req, res) => {
@@ -37,12 +25,16 @@ app.get("/api/health", (_req, res) => {
 
 // AI Assistant endpoint
 app.post("/api/ai/chat", async (req, res) => {
-  try {
-    const { prompt, context } = req.body;
-    if (!prompt) {
-      return res.status(400).json({ error: "Missing prompt" });
-    }
+  const auth = await requireAuthenticatedUser(req.headers as Record<string, string | string[] | undefined>);
+  if (!auth.ok) return res.status(auth.status).json({ error: auth.message });
+  if (!checkRateLimit(auth.userId)) {
+    return res.status(429).json({ error: "Too many AI requests. Please wait a moment and try again." });
+  }
+  const validated = validateChatInput(req.body);
+  if ("error" in validated) return res.status(400).json({ error: validated.error });
+  const { prompt, context } = validated;
 
+  try {
     const ai = getGenAIClient();
     if (!ai) {
       // Intelligent rule-based fallback if no API key is configured
@@ -73,19 +65,24 @@ Provide clear, objective, professional, and dense feedback. Tone: Calm, discipli
     });
 
     return res.json({ text: response.text || "No response generated." });
-  } catch (error: any) {
-    console.error("AI Chat Error:", error);
-    return res.status(500).json({
-      error: "AI analysis encountered an error.",
-      details: error?.message || String(error),
-    });
+  } catch (error) {
+    logServerError("ai/chat", error);
+    return res.status(500).json({ error: "AI analysis encountered an error. Please try again shortly." });
   }
 });
 
 // AI Trade Critique endpoint
 app.post("/api/ai/analyze-trade", async (req, res) => {
+  const auth = await requireAuthenticatedUser(req.headers as Record<string, string | string[] | undefined>);
+  if (!auth.ok) return res.status(auth.status).json({ error: auth.message });
+  if (!checkRateLimit(auth.userId)) {
+    return res.status(429).json({ error: "Too many AI requests. Please wait a moment and try again." });
+  }
+  const validated = validateAnalyzeInput(req.body);
+  if ("error" in validated) return res.status(400).json({ error: validated.error });
+  const { trade, rules } = validated as { trade: Record<string, any>; rules: unknown };
+
   try {
-    const { trade, rules } = req.body;
     const ai = getGenAIClient();
 
     if (!ai) {
@@ -117,9 +114,9 @@ Keep it concise, rigorous, and direct.`;
     });
 
     return res.json({ critique: response.text });
-  } catch (error: any) {
-    console.error("Trade analysis error:", error);
-    return res.status(500).json({ error: error?.message });
+  } catch (error) {
+    logServerError("ai/analyze-trade", error);
+    return res.status(500).json({ error: "Trade analysis encountered an error. Please try again shortly." });
   }
 });
 

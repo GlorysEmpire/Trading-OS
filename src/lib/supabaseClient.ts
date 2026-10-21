@@ -11,3 +11,12 @@ if (!url || !anonKey) {
 }
 
 export const supabase = createClient(url || '', anonKey || '');
+
+/** Authorization header for calling our own /api/ai/* routes, which require
+ * a signed-in Supabase user. Returns {} when there's no session — the route
+ * will reject the request with 401 rather than silently proceeding. */
+export async function getAuthHeaders(): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}

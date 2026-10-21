@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTrading } from '../context/TradingContext';
+import { getAuthHeaders } from '../lib/supabaseClient';
 import {
   BookOpen,
   Filter,
@@ -117,7 +118,7 @@ export const JournalView: React.FC = () => {
     try {
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
         body: JSON.stringify({
           prompt: `Perform a rigorous professional post-trade process audit on this trade. Compare it strictly against active Trading HQ rules:
 - Asset: ${trade.asset}
@@ -144,6 +145,10 @@ Provide an objective assessment:
         }),
       });
       const data = await response.json();
+      if (!response.ok) {
+        setAuditResult({ tradeId: trade.id, analysis: data.error || 'Audit request failed.' });
+        return;
+      }
       setAuditResult({
         tradeId: trade.id,
         analysis: data.text || 'Audit completed.',

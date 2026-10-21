@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTrading } from '../context/TradingContext';
+import { getAuthHeaders } from '../lib/supabaseClient';
 import {
   Activity,
   AlertTriangle,
@@ -47,7 +48,7 @@ export const DashboardView: React.FC = () => {
     try {
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
         body: JSON.stringify({
           prompt:
             'Generate a high-density daily operational executive briefing for the trader: review today\'s session windows, active risk limits (1% risk, max 2 losses, no re-entry), current market biases for BTC/ETH/NQ, today\'s backtest assignment (ETH RQ-05), and psychological vigilance.',
@@ -66,6 +67,10 @@ export const DashboardView: React.FC = () => {
         }),
       });
       const data = await response.json();
+      if (!response.ok) {
+        setAiBriefText(data.error || 'Could not generate the briefing right now.');
+        return;
+      }
       setAiBriefText(data.text || 'Operational briefing generated.');
     } catch (e: any) {
       setAiBriefText(

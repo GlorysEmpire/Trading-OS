@@ -1,25 +1,11 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { GoogleGenAI } from "@google/genai";
-
-// Lazy GoogleGenAI client, reused across warm serverless invocations
-// (same pattern as the local Express server in server.ts).
-let genAIClient: GoogleGenAI | null = null;
-function getGenAIClient(): GoogleGenAI | null {
-  if (!process.env.GEMINI_API_KEY) {
-    return null;
-  }
-  if (!genAIClient) {
-    genAIClient = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        },
-      },
-    });
-  }
-  return genAIClient;
-}
+import {
+  checkRateLimit,
+  getGenAIClient,
+  logServerError,
+  requireAuthenticatedUser,
+  validateChatInput,
+} from "../_lib/ai";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -27,12 +13,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  try {
-    const { prompt, context } = req.body ?? {};
-    if (!prompt) {
-      return res.status(400).json({ error: "Missing prompt" });
-    }
+  const auth = await requireAuthenticatedUser(req.headers as Record<string, string | string[] | undefined>);
+  if (!auth.ok) {
+    return res.status(auth.status).json({ error: auth.message });
+  }
 
+  if (!checkRateLimit(auth.userId)) {
+    return res.status(429).json({ error: "Too many AI requests. Please wait a moment and try again." });
+  }
+
+  const validated = validateChatInput(req.body);
+  if ("error" in validated) {
+    return res.status(400).json({ error: validated.error });
+  }
+  const { prompt, context } = validated;
+
+  try {
     const ai = getGenAIClient();
     if (!ai) {
       // Intelligent rule-based fallback if no API key is configured
@@ -63,11 +59,8 @@ Provide clear, objective, professional, and dense feedback. Tone: Calm, discipli
     });
 
     return res.json({ text: response.text || "No response generated." });
-  } catch (error: any) {
-    console.error("AI Chat Error:", error);
-    return res.status(500).json({
-      error: "AI analysis encountered an error.",
-      details: error?.message || String(error),
-    });
+  } catch (error) {
+    logServerError("ai/chat", error);
+    return res.status(500).json({ error: "AI analysis encountered an error. Please try again shortly." });
   }
 }

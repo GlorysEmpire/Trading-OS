@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTrading } from '../context/TradingContext';
+import { getAuthHeaders } from '../lib/supabaseClient';
 import {
   Sparkles,
   Send,
@@ -61,7 +62,7 @@ export const AIAssistantView: React.FC = () => {
     try {
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
         body: JSON.stringify({
           prompt: text.trim(),
           context: {
@@ -86,7 +87,7 @@ export const AIAssistantView: React.FC = () => {
       const assistantMsg: ChatMessage = {
         id: `a-${Date.now()}`,
         sender: 'assistant',
-        text: data.text || 'Operational response synthesized.',
+        text: response.ok ? data.text || 'Operational response synthesized.' : data.error || 'The AI request failed.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, assistantMsg]);
