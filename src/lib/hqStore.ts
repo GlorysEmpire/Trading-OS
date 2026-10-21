@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { toSupabaseError } from './supabaseErrors';
-import type { ExecutionModel, MistakeCode, RiskRules, SessionWindow, SetupGradeRule, TradingHQConfig } from '../types';
+import type { ExecutionModel, MistakeCode, ResearchFramework, RiskRules, SessionWindow, SetupGradeRule, TradingHQConfig } from '../types';
 
 /** One row per category, versioned: editing never overwrites — it
  * deactivates the old row and inserts the next version, so historical
@@ -135,7 +135,7 @@ const REAL_MISTAKE_CODES: MistakeCode[] = [
   { code: 'OTHER', label: 'Other', category: 'EXECUTION', description: 'Any deviation not covered by the codes above — record what happened in the trade notes.' },
 ];
 
-const REAL_RESEARCH_FRAMEWORK = {
+export const REAL_RESEARCH_FRAMEWORK: ResearchFramework = {
   workflow: ['OBSERVATION', 'HYPOTHESIS', 'BACKTEST', 'VALIDATION', 'LOCKED_RULE'],
   minSamples: 12,
   notes: 'A finding is not meaningful before roughly 12–15 clean samples (configurable, not a universal law). Research is a tree, not a flat list — child questions branch from findings.',
@@ -213,7 +213,7 @@ export async function saveHQCategory(
   changedReason: string
 ) {
   const { error: deactivateError } = await supabase.from('trading_hq_configs').update({ is_active: false }).eq('id', row.id);
-  if (deactivateError) throw deactivateError;
+  if (deactivateError) throw toSupabaseError(deactivateError);
 
   const { error: insertError } = await supabase.from('trading_hq_configs').insert({
     user_id: userId,
@@ -225,7 +225,7 @@ export async function saveHQCategory(
     is_active: true,
     changed_reason: changedReason || null,
   });
-  if (insertError) throw insertError;
+  if (insertError) throw toSupabaseError(insertError);
 }
 
 /** Normalizes rows (tolerating a legacy {description, values:string[]} shape
@@ -258,6 +258,7 @@ export function buildTradingHQConfig(rows: HQConfigRow[]): { config: TradingHQCo
     sessions: content<SessionWindow[]>('session', REAL_SESSIONS),
     processChecks: content<string[]>('process_score', REAL_PROCESS_CHECKS),
     mistakeCodes: content<MistakeCode[]>('mistake_code', REAL_MISTAKE_CODES),
+    researchFramework: content<ResearchFramework>('research_framework', REAL_RESEARCH_FRAMEWORK),
     notes: 'Trading HQ is the operational source of truth. Every category above is versioned in Supabase — editing writes a new version rather than rewriting history.',
   };
 

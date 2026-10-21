@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useTrading } from '../context/TradingContext';
-import { Sliders, ShieldCheck, Clock, AlertOctagon, Save, Tag, Info, Layers, History } from 'lucide-react';
+import { Sliders, ShieldCheck, Clock, AlertOctagon, Save, Tag, Info, Layers, History, Plus, Trash2, ListChecks, FlaskConical } from 'lucide-react';
 import type { HQCategory } from '../lib/hqStore';
 import { REAL_SESSIONS } from '../lib/hqStore';
-import type { SessionWindow } from '../types';
+import type { ExecutionModel, MistakeCode, SessionWindow, SetupGradeRule } from '../types';
 
 function CategoryVersionBadge({ label }: { label: string }) {
   return (
@@ -13,12 +13,62 @@ function CategoryVersionBadge({ label }: { label: string }) {
   );
 }
 
+/** Small shared input styling so every editable field in this view looks
+ * consistent without repeating the class string everywhere. */
+const fieldClass =
+  'bg-[#162130] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 text-xs font-mono outline-none focus:border-cyan-600 w-full';
+const textareaClass = `${fieldClass} font-sans resize-none`;
+
+function SectionHeader({
+  icon,
+  title,
+  onSave,
+  saving,
+  extra,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  onSave?: () => void;
+  saving?: boolean;
+  extra?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between border-b border-slate-800 pb-2 flex-wrap gap-2">
+      <div className="flex items-center gap-2">
+        {icon}
+        <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">{title}</h3>
+      </div>
+      <div className="flex items-center gap-2">
+        {extra}
+        {onSave && (
+          <button
+            onClick={onSave}
+            disabled={saving}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-mono text-xs font-bold transition"
+          >
+            <Save className="w-3.5 h-3.5" />
+            {saving ? 'SAVING…' : 'SAVE'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export const TradingHQView: React.FC = () => {
   const { tradingHQ, hqLoading, hqError, updateHQCategory } = useTrading();
   const [savingCategory, setSavingCategory] = useState<HQCategory | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Local editable copies, seeded from tradingHQ once loaded.
+  // Local editable copies, seeded from tradingHQ once loaded. Every category
+  // here is just a reference list or a rules object the trader fills in —
+  // none of it is hardcoded logic. What ships as the DEFAULT content (the
+  // Wyckoff+ICT/SLP methodology, the London/NY/Afternoon/Tokyo sessions,
+  // etc.) is one trader's real strategy, kept as the starting point for a
+  // new account — but every field below can be edited, added to, or
+  // removed so a different trader's methodology fits just as naturally.
+
+  // ---- Section 1: Risk Rules ----
   const [riskPerSetup, setRiskPerSetup] = useState(tradingHQ.riskRules.riskPerSetupPct);
   const [maxDailyLosses, setMaxDailyLosses] = useState(tradingHQ.riskRules.maxDailyLosses);
   const [noReEntry, setNoReEntry] = useState(tradingHQ.riskRules.noReEntry);
@@ -26,8 +76,31 @@ export const TradingHQView: React.FC = () => {
   const [scratchCountsAsLoss, setScratchCountsAsLoss] = useState(tradingHQ.riskRules.scratchCountsAsLoss);
   const [maxOpenTrades, setMaxOpenTrades] = useState(tradingHQ.riskRules.maxOpenTrades);
 
-  async function saveCategory(category: HQCategory, content: unknown) {
-    const reason = window.prompt('Why is this changing? (recorded on the new version, optional)') ?? '';
+  // ---- Section 2: Setup Grades ----
+  const [setupGrades, setSetupGrades] = useState<SetupGradeRule[]>(tradingHQ.setupGrades);
+
+  // ---- Section 3: Execution Models ----
+  const [executionModels, setExecutionModels] = useState<ExecutionModel[]>(tradingHQ.executionModels);
+
+  // ---- Section 4: Sessions ----
+  const [sessions, setSessions] = useState<SessionWindow[]>(tradingHQ.sessions);
+
+  // ---- Section 5: Mistake Codes ----
+  const [mistakeCodes, setMistakeCodes] = useState<MistakeCode[]>(tradingHQ.mistakeCodes);
+
+  // ---- Section 6: Process Checklist ----
+  // Labels only — the trade-logging form (Quick Trade / Journal) always
+  // scores exactly 5 checks under the hood (ProcessScore has 5 fixed
+  // boolean fields), so this list stays at 5 entries; renaming them here
+  // changes how they read everywhere else they're shown.
+  const [processChecks, setProcessChecks] = useState<string[]>(tradingHQ.processChecks);
+
+  // ---- Section 7: Research Framework ----
+  const [minSamples, setMinSamples] = useState(tradingHQ.researchFramework.minSamples);
+  const [researchNotes, setResearchNotes] = useState(tradingHQ.researchFramework.notes);
+
+  async function saveCategory(category: HQCategory, content: unknown, reasonPrompt = true) {
+    const reason = reasonPrompt ? window.prompt('Why is this changing? (recorded on the new version, optional)') ?? '' : '';
     setSavingCategory(category);
     setSaveError(null);
     try {
@@ -49,36 +122,59 @@ export const TradingHQView: React.FC = () => {
       ...(maxOpenTrades !== undefined ? { maxOpenTrades: Number(maxOpenTrades) } : {}),
     });
 
-  const resetSessionsToStandard = () => saveCategory('session', REAL_SESSIONS);
+  const handleSaveSetupGrades = () => saveCategory('setup_quality', setupGrades);
+  const addSetupGrade = () => setSetupGrades((prev) => [...prev, { grade: 'New Grade', minR: 1, description: '' }]);
+  const removeSetupGrade = (idx: number) => setSetupGrades((prev) => prev.filter((_, i) => i !== idx));
+  const updateSetupGrade = (idx: number, patch: Partial<SetupGradeRule>) =>
+    setSetupGrades((prev) => prev.map((g, i) => (i === idx ? { ...g, ...patch } : g)));
 
-  const editSession = (id: string) => {
-    const sess = tradingHQ.sessions.find(s => s.id === id);
-    if (!sess) return;
-    const nyStart = window.prompt(`${sess.name} — NY start time (HH:MM)`, sess.nyStart);
-    if (nyStart === null) return;
-    const nyEnd = window.prompt(`${sess.name} — NY end time (HH:MM)`, sess.nyEnd);
-    if (nyEnd === null) return;
-    const lagosStart = window.prompt(`${sess.name} — Lagos start time (HH:MM)`, sess.lagosStart);
-    if (lagosStart === null) return;
-    const lagosEnd = window.prompt(`${sess.name} — Lagos end time (HH:MM)`, sess.lagosEnd);
-    if (lagosEnd === null) return;
-    const updated: SessionWindow[] = tradingHQ.sessions.map(s =>
-      s.id === id ? { ...s, nyStart, nyEnd, lagosStart, lagosEnd } : s
-    );
-    saveCategory('session', updated);
-  };
+  const handleSaveExecutionModels = () => saveCategory('execution_model', executionModels);
+  const addExecutionModel = () =>
+    setExecutionModels((prev) => [...prev, { id: `model-${Date.now()}`, name: 'New Model', description: '', keyCriteria: [] }]);
+  const removeExecutionModel = (id: string) => setExecutionModels((prev) => prev.filter((m) => m.id !== id));
+  const updateExecutionModel = (id: string, patch: Partial<ExecutionModel>) =>
+    setExecutionModels((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)));
 
-  const editModel = (id: string) => {
-    const model = tradingHQ.executionModels.find(m => m.id === id);
-    if (!model) return;
-    const description = window.prompt(`Description for ${model.name}`, model.description);
-    if (description === null) return;
-    const criteriaRaw = window.prompt('Key criteria (one per line, can be left blank until confirmed)', model.keyCriteria.join('\n')) ?? '';
-    const updated = tradingHQ.executionModels.map(m =>
-      m.id === id ? { ...m, description, keyCriteria: criteriaRaw.split('\n').map(c => c.trim()).filter(Boolean) } : m
-    );
-    saveCategory('execution_model', updated);
+  const handleSaveSessions = () => saveCategory('session', sessions);
+  const resetSessionsToStandard = () => {
+    setSessions(REAL_SESSIONS);
+    saveCategory('session', REAL_SESSIONS, false);
   };
+  const addSession = () =>
+    setSessions((prev) => [
+      ...prev,
+      {
+        id: `sess-${Date.now()}`,
+        name: 'New Session',
+        nyStart: '00:00',
+        nyEnd: '00:00',
+        lagosStart: '00:00',
+        lagosEnd: '00:00',
+        activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+        notes: '',
+      },
+    ]);
+  const removeSession = (id: string) => setSessions((prev) => prev.filter((s) => s.id !== id));
+  const updateSession = (id: string, patch: Partial<SessionWindow>) =>
+    setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+
+  const handleSaveMistakeCodes = () => saveCategory('mistake_code', mistakeCodes);
+  const addMistakeCode = () =>
+    setMistakeCodes((prev) => [...prev, { code: 'NEW_CODE', label: 'New mistake', category: 'EXECUTION', description: '' }]);
+  const removeMistakeCode = (idx: number) => setMistakeCodes((prev) => prev.filter((_, i) => i !== idx));
+  const updateMistakeCode = (idx: number, patch: Partial<MistakeCode>) =>
+    setMistakeCodes((prev) => prev.map((m, i) => (i === idx ? { ...m, ...patch } : m)));
+
+  const handleSaveProcessChecks = () => saveCategory('process_score', processChecks);
+  const updateProcessCheck = (idx: number, value: string) =>
+    setProcessChecks((prev) => prev.map((c, i) => (i === idx ? value : c)));
+
+  const handleSaveResearchFramework = () =>
+    saveCategory('research_framework', {
+      workflow: tradingHQ.researchFramework.workflow,
+      minSamples: Number(minSamples),
+      notes: researchNotes,
+    });
 
   if (hqLoading) {
     return (
@@ -100,7 +196,9 @@ export const TradingHQView: React.FC = () => {
           <p className="text-xs text-slate-400 font-sans mt-0.5 max-w-3xl">
             The trader's strategy is never hardcoded. Every category below is versioned in Supabase — editing a
             category deactivates the current version and writes the next one, so a past trade always knows which
-            rule it followed.
+            rule it followed. Everything here — risk rules, setup grades, execution models, sessions, mistake
+            codes, the process checklist, and the research framework — is yours to edit, add to, or remove. What's
+            loaded by default is one trader's real methodology; it's a starting point, not a requirement.
           </p>
         </div>
         <CategoryVersionBadge label={tradingHQ.version.replace(/^v/, '')} />
@@ -117,26 +215,19 @@ export const TradingHQView: React.FC = () => {
         <p className="text-xs text-slate-300 font-sans leading-relaxed">
           <strong>AR (Automatic Reaction)</strong> is an <em>analytical/event concept</em> that establishes the
           initial boundaries of a developing Wyckoff schematic. It is <strong>NOT</strong> an entry trigger, POI,
-          confirmation, execution step, or mandatory sequence requirement.
+          confirmation, execution step, or mandatory sequence requirement. This note documents the default
+          methodology's own terminology — it's not enforced on a different strategy's execution models below.
         </p>
       </div>
 
       {/* Section 1: Risk Rules */}
       <div className="bg-[#101722] border border-slate-800 rounded-lg p-5 space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">1. RISK RULES & DRAWDOWN CONTROLS</h3>
-          </div>
-          <button
-            onClick={handleSaveRisk}
-            disabled={savingCategory === 'risk'}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-mono text-xs font-bold transition"
-          >
-            <Save className="w-3.5 h-3.5" />
-            {savingCategory === 'risk' ? 'SAVING…' : 'SAVE'}
-          </button>
-        </div>
+        <SectionHeader
+          icon={<ShieldCheck className="w-4 h-4 text-emerald-400" />}
+          title="1. RISK RULES & DRAWDOWN CONTROLS"
+          onSave={handleSaveRisk}
+          saving={savingCategory === 'risk'}
+        />
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
           <div>
@@ -198,117 +289,305 @@ export const TradingHQView: React.FC = () => {
 
       {/* Section 2: Setup Grades */}
       <div className="bg-[#101722] border border-slate-800 rounded-lg p-5 space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-          <div className="flex items-center gap-2">
-            <Tag className="w-4 h-4 text-purple-400" />
-            <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">2. SETUP GRADES & MINIMUM THRESHOLDS</h3>
-          </div>
-        </div>
+        <SectionHeader
+          icon={<Tag className="w-4 h-4 text-purple-400" />}
+          title="2. SETUP GRADES & MINIMUM THRESHOLDS"
+          onSave={handleSaveSetupGrades}
+          saving={savingCategory === 'setup_quality'}
+          extra={
+            <button onClick={addSetupGrade} className="flex items-center gap-1 text-[11px] font-mono text-cyan-300 hover:text-cyan-200 border border-slate-700 rounded px-2 py-1">
+              <Plus className="w-3 h-3" /> ADD GRADE
+            </button>
+          }
+        />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {tradingHQ.setupGrades.map((g, idx) => (
+          {setupGrades.map((g, idx) => (
             <div key={idx} className="p-3 rounded bg-[#162130] border border-slate-800 space-y-2">
-              <div className="flex items-center justify-between font-mono">
-                <span className="text-sm font-bold text-slate-100">{g.grade}</span>
-                <span className="px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800 text-cyan-300 text-xs font-bold">≥ {g.minR}R</span>
+              <div className="flex items-center gap-2">
+                <input
+                  value={g.grade}
+                  onChange={(e) => updateSetupGrade(idx, { grade: e.target.value })}
+                  className={`${fieldClass} font-bold text-sm`}
+                  placeholder="Grade name"
+                />
+                <button onClick={() => removeSetupGrade(idx)} className="text-slate-500 hover:text-rose-400 shrink-0">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
-              <p className="text-xs text-slate-400 font-sans">{g.description}</p>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono text-slate-500 uppercase shrink-0">Min R</span>
+                <input
+                  type="number"
+                  step="0.5"
+                  value={g.minR}
+                  onChange={(e) => updateSetupGrade(idx, { minR: parseFloat(e.target.value) || 0 })}
+                  className={fieldClass}
+                />
+              </div>
+              <textarea
+                value={g.description}
+                onChange={(e) => updateSetupGrade(idx, { description: e.target.value })}
+                className={textareaClass}
+                rows={3}
+                placeholder="What qualifies a trade for this grade"
+              />
             </div>
           ))}
+          {setupGrades.length === 0 && (
+            <p className="text-xs text-slate-500 font-sans col-span-full">No setup grades yet — add one above.</p>
+          )}
         </div>
       </div>
 
       {/* Section 3: Execution Models */}
       <div className="bg-[#101722] border border-slate-800 rounded-lg p-5 space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-          <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-cyan-400" />
-            <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">3. EXECUTION MODELS ({tradingHQ.executionModels.length})</h3>
-          </div>
-        </div>
+        <SectionHeader
+          icon={<Layers className="w-4 h-4 text-cyan-400" />}
+          title={`3. EXECUTION MODELS (${executionModels.length})`}
+          onSave={handleSaveExecutionModels}
+          saving={savingCategory === 'execution_model'}
+          extra={
+            <button onClick={addExecutionModel} className="flex items-center gap-1 text-[11px] font-mono text-cyan-300 hover:text-cyan-200 border border-slate-700 rounded px-2 py-1">
+              <Plus className="w-3 h-3" /> ADD MODEL
+            </button>
+          }
+        />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {tradingHQ.executionModels.map(model => (
+          {executionModels.map((model) => (
             <div key={model.id} className="p-4 rounded bg-[#162130] border border-slate-800 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-mono font-bold text-sm text-slate-100">{model.name}</span>
-                <button onClick={() => editModel(model.id)} className="text-[11px] font-mono text-cyan-300 hover:text-cyan-200">
-                  Edit
+              <div className="flex items-center gap-2">
+                <input
+                  value={model.name}
+                  onChange={(e) => updateExecutionModel(model.id, { name: e.target.value })}
+                  className={`${fieldClass} font-bold text-sm`}
+                  placeholder="Model name"
+                />
+                <button onClick={() => removeExecutionModel(model.id)} className="text-slate-500 hover:text-rose-400 shrink-0">
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
-              <p className="text-xs text-slate-300 font-sans">{model.description}</p>
-              {model.keyCriteria.length > 0 && (
-                <div className="pt-2 border-t border-slate-800/80 space-y-1">
-                  <span className="text-[10px] font-mono text-slate-400 uppercase">Key Criteria:</span>
-                  <ul className="list-disc list-inside text-xs text-slate-400 space-y-0.5">
-                    {model.keyCriteria.map((c, i) => (
-                      <li key={i}>{c}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              <textarea
+                value={model.description}
+                onChange={(e) => updateExecutionModel(model.id, { description: e.target.value })}
+                className={textareaClass}
+                rows={3}
+                placeholder="Definition and entry criteria"
+              />
+              <div className="pt-1 space-y-1">
+                <span className="text-[10px] font-mono text-slate-400 uppercase">Key Criteria (one per line):</span>
+                <textarea
+                  value={model.keyCriteria.join('\n')}
+                  onChange={(e) =>
+                    updateExecutionModel(model.id, {
+                      keyCriteria: e.target.value.split('\n').map((c) => c.trim()).filter(Boolean),
+                    })
+                  }
+                  className={textareaClass}
+                  rows={3}
+                  placeholder="One criterion per line"
+                />
+              </div>
             </div>
           ))}
+          {executionModels.length === 0 && (
+            <p className="text-xs text-slate-500 font-sans col-span-full">No execution models yet — add one above.</p>
+          )}
         </div>
       </div>
 
       {/* Section 4: Sessions */}
       <div className="bg-[#101722] border border-slate-800 rounded-lg p-5 space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-emerald-400" />
-            <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">4. OPERATIONAL SESSION WINDOWS</h3>
-          </div>
-          <button
-            onClick={resetSessionsToStandard}
-            disabled={savingCategory === 'session'}
-            className="text-[10px] font-mono text-cyan-300 hover:text-cyan-200 border border-slate-700 rounded px-2 py-1"
-            title="Reset to London / New York / Afternoon / Tokyo, each mapped to Lagos time"
-          >
-            {savingCategory === 'session' ? 'SAVING…' : 'RESET TO STANDARD 4-SESSION DAY'}
-          </button>
-        </div>
+        <SectionHeader
+          icon={<Clock className="w-4 h-4 text-emerald-400" />}
+          title="4. OPERATIONAL SESSION WINDOWS"
+          onSave={handleSaveSessions}
+          saving={savingCategory === 'session'}
+          extra={
+            <>
+              <button onClick={addSession} className="flex items-center gap-1 text-[11px] font-mono text-cyan-300 hover:text-cyan-200 border border-slate-700 rounded px-2 py-1">
+                <Plus className="w-3 h-3" /> ADD SESSION
+              </button>
+              <button
+                onClick={resetSessionsToStandard}
+                disabled={savingCategory === 'session'}
+                className="text-[10px] font-mono text-cyan-300 hover:text-cyan-200 border border-slate-700 rounded px-2 py-1"
+                title="Reset to London / New York / Afternoon / Tokyo, each mapped to Lagos time — the default methodology's sessions"
+              >
+                {savingCategory === 'session' ? 'SAVING…' : 'RESET TO DEFAULT 4-SESSION DAY'}
+              </button>
+            </>
+          }
+        />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {tradingHQ.sessions.map(sess => (
+          {sessions.map((sess) => (
             <div key={sess.id} className="p-4 rounded bg-[#162130] border border-slate-800 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-mono font-bold text-sm text-slate-100">{sess.name}</span>
-                <button onClick={() => editSession(sess.id)} className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300">EDIT</button>
+              <div className="flex items-center gap-2">
+                <input
+                  value={sess.name}
+                  onChange={(e) => updateSession(sess.id, { name: e.target.value })}
+                  className={`${fieldClass} font-bold text-sm`}
+                  placeholder="Session name"
+                />
+                <button onClick={() => removeSession(sess.id)} className="text-slate-500 hover:text-rose-400 shrink-0">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
-                <div className="p-2 rounded bg-[#0f1622] border border-slate-800">
+                <div className="space-y-1">
                   <span className="text-slate-400 text-[10px] block">NEW YORK TIME:</span>
-                  <span className="text-cyan-300 font-semibold">{sess.nyStart} – {sess.nyEnd}</span>
+                  <div className="flex items-center gap-1">
+                    <input value={sess.nyStart} onChange={(e) => updateSession(sess.id, { nyStart: e.target.value })} className={`${fieldClass} text-cyan-300`} placeholder="HH:MM" />
+                    <span className="text-slate-500">–</span>
+                    <input value={sess.nyEnd} onChange={(e) => updateSession(sess.id, { nyEnd: e.target.value })} className={`${fieldClass} text-cyan-300`} placeholder="HH:MM" />
+                  </div>
                 </div>
-                <div className="p-2 rounded bg-[#0f1622] border border-slate-800">
+                <div className="space-y-1">
                   <span className="text-slate-400 text-[10px] block">LAGOS TIME:</span>
-                  <span className="text-emerald-300 font-semibold">{sess.lagosStart} – {sess.lagosEnd}</span>
+                  <div className="flex items-center gap-1">
+                    <input value={sess.lagosStart} onChange={(e) => updateSession(sess.id, { lagosStart: e.target.value })} className={`${fieldClass} text-emerald-300`} placeholder="HH:MM" />
+                    <span className="text-slate-500">–</span>
+                    <input value={sess.lagosEnd} onChange={(e) => updateSession(sess.id, { lagosEnd: e.target.value })} className={`${fieldClass} text-emerald-300`} placeholder="HH:MM" />
+                  </div>
                 </div>
               </div>
-              <div className="text-[11px] font-mono text-slate-400 pt-1">Active: {sess.activeDays.join(', ')}</div>
-              {sess.notes && <p className="text-[11px] text-slate-400 font-sans pt-1 border-t border-slate-800/80">{sess.notes}</p>}
+              <div className="space-y-1 pt-1">
+                <span className="text-[10px] font-mono text-slate-400 uppercase">Active Days (comma-separated)</span>
+                <input
+                  value={sess.activeDays.join(', ')}
+                  onChange={(e) => updateSession(sess.id, { activeDays: e.target.value.split(',').map((d) => d.trim()).filter(Boolean) })}
+                  className={fieldClass}
+                  placeholder="Monday, Tuesday, …"
+                />
+              </div>
+              <textarea
+                value={sess.notes ?? ''}
+                onChange={(e) => updateSession(sess.id, { notes: e.target.value })}
+                className={`${textareaClass} mt-1`}
+                rows={2}
+                placeholder="Notes (e.g. timeframe restrictions)"
+              />
             </div>
           ))}
+          {sessions.length === 0 && (
+            <p className="text-xs text-slate-500 font-sans col-span-full">No sessions yet — add one above.</p>
+          )}
         </div>
       </div>
 
       {/* Section 5: Mistake Codes */}
       <div className="bg-[#101722] border border-slate-800 rounded-lg p-5 space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-          <div className="flex items-center gap-2">
-            <AlertOctagon className="w-4 h-4 text-amber-400" />
-            <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">5. MISTAKE CODE TAXONOMY</h3>
-          </div>
-        </div>
+        <SectionHeader
+          icon={<AlertOctagon className="w-4 h-4 text-amber-400" />}
+          title="5. MISTAKE CODE TAXONOMY"
+          onSave={handleSaveMistakeCodes}
+          saving={savingCategory === 'mistake_code'}
+          extra={
+            <button onClick={addMistakeCode} className="flex items-center gap-1 text-[11px] font-mono text-cyan-300 hover:text-cyan-200 border border-slate-700 rounded px-2 py-1">
+              <Plus className="w-3 h-3" /> ADD CODE
+            </button>
+          }
+        />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {tradingHQ.mistakeCodes.map(m => (
-            <div key={m.code} className="p-3 rounded bg-[#162130] border border-slate-800 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="font-mono font-bold text-xs text-amber-400">{m.code}</span>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">{m.category}</span>
+          {mistakeCodes.map((m, idx) => (
+            <div key={idx} className="p-3 rounded bg-[#162130] border border-slate-800 space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  value={m.code}
+                  onChange={(e) => updateMistakeCode(idx, { code: e.target.value.toUpperCase().replace(/\s+/g, '_') })}
+                  className={`${fieldClass} font-bold text-amber-400`}
+                  placeholder="CODE_NAME"
+                />
+                <button onClick={() => removeMistakeCode(idx)} className="text-slate-500 hover:text-rose-400 shrink-0">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
-              <div className="text-xs font-semibold text-slate-200">{m.label}</div>
-              <p className="text-[11px] text-slate-400 font-sans">{m.description}</p>
+              <select
+                value={m.category}
+                onChange={(e) => updateMistakeCode(idx, { category: e.target.value as MistakeCode['category'] })}
+                className={fieldClass}
+              >
+                <option value="MANAGEMENT">MANAGEMENT</option>
+                <option value="EXECUTION">EXECUTION</option>
+                <option value="PSYCHOLOGY">PSYCHOLOGY</option>
+                <option value="RISK">RISK</option>
+              </select>
+              <input
+                value={m.label}
+                onChange={(e) => updateMistakeCode(idx, { label: e.target.value })}
+                className={`${fieldClass} font-sans`}
+                placeholder="Short label"
+              />
+              <textarea
+                value={m.description}
+                onChange={(e) => updateMistakeCode(idx, { description: e.target.value })}
+                className={textareaClass}
+                rows={2}
+                placeholder="What this mistake means"
+              />
             </div>
           ))}
+          {mistakeCodes.length === 0 && (
+            <p className="text-xs text-slate-500 font-sans col-span-full">No mistake codes yet — add one above.</p>
+          )}
+        </div>
+      </div>
+
+      {/* Section 6: Process Checklist */}
+      <div className="bg-[#101722] border border-slate-800 rounded-lg p-5 space-y-4">
+        <SectionHeader
+          icon={<ListChecks className="w-4 h-4 text-cyan-400" />}
+          title="6. PROCESS CHECKLIST"
+          onSave={handleSaveProcessChecks}
+          saving={savingCategory === 'process_score'}
+        />
+        <p className="text-[11px] text-slate-400 font-sans">
+          Every logged trade is scored against exactly these 5 checks — you can rename them to match your own
+          process, but the trade-logging form always captures 5, so the list stays at 5 entries.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+          {processChecks.map((check, idx) => (
+            <div key={idx} className="space-y-1">
+              <span className="text-[10px] font-mono text-slate-500">CHECK {idx + 1}</span>
+              <input value={check} onChange={(e) => updateProcessCheck(idx, e.target.value)} className={`${fieldClass} font-bold`} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Section 7: Research Framework */}
+      <div className="bg-[#101722] border border-slate-800 rounded-lg p-5 space-y-4">
+        <SectionHeader
+          icon={<FlaskConical className="w-4 h-4 text-purple-400" />}
+          title="7. RESEARCH FRAMEWORK"
+          onSave={handleSaveResearchFramework}
+          saving={savingCategory === 'research_framework'}
+        />
+        <div className="flex flex-wrap gap-2 text-[11px] font-mono">
+          {tradingHQ.researchFramework.workflow.map((stage, i) => (
+            <span key={stage} className="px-2 py-1 rounded bg-[#162130] border border-slate-800 text-slate-300">
+              {i + 1}. {stage}
+            </span>
+          ))}
+        </div>
+        <p className="text-[11px] text-slate-500 font-sans">
+          The workflow stages above mirror the Research Engine's own stage names and aren't editable here — the
+          sample-size standard and notes below are.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-slate-400 mb-1 text-xs font-mono">MIN. SAMPLES FOR A FINDING</label>
+            <input
+              type="number"
+              min="1"
+              value={minSamples}
+              onChange={(e) => setMinSamples(parseInt(e.target.value) || 1)}
+              className={fieldClass}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-slate-400 mb-1 text-xs font-mono">NOTES</label>
+            <textarea value={researchNotes} onChange={(e) => setResearchNotes(e.target.value)} className={textareaClass} rows={2} />
+          </div>
         </div>
       </div>
     </div>

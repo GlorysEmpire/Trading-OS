@@ -129,6 +129,18 @@ export interface MistakeCode {
   description: string;
 }
 
+/** The research methodology's workflow stages are intentionally NOT
+ * editable here — they're the same 5 fixed values as ResearchQuestion's
+ * `status` union (OBSERVATION/HYPOTHESIS/BACKTEST/VALIDATION/LOCKED_RULE)
+ * elsewhere in the app, so renaming them here wouldn't actually change
+ * anything in Research Engine. minSamples and notes are real, editable
+ * methodology. */
+export interface ResearchFramework {
+  workflow: string[];
+  minSamples: number;
+  notes: string;
+}
+
 export interface TradingHQConfig {
   version: string;
   updatedAt: string;
@@ -138,6 +150,7 @@ export interface TradingHQConfig {
   sessions: SessionWindow[];
   processChecks: string[]; // ['Session', 'Grade', 'Risk', 'Management', 'Structure']
   mistakeCodes: MistakeCode[];
+  researchFramework: ResearchFramework;
   notes: string;
 }
 
