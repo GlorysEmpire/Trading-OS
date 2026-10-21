@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTrading } from '../context/TradingContext';
 import { getAuthHeaders } from '../lib/supabaseClient';
+import { traderDateString, traderNowMinutes, isSessionActiveNow } from '../utils/traderTime';
 import {
   Activity,
   AlertTriangle,
@@ -17,7 +18,47 @@ import {
   TrendingUp,
   Minus,
   Zap,
+  Settings2,
+  Check,
 } from 'lucide-react';
+
+/** Which of the Dashboard's secondary panels are shown. The point of a
+ * command center is to surface what's actionable at a glance — so the
+ * always-on priority items (risk/open-trades status, Market Watch, the
+ * core R/win-rate numbers) can't be hidden, but the lower-priority
+ * situational panels below default to hidden and are opt-in via
+ * "Customize". Persisted per-browser; this is a view preference, not
+ * trading data, so it doesn't need to live in Supabase. */
+type DashboardWidgetKey = 'sessions' | 'macroEvents' | 'scheduledAssignment' | 'processMatrix' | 'research';
+
+const DASHBOARD_WIDGET_LABELS: Record<DashboardWidgetKey, string> = {
+  sessions: 'Trading Sessions panel',
+  macroEvents: "Today's Macro Events",
+  scheduledAssignment: 'Scheduled Research Assignment',
+  processMatrix: 'Process Integrity vs Outcome Matrix',
+  research: 'Research Engine & Continuous Study',
+};
+
+const DASHBOARD_WIDGET_ORDER: DashboardWidgetKey[] = ['sessions', 'macroEvents', 'scheduledAssignment', 'processMatrix', 'research'];
+
+const DASHBOARD_PREFS_KEY = 'trading_os_dashboard_widgets_v1';
+
+function loadDashboardWidgetPrefs(): Record<DashboardWidgetKey, boolean> {
+  const defaults: Record<DashboardWidgetKey, boolean> = {
+    sessions: false,
+    macroEvents: false,
+    scheduledAssignment: false,
+    processMatrix: false,
+    research: false,
+  };
+  try {
+    const raw = localStorage.getItem(DASHBOARD_PREFS_KEY);
+    if (!raw) return defaults;
+    return { ...defaults, ...JSON.parse(raw) };
+  } catch {
+    return defaults;
+  }
+}
 
 export const DashboardView: React.FC = () => {
   const {
@@ -36,9 +77,30 @@ export const DashboardView: React.FC = () => {
   const [aiBriefLoading, setAiBriefLoading] = useState(false);
   const [aiBriefText, setAiBriefText] = useState<string | null>(null);
 
+  // Ticks once a minute so the active-session indicator (and the LIVE
+  // badge in the sessions card) actually moves across sessions over the
+  // course of the day, instead of being computed once on mount.
+  const [nowMinutes, setNowMinutes] = useState(() => traderNowMinutes());
+  useEffect(() => {
+    const interval = setInterval(() => setNowMinutes(traderNowMinutes()), 30_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const [widgetPrefs, setWidgetPrefs] = useState<Record<DashboardWidgetKey, boolean>>(loadDashboardWidgetPrefs);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+  useEffect(() => {
+    try {
+      localStorage.setItem(DASHBOARD_PREFS_KEY, JSON.stringify(widgetPrefs));
+    } catch {
+      /* best-effort — a view preference, never load-bearing */
+    }
+  }, [widgetPrefs]);
+  const toggleWidget = (key: DashboardWidgetKey) => setWidgetPrefs((prev) => ({ ...prev, [key]: !prev[key] }));
+
   const openTrades = trades.filter((t) => t.status === 'OPEN');
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = traderDateString();
   const todayEvents = calendarEvents.filter((e) => e.date === todayStr);
+  const activeSession = tradingHQ.sessions.find((s) => isSessionActiveNow(s, nowMinutes));
   const activeAlerts = alerts.filter((a) => a.active);
   const watchedAssets = assets.filter((a) => a.watchlisted);
   const activeRQ = researchQuestions[0];
@@ -112,7 +174,9 @@ export const DashboardView: React.FC = () => {
               <div className="font-mono text-xs font-semibold text-slate-200 uppercase tracking-wider flex items-center gap-2">
                 <span>OPERATIONAL STATUS: NORMAL</span>
                 <span className="text-slate-600">•</span>
-                <span className="text-cyan-400">NY AM SESSION WINDOW ACTIVE</span>
+                <span className="text-cyan-400 transition-all duration-500">
+                  {activeSession ? `${activeSession.name.toUpperCase()} SESSION WINDOW ACTIVE` : 'BETWEEN SESSION WINDOWS'}
+                </span>
               </div>
               <div className="text-[11px] text-slate-400 font-sans">
                 Methodology Version <span className="font-mono text-slate-300">{tradingHQ.version}</span> | Strict 1% risk per setup | Absolute No Re-Entry rule enforced
@@ -162,31 +226,83 @@ export const DashboardView: React.FC = () => {
             <Clock className="w-4 h-4 text-cyan-400" />
             1. TODAY — OPERATIONAL AWARENESS
           </h3>
-          <span className="text-[11px] font-mono text-slate-400">{todayStr}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] font-mono text-slate-400">{todayStr}</span>
+            <div className="relative">
+              <button
+                onClick={() => setCustomizeOpen((v) => !v)}
+                className="flex items-center gap-1 text-[10px] font-mono text-slate-400 hover:text-cyan-300 border border-slate-700 rounded px-2 py-1 transition"
+              >
+                <Settings2 className="w-3 h-3" />
+                <span>CUSTOMIZE</span>
+              </button>
+              {customizeOpen && (
+                <div className="absolute right-0 mt-1.5 z-20 w-64 bg-[#141d2a] border border-slate-700 rounded-lg shadow-xl p-2 space-y-0.5">
+                  <p className="text-[10px] font-mono text-slate-500 px-2 py-1 uppercase">Show additional panels</p>
+                  {DASHBOARD_WIDGET_ORDER.map((key) => (
+                    <button
+                      key={key}
+                      onClick={() => toggleWidget(key)}
+                      className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded hover:bg-slate-800/80 text-left text-xs font-sans text-slate-200"
+                    >
+                      <span>{DASHBOARD_WIDGET_LABELS[key]}</span>
+                      <span
+                        className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                          widgetPrefs[key] ? 'bg-cyan-600 border-cyan-500' : 'border-slate-600'
+                        }`}
+                      >
+                        {widgetPrefs[key] && <Check className="w-3 h-3 text-white" />}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div
+          className={`grid grid-cols-1 gap-4 ${
+            { 1: 'md:grid-cols-1', 2: 'md:grid-cols-2', 3: 'md:grid-cols-3', 4: 'md:grid-cols-4' }[
+              1 + (widgetPrefs.sessions ? 1 : 0) + (widgetPrefs.macroEvents ? 1 : 0) + (widgetPrefs.scheduledAssignment ? 1 : 0)
+            ]
+          }`}
+        >
           {/* Active Sessions */}
+          {widgetPrefs.sessions && (
           <div className="bg-[#101722] border border-slate-800 rounded-lg p-3.5 space-y-2">
             <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">TRADING SESSIONS</span>
             <div className="space-y-2">
-              {tradingHQ.sessions.map((s) => (
-                <div key={s.id} className="p-2 rounded bg-[#16202f] border border-slate-800 text-xs">
-                  <div className="flex items-center justify-between font-mono font-medium text-slate-200">
-                    <span>{s.name}</span>
-                    <span className="text-emerald-400 text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/50 border border-emerald-800/60">
-                      LIVE
-                    </span>
+              {tradingHQ.sessions.map((s) => {
+                const live = activeSession?.id === s.id;
+                return (
+                  <div
+                    key={s.id}
+                    className={`p-2 rounded border text-xs transition-all duration-500 ${
+                      live ? 'bg-emerald-950/30 border-emerald-800/60' : 'bg-[#16202f] border-slate-800 opacity-60'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between font-mono font-medium text-slate-200">
+                      <span>{s.name}</span>
+                      {live && (
+                        <span className="flex items-center gap-1 text-emerald-400 text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/50 border border-emerald-800/60">
+                          <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                          LIVE
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-1 font-mono">
+                      NY: {s.nyStart} – {s.nyEnd} | Lagos: {s.lagosStart} – {s.lagosEnd}
+                    </div>
                   </div>
-                  <div className="text-[11px] text-slate-400 mt-1 font-mono">
-                    NY: {s.nyStart} – {s.nyEnd} | Lagos: {s.lagosStart} – {s.lagosEnd}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
+          )}
 
           {/* Economic News & Macro Events */}
+          {widgetPrefs.macroEvents && (
           <div className="bg-[#101722] border border-slate-800 rounded-lg p-3.5 space-y-2">
             <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">TODAY'S MACRO EVENTS</span>
             <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
@@ -209,8 +325,10 @@ export const DashboardView: React.FC = () => {
               )}
             </div>
           </div>
+          )}
 
           {/* Scheduled Backtesting & Research */}
+          {widgetPrefs.scheduledAssignment && (
           <div className="bg-[#101722] border border-slate-800 rounded-lg p-3.5 space-y-2">
             <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">SCHEDULED ASSIGNMENT</span>
             {activeRQ ? (
@@ -229,6 +347,7 @@ export const DashboardView: React.FC = () => {
               <div className="text-slate-500 text-xs p-3 text-center">No active research question</div>
             )}
           </div>
+          )}
 
           {/* Open Trades & Risk Status */}
           <div className="bg-[#101722] border border-slate-800 rounded-lg p-3.5 space-y-2">
@@ -417,6 +536,7 @@ export const DashboardView: React.FC = () => {
         </div>
 
         {/* Process vs Outcome Paradigm Card */}
+        {widgetPrefs.processMatrix && (
         <div className="bg-[#0f1520] border border-slate-800 rounded-lg p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -464,9 +584,11 @@ export const DashboardView: React.FC = () => {
             </div>
           </div>
         </div>
+        )}
       </section>
 
       {/* SECTION 4: RESEARCH & LEARNING */}
+      {widgetPrefs.research && (
       <section className="space-y-3">
         <div className="flex items-center justify-between border-b border-slate-800 pb-2">
           <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
@@ -525,6 +647,7 @@ export const DashboardView: React.FC = () => {
           )}
         </div>
       </section>
+      )}
     </div>
   );
 };

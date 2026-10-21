@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useTrading } from '../context/TradingContext';
 import { calculatePlannedR, evaluateRiskViolations, determineProcessCategory } from '../utils/tradingCalculations';
+import { traderDateString } from '../utils/traderTime';
 import { X, AlertTriangle, ShieldCheck, CheckSquare, Square, Calculator } from 'lucide-react';
 import { Trade } from '../types';
 import { ImageUploadDropzone } from './ImageUploadDropzone';
@@ -88,7 +89,7 @@ export const QuickTradeModal: React.FC = () => {
     };
 
     const newTrade: Omit<Trade, 'id' | 'timestamp' | 'configVersionUsed'> = {
-      date: new Date().toISOString().split('T')[0],
+      date: traderDateString(),
       asset,
       direction,
       timeframe,

@@ -1,4 +1,5 @@
 import { Trade, PerformanceStats, TradingHQConfig, ProcessScore } from '../types';
+import { traderDateString, daysBetweenDateStrings } from './traderTime';
 
 /**
  * Calculates planned R based on direction
@@ -95,7 +96,7 @@ export function computePerformanceStats(trades: Trade[], config: TradingHQConfig
     };
   }
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = traderDateString();
 
   let totalR = 0;
   let todayR = 0;
@@ -114,9 +115,17 @@ export function computePerformanceStats(trades: Trade[], config: TradingHQConfig
 
   let goodProcessLossCount = 0;
   let badProcessWinCount = 0;
+  let scratchCount = 0;
 
-  // Sort chronologically
-  const sorted = [...closedTrades].sort((a, b) => a.timestamp - b.timestamp);
+  // Sort by the trade's actual date (then logged time as a tiebreaker for
+  // same-day trades) — not by `timestamp` (when it was entered into the
+  // system). Those two can diverge for any backfilled/imported trade, which
+  // would otherwise silently corrupt the equity curve the drawdown is
+  // computed from.
+  const sorted = [...closedTrades].sort((a, b) => {
+    if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+    return a.timestamp - b.timestamp;
+  });
 
   sorted.forEach((trade) => {
     const r = trade.realizedR || 0;
@@ -138,13 +147,13 @@ export function computePerformanceStats(trades: Trade[], config: TradingHQConfig
       }
     }
 
-    // Rough weekly check (last 7 days)
-    const now = Date.now();
-    const tradeAgeDays = (now - trade.timestamp) / (1000 * 60 * 60 * 24);
-    if (tradeAgeDays <= 7) {
+    // Age in calendar days from the trade's own date to today, in the
+    // trader's timezone — not elapsed wall-clock time since it was logged.
+    const tradeAgeDays = daysBetweenDateStrings(trade.date, todayStr);
+    if (tradeAgeDays >= 0 && tradeAgeDays <= 7) {
       weeklyR += r;
     }
-    if (tradeAgeDays <= 30) {
+    if (tradeAgeDays >= 0 && tradeAgeDays <= 30) {
       monthlyR += r;
     }
 
@@ -161,6 +170,23 @@ export function computePerformanceStats(trades: Trade[], config: TradingHQConfig
       currentLossStreak++;
       if (trade.processScore && trade.processScore.score >= 4) {
         goodProcessLossCount++;
+      }
+    } else {
+      // Scratch (realizedR === 0): per Trading HQ's own scratchCountsAsLoss
+      // rule — the same rule JournalView uses to label the outcome
+      // 'SCRATCH' as not a win — a scratch either continues the loss streak
+      // or, if the rule is off, breaks it (it's not a loss, but it's not a
+      // win either). Scratches never affect avgRLoss (0R has no magnitude),
+      // but they do count toward the good-process-loss rate when the rule
+      // treats them as loss-like, via the separate lossLikeCount below.
+      scratchCount++;
+      if (config.riskRules.scratchCountsAsLoss) {
+        currentLossStreak++;
+        if (trade.processScore && trade.processScore.score >= 4) {
+          goodProcessLossCount++;
+        }
+      } else {
+        currentLossStreak = 0;
       }
     }
   });
@@ -181,7 +207,8 @@ export function computePerformanceStats(trades: Trade[], config: TradingHQConfig
     riskStatus = 'WARNING';
   }
 
-  const goodProcessLossPct = losses > 0 ? Number(((goodProcessLossCount / losses) * 100).toFixed(1)) : 0;
+  const lossLikeCount = losses + (config.riskRules.scratchCountsAsLoss ? scratchCount : 0);
+  const goodProcessLossPct = lossLikeCount > 0 ? Number(((goodProcessLossCount / lossLikeCount) * 100).toFixed(1)) : 0;
   const badProcessWinPct = wins > 0 ? Number(((badProcessWinCount / wins) * 100).toFixed(1)) : 0;
 
   return {
