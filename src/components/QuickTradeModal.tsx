@@ -66,7 +66,7 @@ export const QuickTradeModal: React.FC = () => {
 
   if (!quickTradeModalOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isNaN(numEntry) || isNaN(numStop) || isNaN(numTarget)) {
       alert('Please provide valid Entry, Stop, and Target prices.');
@@ -112,8 +112,13 @@ export const QuickTradeModal: React.FC = () => {
       reflectionAfter: '',
     };
 
-    addTrade(newTrade);
-    setQuickTradeModalOpen(false);
+    try {
+      await addTrade(newTrade);
+      setQuickTradeModalOpen(false);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Could not save the trade. Your journal has not been changed.');
+      return;
+    }
 
     // Reset fields
     setEntryPrice('');

@@ -11,7 +11,6 @@ import {
   TradingHQConfig,
 } from '../types';
 import {
-  INITIAL_TRADES,
   INITIAL_RESEARCH_QUESTIONS,
   INITIAL_BACKTEST_SAMPLES,
   INITIAL_PSYCHOLOGY_ENTRIES,
@@ -22,6 +21,7 @@ import { computePerformanceStats } from '../utils/tradingCalculations';
 import { supabase } from '../lib/supabaseClient';
 import { buildTradingHQConfig, loadHQConfigRows, saveHQCategory, seedMissingHQCategories, type HQCategory, type HQConfigRow } from '../lib/hqStore';
 import { archiveAssetDesk, createAssetDesk, loadAssetDesks, saveAssetDeskPatch, seedAssetDesksIfMissing, updateInstrument, type InstrumentInput } from '../lib/assetDesksStore';
+import { importTradesOnce, loadTrades, removeTrade, saveTrade } from '../lib/tradeStore';
 
 export type NavSection =
   | 'dashboard'
@@ -59,11 +59,14 @@ interface TradingContextType {
   updateInstrument: (id: string, input: InstrumentInput) => Promise<void>;
   archiveInstrument: (id: string) => Promise<void>;
 
-  // Still local-only — later weeks per the MVP roadmap
   trades: Trade[];
-  addTrade: (trade: Omit<Trade, 'id' | 'timestamp' | 'configVersionUsed'>) => Trade;
-  updateTrade: (id: string, updated: Partial<Trade>) => void;
-  deleteTrade: (id: string) => void;
+  tradesLoading: boolean;
+  tradesError: string | null;
+  localTradeImportCount: number;
+  addTrade: (trade: Omit<Trade, 'id' | 'timestamp' | 'configVersionUsed'>) => Promise<Trade>;
+  updateTrade: (id: string, updated: Partial<Trade>) => Promise<void>;
+  deleteTrade: (id: string) => Promise<void>;
+  importLocalTrades: () => Promise<number>;
   researchQuestions: ResearchQuestion[];
   addResearchQuestion: (rq: Omit<ResearchQuestion, 'id' | 'createdAt'>) => void;
   updateResearchQuestion: (id: string, updated: Partial<ResearchQuestion>) => void;
@@ -190,11 +193,11 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
   const updateInstrumentMetadata = async (id: string, input: InstrumentInput) => { await updateInstrument(supabase, id, input); await refreshDesks(); };
   const archiveInstrument = async (id: string) => { await archiveAssetDesk(supabase, id); await refreshDesks(); };
 
-  // ---- Everything else: local-only for now (later weeks) ----
-  const [trades, setTrades] = useState<Trade[]>(() => {
-    const saved = localStorage.getItem(key('trades'));
-    return saved ? JSON.parse(saved) : INITIAL_TRADES;
-  });
+  // ---- Week 2: durable, Supabase-backed journal; local entries require explicit import ----
+  const [trades, setTrades] = useState<Trade[]>([]);
+  const [tradesLoading, setTradesLoading] = useState(true);
+  const [tradesError, setTradesError] = useState<string | null>(null);
+  const [localTradeImportCount, setLocalTradeImportCount] = useState(0);
   const [researchQuestions, setResearchQuestions] = useState<ResearchQuestion[]>(() => {
     const saved = localStorage.getItem(key('rqs'));
     return saved ? JSON.parse(saved) : INITIAL_RESEARCH_QUESTIONS;
@@ -216,20 +219,33 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
     return saved ? JSON.parse(saved) : INITIAL_ALERTS;
   });
 
-  useEffect(() => { localStorage.setItem(key('trades'), JSON.stringify(trades)); }, [trades]);
+  useEffect(() => {
+    const raw = localStorage.getItem(key('trades'));
+    try { setLocalTradeImportCount(raw ? (JSON.parse(raw) as Trade[]).length : 0); } catch { setLocalTradeImportCount(0); }
+    setTradesLoading(true);
+    loadTrades(supabase, userId).then(setTrades).catch(error => setTradesError(error instanceof Error ? error.message : 'Failed to load journal')).finally(() => setTradesLoading(false));
+  }, [userId]);
   useEffect(() => { localStorage.setItem(key('rqs'), JSON.stringify(researchQuestions)); }, [researchQuestions]);
   useEffect(() => { localStorage.setItem(key('backtests'), JSON.stringify(backtestSamples)); }, [backtestSamples]);
   useEffect(() => { localStorage.setItem(key('psychology'), JSON.stringify(psychologyEntries)); }, [psychologyEntries]);
   useEffect(() => { localStorage.setItem(key('calendar'), JSON.stringify(calendarEvents)); }, [calendarEvents]);
   useEffect(() => { localStorage.setItem(key('alerts'), JSON.stringify(alerts)); }, [alerts]);
 
-  const addTrade = (tradeData: Omit<Trade, 'id' | 'timestamp' | 'configVersionUsed'>) => {
+  const addTrade = async (tradeData: Omit<Trade, 'id' | 'timestamp' | 'configVersionUsed'>) => {
     const newTrade: Trade = { ...tradeData, id: `tr-${Date.now().toString().slice(-6)}`, timestamp: Date.now(), configVersionUsed: tradingHQ.version };
+    await saveTrade(supabase, userId, newTrade);
     setTrades(prev => [newTrade, ...prev]);
     return newTrade;
   };
-  const updateTrade = (id: string, updated: Partial<Trade>) => setTrades(prev => prev.map(t => (t.id === id ? { ...t, ...updated } : t)));
-  const deleteTrade = (id: string) => setTrades(prev => prev.filter(t => t.id !== id));
+  const updateTrade = async (id: string, updated: Partial<Trade>) => {
+    const current = trades.find(trade => trade.id === id); if (!current) return;
+    const next = { ...current, ...updated }; await saveTrade(supabase, userId, next); setTrades(prev => prev.map(trade => trade.id === id ? next : trade));
+  };
+  const deleteTrade = async (id: string) => { await removeTrade(supabase, id); setTrades(prev => prev.filter(trade => trade.id !== id)); };
+  const importLocalTrades = async () => {
+    const raw = localStorage.getItem(key('trades')); const local = raw ? JSON.parse(raw) as Trade[] : [];
+    const count = await importTradesOnce(supabase, userId, local); setTrades(await loadTrades(supabase, userId)); setLocalTradeImportCount(0); return count;
+  };
 
   const addResearchQuestion = (rqData: Omit<ResearchQuestion, 'id' | 'createdAt'>) => {
     const newRq: ResearchQuestion = { ...rqData, id: `rq-${Date.now().toString().slice(-4)}`, createdAt: new Date().toISOString().split('T')[0] };
@@ -317,9 +333,13 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
       updateInstrument: updateInstrumentMetadata,
       archiveInstrument,
         trades,
+        tradesLoading,
+        tradesError,
+        localTradeImportCount,
         addTrade,
         updateTrade,
         deleteTrade,
+        importLocalTrades,
         researchQuestions,
         addResearchQuestion,
         updateResearchQuestion,

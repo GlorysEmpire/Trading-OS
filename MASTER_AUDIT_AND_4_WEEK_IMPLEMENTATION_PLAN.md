@@ -41,9 +41,13 @@ Trading OS is a configurable, process-first discretionary trading journal and re
 
 ## Week 2 — Persistent trade journal
 
-- [ ] Add user-scoped schema/policies and code for durable trades; do not apply without backup/approval.
-- [ ] Provide localStorage-import preview/dedupe, lifecycle, screenshots/notes, and historical HQ version semantics.
-- [ ] Clearly separate seed/demo data from real performance.
+- [x] Added additive `20261022000000_persistent_trade_journal.sql`: owner-scoped table, RLS policies, and no destructive alteration of legacy data.
+- [x] New trades now save to Supabase before local UI state updates; edits and deletes use the durable record.
+- [x] Existing localStorage records are not silently merged into performance. The Journal displays an explicit import action and upserts by trade ID.
+- [x] Journal asset filter now derives from configured active instruments.
+- [x] Typecheck passed after this work (`npm run lint`, 2026-10-21).
+- [ ] Apply the migration and verify owner isolation, open/edit/close/delete/reload, screenshots, and local import in the actual Supabase project.
+- [ ] The source’s current trade ID is client-generated and HQ version is captured as a config version string; strengthen the snapshot representation after the deployed HQ schema is verified.
 
 ## Week 3 — Persistent research and backtesting
 

@@ -23,7 +23,7 @@ import { ImageViewerModal, LightboxImage } from './ImageViewerModal';
 import { ImageUploadDropzone } from './ImageUploadDropzone';
 
 export const JournalView: React.FC = () => {
-  const { trades, updateTrade, deleteTrade, setQuickTradeModalOpen, tradingHQ } = useTrading();
+  const { trades, assets, updateTrade, deleteTrade, setQuickTradeModalOpen, tradingHQ, tradesLoading, tradesError, localTradeImportCount, importLocalTrades } = useTrading();
 
   const [filterAsset, setFilterAsset] = useState<string>('ALL');
   const [filterProcess, setFilterProcess] = useState<string>('ALL');
@@ -180,6 +180,7 @@ Provide an objective assessment:
         >
           <span>+ LOG NEW EXECUTION</span>
         </button>
+        {localTradeImportCount > 0 && <button onClick={() => importLocalTrades().catch(error => alert(error instanceof Error ? error.message : 'Import failed'))} className="px-4 py-2 rounded border border-amber-700 text-amber-300 font-mono text-xs font-bold">IMPORT {localTradeImportCount} LOCAL TRADE{localTradeImportCount === 1 ? '' : 'S'}</button>}
       </div>
 
       {/* Filters Bar */}
@@ -193,11 +194,7 @@ Provide an objective assessment:
             className="bg-[#162130] border border-slate-700 rounded px-2.5 py-1 text-slate-200 outline-none"
           >
             <option value="ALL">All Assets ({trades.length})</option>
-            <option value="BTC">BTC</option>
-            <option value="ETH">ETH</option>
-            <option value="NQ">NQ</option>
-            <option value="XAU">XAU</option>
-            <option value="EUR/USD">EUR/USD</option>
+            {assets.map(asset => <option key={asset.id} value={asset.symbol}>{asset.symbol}</option>)}
           </select>
         </div>
 
@@ -233,6 +230,8 @@ Provide an objective assessment:
 
       {/* Trades List */}
       <div className="space-y-3">
+        {tradesLoading && <p className="text-xs font-mono text-slate-500">Loading durable trade journal…</p>}
+        {tradesError && <p className="text-xs font-mono text-rose-400">{tradesError}</p>}
         {filteredTrades.map((trade) => {
           const isExpanded = expandedTradeId === trade.id;
           const isWin = trade.outcome === 'WIN';
