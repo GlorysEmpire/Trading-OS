@@ -74,12 +74,13 @@ export const Header: React.FC = () => {
     reader.onload = (event) => {
       const content = event.target?.result as string;
       if (content) {
-        const success = importDataJSON(content);
-        if (success) {
-          alert('Trading OS state successfully restored.');
-        } else {
-          alert('Failed to parse Trading OS backup JSON.');
-        }
+        importDataJSON(content).then((success) => {
+          if (success) {
+            alert('Trading OS state successfully restored.');
+          } else {
+            alert('Failed to parse or save Trading OS backup JSON. Your current data has not been changed.');
+          }
+        });
       }
     };
     reader.readAsText(file);

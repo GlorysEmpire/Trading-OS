@@ -15,7 +15,7 @@ import {
 import { ResearchQuestion } from '../types';
 
 export const ResearchView: React.FC = () => {
-  const { researchQuestions, addResearchQuestion, backtestSamples, setActiveTab } = useTrading();
+  const { researchQuestions, addResearchQuestion, backtestSamples, setActiveTab, researchLoading, researchError, localResearchImportCount, importLocalResearchQuestions } = useTrading();
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [code, setCode] = useState(`RQ-0${researchQuestions.length + 1}`);
@@ -25,21 +25,26 @@ export const ResearchView: React.FC = () => {
   const [initialAsset, setInitialAsset] = useState('ETH');
   const [scheduledDay, setScheduledDay] = useState('Tuesday');
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !hypothesis.trim()) return;
 
-    addResearchQuestion({
-      code,
-      title: title.trim(),
-      hypothesis: hypothesis.trim(),
-      targetSamples: Number(targetSamples),
-      sampleCount: 0,
-      initialAsset,
-      scheduledDay,
-      status: 'HYPOTHESIS',
-      findings: 'Hypothesis registered. Commencing empirical sample collection.',
-    });
+    try {
+      await addResearchQuestion({
+        code,
+        title: title.trim(),
+        hypothesis: hypothesis.trim(),
+        targetSamples: Number(targetSamples),
+        sampleCount: 0,
+        initialAsset,
+        scheduledDay,
+        status: 'HYPOTHESIS',
+        findings: 'Hypothesis registered. Commencing empirical sample collection.',
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Could not save the research question. It has not been registered.');
+      return;
+    }
 
     setTitle('');
     setHypothesis('');
@@ -68,6 +73,14 @@ export const ResearchView: React.FC = () => {
           <Plus className="w-4 h-4" />
           <span>+ REGISTER RESEARCH QUESTION</span>
         </button>
+        {localResearchImportCount > 0 && (
+          <button
+            onClick={() => importLocalResearchQuestions().catch(error => alert(error instanceof Error ? error.message : 'Import failed'))}
+            className="px-4 py-2 rounded border border-amber-700 text-amber-300 font-mono text-xs font-bold"
+          >
+            IMPORT {localResearchImportCount} LOCAL RESEARCH QUESTION{localResearchImportCount === 1 ? '' : 'S'}
+          </button>
+        )}
       </div>
 
       {/* Scientific Workflow Diagram */}
@@ -87,6 +100,8 @@ export const ResearchView: React.FC = () => {
 
       {/* Questions Cards */}
       <div className="space-y-4">
+        {researchLoading && <p className="text-xs font-mono text-slate-500">Loading durable research questions…</p>}
+        {researchError && <p className="text-xs font-mono text-rose-400">{researchError}</p>}
         {researchQuestions.map((rq) => {
           const pct = Math.min(100, Math.round((rq.sampleCount / rq.targetSamples) * 100));
 

@@ -11,8 +11,6 @@ import {
   TradingHQConfig,
 } from '../types';
 import {
-  INITIAL_RESEARCH_QUESTIONS,
-  INITIAL_BACKTEST_SAMPLES,
   INITIAL_PSYCHOLOGY_ENTRIES,
   INITIAL_CALENDAR_EVENTS,
   INITIAL_ALERTS,
@@ -22,6 +20,16 @@ import { supabase } from '../lib/supabaseClient';
 import { buildTradingHQConfig, loadHQConfigRows, saveHQCategory, seedMissingHQCategories, type HQCategory, type HQConfigRow } from '../lib/hqStore';
 import { archiveAssetDesk, createAssetDesk, loadAssetDesks, saveAssetDeskPatch, seedAssetDesksIfMissing, updateInstrument, type InstrumentInput } from '../lib/assetDesksStore';
 import { importTradesOnce, loadTrades, removeTrade, saveTrade } from '../lib/tradeStore';
+import { importResearchQuestionsOnce, loadResearchQuestions, removeResearchQuestion, saveResearchQuestion } from '../lib/researchStore';
+import { importBacktestSamplesOnce, loadBacktestSamples, removeBacktestSample, saveBacktestSample } from '../lib/backtestStore';
+
+/** crypto.randomUUID() is collision-safe; the old `Date.now().toString().slice(-N)`
+ * scheme could (and occasionally did) collide when two records were created within
+ * the same render tick. Falls back for any runtime without the Web Crypto API. */
+function genId(prefix: string): string {
+  const uuid = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return `${prefix}-${uuid}`;
+}
 
 export type NavSection =
   | 'dashboard'
@@ -68,12 +76,20 @@ interface TradingContextType {
   deleteTrade: (id: string) => Promise<void>;
   importLocalTrades: () => Promise<number>;
   researchQuestions: ResearchQuestion[];
-  addResearchQuestion: (rq: Omit<ResearchQuestion, 'id' | 'createdAt'>) => void;
-  updateResearchQuestion: (id: string, updated: Partial<ResearchQuestion>) => void;
+  researchLoading: boolean;
+  researchError: string | null;
+  localResearchImportCount: number;
+  addResearchQuestion: (rq: Omit<ResearchQuestion, 'id' | 'createdAt'>) => Promise<ResearchQuestion>;
+  updateResearchQuestion: (id: string, updated: Partial<ResearchQuestion>) => Promise<void>;
+  importLocalResearchQuestions: () => Promise<number>;
   backtestSamples: BacktestSample[];
-  addBacktestSample: (sample: Omit<BacktestSample, 'id'>) => void;
-  updateBacktestSample: (id: string, updated: Partial<BacktestSample>) => void;
-  deleteBacktestSample: (id: string) => void;
+  backtestLoading: boolean;
+  backtestError: string | null;
+  localBacktestImportCount: number;
+  addBacktestSample: (sample: Omit<BacktestSample, 'id'>) => Promise<BacktestSample>;
+  updateBacktestSample: (id: string, updated: Partial<BacktestSample>) => Promise<void>;
+  deleteBacktestSample: (id: string) => Promise<void>;
+  importLocalBacktestSamples: () => Promise<number>;
   psychologyEntries: PsychologyEntry[];
   addPsychologyEntry: (entry: Omit<PsychologyEntry, 'id' | 'timestamp'>) => void;
   calendarEvents: OperationalCalendarEvent[];
@@ -84,7 +100,7 @@ interface TradingContextType {
   toggleAlert: (id: string) => void;
   performanceStats: PerformanceStats;
   exportDataJSON: () => void;
-  importDataJSON: (jsonString: string) => boolean;
+  importDataJSON: (jsonString: string) => Promise<boolean>;
   quickTradeModalOpen: boolean;
   setQuickTradeModalOpen: (open: boolean) => void;
 }
@@ -198,14 +214,17 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
   const [tradesLoading, setTradesLoading] = useState(true);
   const [tradesError, setTradesError] = useState<string | null>(null);
   const [localTradeImportCount, setLocalTradeImportCount] = useState(0);
-  const [researchQuestions, setResearchQuestions] = useState<ResearchQuestion[]>(() => {
-    const saved = localStorage.getItem(key('rqs'));
-    return saved ? JSON.parse(saved) : INITIAL_RESEARCH_QUESTIONS;
-  });
-  const [backtestSamples, setBacktestSamples] = useState<BacktestSample[]>(() => {
-    const saved = localStorage.getItem(key('backtests'));
-    return saved ? JSON.parse(saved) : INITIAL_BACKTEST_SAMPLES;
-  });
+
+  // ---- Week 3: durable, Supabase-backed research & backtesting; local entries require explicit import ----
+  const [researchQuestions, setResearchQuestions] = useState<ResearchQuestion[]>([]);
+  const [researchLoading, setResearchLoading] = useState(true);
+  const [researchError, setResearchError] = useState<string | null>(null);
+  const [localResearchImportCount, setLocalResearchImportCount] = useState(0);
+
+  const [backtestSamples, setBacktestSamples] = useState<BacktestSample[]>([]);
+  const [backtestLoading, setBacktestLoading] = useState(true);
+  const [backtestError, setBacktestError] = useState<string | null>(null);
+  const [localBacktestImportCount, setLocalBacktestImportCount] = useState(0);
   const [psychologyEntries, setPsychologyEntries] = useState<PsychologyEntry[]>(() => {
     const saved = localStorage.getItem(key('psychology'));
     return saved ? JSON.parse(saved) : INITIAL_PSYCHOLOGY_ENTRIES;
@@ -225,14 +244,24 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
     setTradesLoading(true);
     loadTrades(supabase, userId).then(setTrades).catch(error => setTradesError(error instanceof Error ? error.message : 'Failed to load journal')).finally(() => setTradesLoading(false));
   }, [userId]);
-  useEffect(() => { localStorage.setItem(key('rqs'), JSON.stringify(researchQuestions)); }, [researchQuestions]);
-  useEffect(() => { localStorage.setItem(key('backtests'), JSON.stringify(backtestSamples)); }, [backtestSamples]);
+  useEffect(() => {
+    const raw = localStorage.getItem(key('rqs'));
+    try { setLocalResearchImportCount(raw ? (JSON.parse(raw) as ResearchQuestion[]).length : 0); } catch { setLocalResearchImportCount(0); }
+    setResearchLoading(true);
+    loadResearchQuestions(supabase, userId).then(setResearchQuestions).catch(error => setResearchError(error instanceof Error ? error.message : 'Failed to load research questions')).finally(() => setResearchLoading(false));
+  }, [userId]);
+  useEffect(() => {
+    const raw = localStorage.getItem(key('backtests'));
+    try { setLocalBacktestImportCount(raw ? (JSON.parse(raw) as BacktestSample[]).length : 0); } catch { setLocalBacktestImportCount(0); }
+    setBacktestLoading(true);
+    loadBacktestSamples(supabase, userId).then(setBacktestSamples).catch(error => setBacktestError(error instanceof Error ? error.message : 'Failed to load backtest samples')).finally(() => setBacktestLoading(false));
+  }, [userId]);
   useEffect(() => { localStorage.setItem(key('psychology'), JSON.stringify(psychologyEntries)); }, [psychologyEntries]);
   useEffect(() => { localStorage.setItem(key('calendar'), JSON.stringify(calendarEvents)); }, [calendarEvents]);
   useEffect(() => { localStorage.setItem(key('alerts'), JSON.stringify(alerts)); }, [alerts]);
 
   const addTrade = async (tradeData: Omit<Trade, 'id' | 'timestamp' | 'configVersionUsed'>) => {
-    const newTrade: Trade = { ...tradeData, id: `tr-${Date.now().toString().slice(-6)}`, timestamp: Date.now(), configVersionUsed: tradingHQ.version };
+    const newTrade: Trade = { ...tradeData, id: genId('tr'), timestamp: Date.now(), configVersionUsed: tradingHQ.version };
     await saveTrade(supabase, userId, newTrade);
     setTrades(prev => [newTrade, ...prev]);
     return newTrade;
@@ -247,36 +276,67 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
     const count = await importTradesOnce(supabase, userId, local); setTrades(await loadTrades(supabase, userId)); setLocalTradeImportCount(0); return count;
   };
 
-  const addResearchQuestion = (rqData: Omit<ResearchQuestion, 'id' | 'createdAt'>) => {
-    const newRq: ResearchQuestion = { ...rqData, id: `rq-${Date.now().toString().slice(-4)}`, createdAt: new Date().toISOString().split('T')[0] };
+  const addResearchQuestion = async (rqData: Omit<ResearchQuestion, 'id' | 'createdAt'>) => {
+    const newRq: ResearchQuestion = { ...rqData, id: genId('rq'), createdAt: new Date().toISOString().split('T')[0] };
+    await saveResearchQuestion(supabase, userId, newRq);
     setResearchQuestions(prev => [newRq, ...prev]);
+    return newRq;
   };
-  const updateResearchQuestion = (id: string, updated: Partial<ResearchQuestion>) =>
-    setResearchQuestions(prev => prev.map(rq => (rq.id === id ? { ...rq, ...updated } : rq)));
+  const updateResearchQuestion = async (id: string, updated: Partial<ResearchQuestion>) => {
+    const current = researchQuestions.find(rq => rq.id === id); if (!current) return;
+    const next = { ...current, ...updated };
+    await saveResearchQuestion(supabase, userId, next);
+    setResearchQuestions(prev => prev.map(rq => (rq.id === id ? next : rq)));
+  };
+  const importLocalResearchQuestions = async () => {
+    const raw = localStorage.getItem(key('rqs')); const local = raw ? JSON.parse(raw) as ResearchQuestion[] : [];
+    const count = await importResearchQuestionsOnce(supabase, userId, local);
+    setResearchQuestions(await loadResearchQuestions(supabase, userId));
+    setLocalResearchImportCount(0);
+    return count;
+  };
 
-  const addBacktestSample = (sampleData: Omit<BacktestSample, 'id'>) => {
-    const newSample: BacktestSample = { ...sampleData, id: `bt-${Date.now().toString().slice(-4)}` };
+  const addBacktestSample = async (sampleData: Omit<BacktestSample, 'id'>) => {
+    const newSample: BacktestSample = { ...sampleData, id: genId('bt') };
+    await saveBacktestSample(supabase, userId, newSample);
     setBacktestSamples(prev => [newSample, ...prev]);
     if (sampleData.researchQuestionId) {
-      setResearchQuestions(prev => prev.map(rq => (rq.id === sampleData.researchQuestionId ? { ...rq, sampleCount: (rq.sampleCount || 0) + 1 } : rq)));
+      const rq = researchQuestions.find(r => r.id === sampleData.researchQuestionId);
+      if (rq) await updateResearchQuestion(rq.id, { sampleCount: (rq.sampleCount || 0) + 1 });
     }
+    return newSample;
   };
-  const updateBacktestSample = (id: string, updated: Partial<BacktestSample>) => setBacktestSamples(prev => prev.map(s => (s.id === id ? { ...s, ...updated } : s)));
-  const deleteBacktestSample = (id: string) => setBacktestSamples(prev => prev.filter(s => s.id !== id));
+  const updateBacktestSample = async (id: string, updated: Partial<BacktestSample>) => {
+    const current = backtestSamples.find(s => s.id === id); if (!current) return;
+    const next = { ...current, ...updated };
+    await saveBacktestSample(supabase, userId, next);
+    setBacktestSamples(prev => prev.map(s => (s.id === id ? next : s)));
+  };
+  const deleteBacktestSample = async (id: string) => {
+    await removeBacktestSample(supabase, id);
+    setBacktestSamples(prev => prev.filter(s => s.id !== id));
+  };
+  const importLocalBacktestSamples = async () => {
+    const raw = localStorage.getItem(key('backtests')); const local = raw ? JSON.parse(raw) as BacktestSample[] : [];
+    const count = await importBacktestSamplesOnce(supabase, userId, local);
+    setBacktestSamples(await loadBacktestSamples(supabase, userId));
+    setLocalBacktestImportCount(0);
+    return count;
+  };
 
   const addPsychologyEntry = (entryData: Omit<PsychologyEntry, 'id' | 'timestamp'>) => {
-    const newEntry: PsychologyEntry = { ...entryData, id: `psy-${Date.now().toString().slice(-4)}`, timestamp: Date.now() };
+    const newEntry: PsychologyEntry = { ...entryData, id: genId('psy'), timestamp: Date.now() };
     setPsychologyEntries(prev => [newEntry, ...prev]);
   };
 
   const addCalendarEvent = (eventData: Omit<OperationalCalendarEvent, 'id'>) => {
-    const newEvent: OperationalCalendarEvent = { ...eventData, id: `cal-${Date.now().toString().slice(-4)}` };
+    const newEvent: OperationalCalendarEvent = { ...eventData, id: genId('cal') };
     setCalendarEvents(prev => [...prev, newEvent]);
   };
   const toggleCalendarEvent = (id: string) => setCalendarEvents(prev => prev.map(ev => (ev.id === id ? { ...ev, completed: !ev.completed } : ev)));
 
   const addAlert = (alertData: Omit<AlertRule, 'id'>) => {
-    const newAlert: AlertRule = { ...alertData, id: `al-${Date.now().toString().slice(-4)}` };
+    const newAlert: AlertRule = { ...alertData, id: genId('al') };
     setAlerts(prev => [newAlert, ...prev]);
   };
   const toggleAlert = (id: string) => setAlerts(prev => prev.map(al => (al.id === id ? { ...al, active: !al.active } : al)));
@@ -294,14 +354,25 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
     URL.revokeObjectURL(url);
   };
 
-  const importDataJSON = (jsonString: string): boolean => {
+  const importDataJSON = async (jsonString: string): Promise<boolean> => {
     try {
       const parsed = JSON.parse(jsonString);
-      // Trading HQ and Asset Desks are Supabase-backed now, so imports only
-      // restore the still-local pieces.
-      if (parsed.trades) setTrades(parsed.trades);
-      if (parsed.researchQuestions) setResearchQuestions(parsed.researchQuestions);
-      if (parsed.backtestSamples) setBacktestSamples(parsed.backtestSamples);
+      // Trading HQ and Asset Desks are Supabase-backed now. Trades, research
+      // questions, and backtest samples are too (Weeks 2–3) — a restore has to
+      // actually write them through, not just set local state, or the
+      // "imported" data would vanish again on next reload.
+      if (Array.isArray(parsed.trades)) {
+        for (const trade of parsed.trades as Trade[]) await saveTrade(supabase, userId, trade);
+        setTrades(await loadTrades(supabase, userId));
+      }
+      if (Array.isArray(parsed.researchQuestions)) {
+        for (const rq of parsed.researchQuestions as ResearchQuestion[]) await saveResearchQuestion(supabase, userId, rq);
+        setResearchQuestions(await loadResearchQuestions(supabase, userId));
+      }
+      if (Array.isArray(parsed.backtestSamples)) {
+        for (const sample of parsed.backtestSamples as BacktestSample[]) await saveBacktestSample(supabase, userId, sample);
+        setBacktestSamples(await loadBacktestSamples(supabase, userId));
+      }
       if (parsed.psychologyEntries) setPsychologyEntries(parsed.psychologyEntries);
       if (parsed.calendarEvents) setCalendarEvents(parsed.calendarEvents);
       if (parsed.alerts) setAlerts(parsed.alerts);
@@ -341,12 +412,20 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
         deleteTrade,
         importLocalTrades,
         researchQuestions,
+        researchLoading,
+        researchError,
+        localResearchImportCount,
         addResearchQuestion,
         updateResearchQuestion,
+        importLocalResearchQuestions,
         backtestSamples,
+        backtestLoading,
+        backtestError,
+        localBacktestImportCount,
         addBacktestSample,
         updateBacktestSample,
         deleteBacktestSample,
+        importLocalBacktestSamples,
         psychologyEntries,
         addPsychologyEntry,
         calendarEvents,

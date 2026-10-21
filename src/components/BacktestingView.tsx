@@ -28,6 +28,10 @@ export const BacktestingView: React.FC = () => {
     researchQuestions,
     performanceStats,
     assets,
+    backtestLoading,
+    backtestError,
+    localBacktestImportCount,
+    importLocalBacktestSamples,
   } = useTrading();
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -78,7 +82,7 @@ export const BacktestingView: React.FC = () => {
   const [notes, setNotes] = useState('Clean reaction following AR level test');
   const [screenshot, setScreenshot] = useState('');
 
-  const handleAddSample = (e: React.FormEvent) => {
+  const handleAddSample = async (e: React.FormEvent) => {
     e.preventDefault();
     const entry = parseFloat(entryPrice);
     const stop = parseFloat(stopPrice);
@@ -93,24 +97,29 @@ export const BacktestingView: React.FC = () => {
     const realizedR = calculateRealizedR(direction, entry, stop, exit);
     const result = realizedR > 0 ? 'WIN' : realizedR < 0 ? 'LOSS' : 'SCRATCH';
 
-    addBacktestSample({
-      researchQuestionId: rqId || 'rq-05',
-      asset,
-      date,
-      marketRegime: regime,
-      narrative,
-      setupModel,
-      direction,
-      entry,
-      stop,
-      target,
-      result,
-      realizedR,
-      isValidSetup,
-      evidence,
-      screenshot: screenshot.trim() || undefined,
-      notes: notes.trim() || 'Empirical sample recorded',
-    });
+    try {
+      await addBacktestSample({
+        researchQuestionId: rqId || 'rq-05',
+        asset,
+        date,
+        marketRegime: regime,
+        narrative,
+        setupModel,
+        direction,
+        entry,
+        stop,
+        target,
+        result,
+        realizedR,
+        isValidSetup,
+        evidence,
+        screenshot: screenshot.trim() || undefined,
+        notes: notes.trim() || 'Empirical sample recorded',
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Could not save the backtest sample. It has not been recorded.');
+      return;
+    }
 
     setShowAddModal(false);
   };
@@ -144,6 +153,14 @@ export const BacktestingView: React.FC = () => {
           <Plus className="w-4 h-4" />
           <span>+ LOG BACKTEST SAMPLE</span>
         </button>
+        {localBacktestImportCount > 0 && (
+          <button
+            onClick={() => importLocalBacktestSamples().catch(error => alert(error instanceof Error ? error.message : 'Import failed'))}
+            className="px-4 py-2 rounded border border-amber-700 text-amber-300 font-mono text-xs font-bold"
+          >
+            IMPORT {localBacktestImportCount} LOCAL SAMPLE{localBacktestImportCount === 1 ? '' : 'S'}
+          </button>
+        )}
       </div>
 
       {/* Analytics Comparison: Live vs Backtest */}
@@ -172,6 +189,13 @@ export const BacktestingView: React.FC = () => {
           <span className="text-[10px] text-slate-500">Expected sample payoff</span>
         </div>
       </div>
+
+      {(backtestLoading || backtestError) && (
+        <div className="space-y-1">
+          {backtestLoading && <p className="text-xs font-mono text-slate-500">Loading durable backtest samples…</p>}
+          {backtestError && <p className="text-xs font-mono text-rose-400">{backtestError}</p>}
+        </div>
+      )}
 
       {/* Samples Table / List / Visual Gallery */}
       <div className="bg-[#101722] border border-slate-800 rounded-lg overflow-hidden">
