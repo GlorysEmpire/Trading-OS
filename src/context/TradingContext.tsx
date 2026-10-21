@@ -21,7 +21,7 @@ import {
 import { computePerformanceStats } from '../utils/tradingCalculations';
 import { supabase } from '../lib/supabaseClient';
 import { buildTradingHQConfig, loadHQConfigRows, saveHQCategory, seedMissingHQCategories, type HQCategory, type HQConfigRow } from '../lib/hqStore';
-import { loadAssetDesks, saveAssetDeskPatch, seedAssetDesksIfMissing } from '../lib/assetDesksStore';
+import { archiveAssetDesk, createAssetDesk, loadAssetDesks, saveAssetDeskPatch, seedAssetDesksIfMissing, updateInstrument, type InstrumentInput } from '../lib/assetDesksStore';
 
 export type NavSection =
   | 'dashboard'
@@ -55,6 +55,9 @@ interface TradingContextType {
   selectedAssetId: string;
   setSelectedAssetId: (id: string) => void;
   updateAssetDesk: (id: string, updated: Partial<AssetDeskData>) => Promise<void>;
+  createInstrument: (input: InstrumentInput) => Promise<void>;
+  updateInstrument: (id: string, input: InstrumentInput) => Promise<void>;
+  archiveInstrument: (id: string) => Promise<void>;
 
   // Still local-only — later weeks per the MVP roadmap
   trades: Trade[];
@@ -177,6 +180,15 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
     setAssets(prev => prev.map(a => (a.id === id ? { ...a, ...updated } : a)));
     await saveAssetDeskPatch(supabase, id, updated);
   };
+
+  const refreshDesks = useCallback(async () => {
+    const desks = await loadAssetDesks(supabase, userId);
+    setAssets(desks);
+    setSelectedAssetId(previous => desks.some(desk => desk.id === previous) ? previous : desks[0]?.id || '');
+  }, [userId]);
+  const createInstrument = async (input: InstrumentInput) => { await createAssetDesk(supabase, userId, input); await refreshDesks(); };
+  const updateInstrumentMetadata = async (id: string, input: InstrumentInput) => { await updateInstrument(supabase, id, input); await refreshDesks(); };
+  const archiveInstrument = async (id: string) => { await archiveAssetDesk(supabase, id); await refreshDesks(); };
 
   // ---- Everything else: local-only for now (later weeks) ----
   const [trades, setTrades] = useState<Trade[]>(() => {
@@ -301,6 +313,9 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
         selectedAssetId,
         setSelectedAssetId,
         updateAssetDesk,
+      createInstrument,
+      updateInstrument: updateInstrumentMetadata,
+      archiveInstrument,
         trades,
         addTrade,
         updateTrade,

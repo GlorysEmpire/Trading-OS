@@ -11,12 +11,10 @@ const REAL_ASSETS: { symbol: string; name: string; category: AssetCategory; trad
   { symbol: 'EURUSD', name: 'Euro / US Dollar', category: 'FX', tradingViewSymbol: 'FX:EURUSD' },
 ];
 
-const CATEGORY_BY_SYMBOL: Record<string, AssetCategory> = Object.fromEntries(REAL_ASSETS.map(a => [a.symbol, a.category]));
-const TV_SYMBOL_BY_SYMBOL: Record<string, string> = Object.fromEntries(REAL_ASSETS.map(a => [a.symbol, a.tradingViewSymbol]));
 
 /**
- * IMPORTANT — schema reality check (2026-10-20):
- * The deployed `asset_desks` table does NOT have `liquidity_zones`,
+ * Schema compatibility note: before the Week 1 migration is applied, the deployed
+ * `asset_desks` table does NOT have `liquidity_zones`,
  * `active_pois`, `scenario_list`, `wyckoff_events`, or `tradingview_symbol`
  * columns (confirmed directly against the live PostgREST schema — selecting
  * any of them returns Postgres error 42703 "column does not exist"). This is
@@ -29,9 +27,9 @@ const TV_SYMBOL_BY_SYMBOL: Record<string, string> = Object.fromEntries(REAL_ASSE
  * previously-unused `notes` text column carries a small JSON bundle for the
  * remaining fields that have no column of their own at all (liquidity zones,
  * identified Wyckoff events, and desk chart/screenshot attachments).
- * `tradingViewSymbol` isn't persisted at all — it's never user-edited (only
- * used as an outbound TradingView link), so it's derived from the symbol via
- * the REAL_ASSETS map every time instead of needing a column.
+ * The Week 1 migration adds explicit instrument metadata and a soft archive;
+ * until it is applied, this version intentionally fails rather than silently
+ * reverting to a hardcoded universe.
  */
 
 type DeskRow = {
@@ -48,10 +46,14 @@ type DeskRow = {
   scenarios: string | null; // repurposed: JSON-encoded Scenario[]
   research_notes: string | null;
   notes: string | null; // repurposed: JSON-encoded {liquidityZones, wyckoffEvents, charts}
+  canonical_symbol: string;
+  category: AssetCategory;
+  tradingview_symbol: string | null;
+  archived_at: string | null;
 };
 
 const DESK_COLUMNS =
-  'id, symbol, name, bias, htf_structure, narrative, liquidity, pois, wyckoff_development, external_context, scenarios, research_notes, notes';
+  'id, symbol, name, bias, htf_structure, narrative, liquidity, pois, wyckoff_development, external_context, scenarios, research_notes, notes, canonical_symbol, category, tradingview_symbol, archived_at';
 
 type NotesBundle = {
   liquidityZones?: LiquidityZone[];
@@ -80,9 +82,9 @@ function rowToDesk(row: DeskRow): AssetDeskData {
     id: row.id,
     symbol: row.symbol,
     name: row.name,
-    category: CATEGORY_BY_SYMBOL[row.symbol] ?? 'CRYPTO',
+    category: row.category || 'OTHER',
     currentBias: (row.bias as AssetDeskData['currentBias']) || 'NEUTRAL',
-    tradingViewSymbol: TV_SYMBOL_BY_SYMBOL[row.symbol] ?? '',
+    tradingViewSymbol: row.tradingview_symbol ?? '',
     htfStructure: safeParse(row.htf_structure, { monthly: '', weekly: '', daily: '', h4: '' }),
     currentNarrative: row.narrative || '',
     liquidityZones: notesBundle.liquidityZones ?? [],
@@ -101,6 +103,7 @@ export async function loadAssetDesks(supabase: SupabaseClient, userId: string): 
     .from('asset_desks')
     .select(DESK_COLUMNS)
     .eq('user_id', userId)
+    .is('archived_at', null)
     .order('symbol');
   if (error) throw error;
   return (data ?? []).map(row => rowToDesk(row as DeskRow));
@@ -117,9 +120,26 @@ export async function seedAssetDesksIfMissing(supabase: SupabaseClient, userId: 
     user_id: userId,
     symbol: a.symbol,
     name: a.name,
-    bias: 'NEUTRAL',
+    bias: 'NEUTRAL', canonical_symbol: a.symbol, category: a.category, tradingview_symbol: a.tradingViewSymbol,
   }));
   const { error } = await supabase.from('asset_desks').upsert(rows, { onConflict: 'user_id,symbol', ignoreDuplicates: true });
+  if (error) throw error;
+}
+
+export type InstrumentInput = { symbol: string; name: string; canonicalSymbol: string; category: AssetCategory; tradingViewSymbol?: string };
+
+export async function createAssetDesk(supabase: SupabaseClient, userId: string, input: InstrumentInput) {
+  const { error } = await supabase.from('asset_desks').insert({ user_id: userId, symbol: input.symbol.trim().toUpperCase(), name: input.name.trim(), canonical_symbol: input.canonicalSymbol.trim().toUpperCase(), category: input.category, tradingview_symbol: input.tradingViewSymbol?.trim() || null, bias: 'NEUTRAL' });
+  if (error) throw error;
+}
+
+export async function updateInstrument(supabase: SupabaseClient, deskId: string, input: InstrumentInput) {
+  const { error } = await supabase.from('asset_desks').update({ symbol: input.symbol.trim().toUpperCase(), name: input.name.trim(), canonical_symbol: input.canonicalSymbol.trim().toUpperCase(), category: input.category, tradingview_symbol: input.tradingViewSymbol?.trim() || null }).eq('id', deskId);
+  if (error) throw error;
+}
+
+export async function archiveAssetDesk(supabase: SupabaseClient, deskId: string) {
+  const { error } = await supabase.from('asset_desks').update({ archived_at: new Date().toISOString() }).eq('id', deskId);
   if (error) throw error;
 }
 

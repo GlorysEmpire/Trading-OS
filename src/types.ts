@@ -3,7 +3,7 @@
  * Adhering strictly to configurable methodology & versioned rules.
  */
 
-export type AssetCategory = 'CRYPTO' | 'INDICES' | 'METALS' | 'FX';
+export type AssetCategory = 'CRYPTO' | 'INDICES' | 'METALS' | 'FX' | 'EQUITIES' | 'OTHER';
 
 export type BiasType = 'BULLISH' | 'BEARISH' | 'NEUTRAL' | 'ACCUMULATION' | 'DISTRIBUTION' | 'RE-ACCUMULATION';
 

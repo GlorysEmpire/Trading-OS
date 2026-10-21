@@ -14,14 +14,14 @@ import {
   Camera,
   ImagePlus,
 } from 'lucide-react';
-import { BiasType, Scenario, LiquidityZone, AssetChartScreenshot } from '../types';
+import { AssetCategory, BiasType, Scenario, LiquidityZone, AssetChartScreenshot } from '../types';
 import { ImageUploadDropzone } from './ImageUploadDropzone';
 import { ImageViewerModal, LightboxImage } from './ImageViewerModal';
 
 const inputClass = 'bg-[#162130] border border-slate-700 rounded px-2.5 py-1.5 text-slate-200 outline-none focus:border-cyan-500 font-sans';
 
 export const AssetDesksView: React.FC = () => {
-  const { assets, selectedAssetId, setSelectedAssetId, updateAssetDesk, setQuickTradeModalOpen, desksLoading, desksError } = useTrading();
+  const { assets, selectedAssetId, setSelectedAssetId, updateAssetDesk, createInstrument, updateInstrument, archiveInstrument, setQuickTradeModalOpen, desksLoading, desksError } = useTrading();
 
   const currentDesk = assets.find(a => a.id === selectedAssetId) || assets[0];
 
@@ -62,6 +62,9 @@ export const AssetDesksView: React.FC = () => {
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [newChartTitle, setNewChartTitle] = useState('');
   const [pendingChartUrl, setPendingChartUrl] = useState('');
+  const [instrumentFormOpen, setInstrumentFormOpen] = useState(false);
+  const [instrumentError, setInstrumentError] = useState<string | null>(null);
+  const [instrumentDraft, setInstrumentDraft] = useState({ symbol: '', name: '', canonicalSymbol: '', category: 'CRYPTO' as AssetCategory, tradingViewSymbol: '' });
 
   if (desksLoading) {
     return (
@@ -204,6 +207,21 @@ export const AssetDesksView: React.FC = () => {
     setShowAddScenario(false);
   };
   const deleteScenario = (id: string) => updateAssetDesk(currentDesk.id, { scenarios: currentDesk.scenarios.filter(s => s.id !== id) });
+  const saveInstrument = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!instrumentDraft.symbol.trim() || !instrumentDraft.name.trim() || !instrumentDraft.canonicalSymbol.trim()) { setInstrumentError('Display symbol, name, and canonical symbol are required.'); return; }
+    try { setInstrumentError(null); await createInstrument(instrumentDraft); setInstrumentFormOpen(false); setInstrumentDraft({ symbol: '', name: '', canonicalSymbol: '', category: 'CRYPTO', tradingViewSymbol: '' }); }
+    catch (error) { setInstrumentError(error instanceof Error ? error.message : 'Could not save instrument. Symbols must be unique.'); }
+  };
+  const editCurrentInstrument = async () => {
+    const symbol = window.prompt('Display symbol', currentDesk.symbol); if (symbol === null) return;
+    const name = window.prompt('Instrument name', currentDesk.name); if (name === null) return;
+    const canonicalSymbol = window.prompt('Canonical symbol (for example BTCUSDT)', currentDesk.symbol); if (canonicalSymbol === null) return;
+    const category = window.prompt('Category: CRYPTO, INDICES, METALS, FX, EQUITIES, or OTHER', currentDesk.category); if (category === null) return;
+    const tradingViewSymbol = window.prompt('TradingView symbol (optional)', currentDesk.tradingViewSymbol) ?? '';
+    try { await updateInstrument(currentDesk.id, { symbol, name, canonicalSymbol, category: category.toUpperCase() as AssetCategory, tradingViewSymbol }); } catch (error) { setInstrumentError(error instanceof Error ? error.message : 'Could not update instrument.'); }
+  };
+  const archiveCurrentInstrument = async () => { if (!window.confirm(`Archive ${currentDesk.symbol}? Its desk notes and historical data are retained.`)) return; try { await archiveInstrument(currentDesk.id); } catch (error) { setInstrumentError(error instanceof Error ? error.message : 'Could not archive instrument.'); } };
 
   return (
     <div className="p-4 sm:p-6 space-y-5 max-w-7xl mx-auto">
@@ -236,10 +254,10 @@ export const AssetDesksView: React.FC = () => {
             );
           })}
         </div>
-        <button onClick={() => setQuickTradeModalOpen(true)} className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold px-3 py-1.5 rounded transition">
-          <span>+ EXECUTE ON {currentDesk.symbol}</span>
-        </button>
+        <div className="flex gap-2"><button onClick={() => setInstrumentFormOpen(v => !v)} className="bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 font-mono text-xs font-bold px-3 py-1.5 rounded">+ INSTRUMENT</button><button onClick={() => setQuickTradeModalOpen(true)} className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold px-3 py-1.5 rounded transition"><span>+ EXECUTE ON {currentDesk.symbol}</span></button></div>
       </div>
+      {instrumentError && <p className="text-xs font-mono text-rose-400">{instrumentError}</p>}
+      {instrumentFormOpen && <form onSubmit={saveInstrument} className="bg-[#101722] border border-slate-800 rounded-lg p-4 grid gap-3 md:grid-cols-2"><h3 className="md:col-span-2 text-sm font-mono font-bold text-slate-100">Add instrument / pair</h3>{([['Display symbol', 'symbol'], ['Name', 'name'], ['Canonical symbol', 'canonicalSymbol'], ['TradingView symbol (optional)', 'tradingViewSymbol']] as const).map(([title, field]) => <label key={field} className="text-[10px] font-mono text-slate-400">{title}<input required={field !== 'tradingViewSymbol'} value={instrumentDraft[field]} onChange={e => setInstrumentDraft({ ...instrumentDraft, [field]: e.target.value })} className={`${inputClass} w-full mt-1`} /></label>)}<label className="text-[10px] font-mono text-slate-400">Category<select value={instrumentDraft.category} onChange={e => setInstrumentDraft({ ...instrumentDraft, category: e.target.value as AssetCategory })} className={`${inputClass} w-full mt-1`}>{(['CRYPTO', 'INDICES', 'METALS', 'FX', 'EQUITIES', 'OTHER'] as AssetCategory[]).map(category => <option key={category}>{category}</option>)}</select></label><p className="md:col-span-2 text-xs text-slate-400">Use separate records for BTCUSD and BTCUSDT. Archive hides an instrument from new selectors without deleting desk/history.</p><button className="w-fit px-3 py-2 rounded bg-cyan-600 text-white font-mono text-xs font-bold">SAVE INSTRUMENT</button></form>}
 
       {/* Desk Subheader */}
       <div className="bg-[#101722] border border-slate-800 rounded-lg p-4 flex flex-wrap items-center justify-between gap-4">
@@ -262,6 +280,7 @@ export const AssetDesksView: React.FC = () => {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={editCurrentInstrument} className="text-[10px] font-mono text-cyan-300">EDIT INSTRUMENT</button><button onClick={archiveCurrentInstrument} className="text-[10px] font-mono text-amber-300">ARCHIVE</button>
           <span className="text-[11px] font-mono text-slate-400 uppercase">CURRENT BIAS:</span>
           <select
             value={currentDesk.currentBias}
