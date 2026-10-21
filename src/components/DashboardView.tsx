@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTrading } from '../context/TradingContext';
 import { getAuthHeaders } from '../lib/supabaseClient';
 import { traderDateString, traderNowMinutes, isSessionActiveNow } from '../utils/traderTime';
@@ -22,6 +22,8 @@ import {
   Settings2,
   Check,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 /** Which of the Dashboard's secondary panels are shown. The point of a
@@ -63,17 +65,25 @@ function loadDashboardWidgetPrefs(): Record<DashboardWidgetKey, boolean> {
 }
 
 
-/** Best single chart screenshot to represent an asset at a glance: prefer
- * the most recently uploaded BIAS-category chart (that's the one meant to
- * summarize current directional read), otherwise just the most recent
- * screenshot of any category. Returns undefined when the desk has none. */
-function getBestChartScreenshot(asset: AssetDeskData) {
+/** All of an asset's chart screenshots, ordered so the single "best" one
+ * (most recently uploaded BIAS-category chart — the one meant to summarize
+ * current directional read — falling back to the most recent of any
+ * category) comes first, followed by the rest by recency. Empty array when
+ * the desk has none. */
+function getOrderedChartScreenshots(asset: AssetDeskData) {
   const charts = asset.charts ?? [];
-  if (charts.length === 0) return undefined;
+  if (charts.length === 0) return [];
   const byRecency = [...charts].sort(
     (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
   );
-  return byRecency.find((c) => c.category === 'BIAS') ?? byRecency[0];
+  const best = byRecency.find((c) => c.category === 'BIAS') ?? byRecency[0];
+  return [best, ...byRecency.filter((c) => c.id !== best.id)];
+}
+
+/** Best single chart screenshot to represent an asset at a glance (see
+ * getOrderedChartScreenshots). Returns undefined when the desk has none. */
+function getBestChartScreenshot(asset: AssetDeskData) {
+  return getOrderedChartScreenshots(asset)[0];
 }
 
 /** The scenario currently marked PRIMARY for this desk, if any. */
@@ -145,6 +155,14 @@ export const DashboardView: React.FC = () => {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
+  }, [expandedAssetId]);
+
+  // Which chart screenshot the quick-look modal's carousel is currently on.
+  // Resets whenever a different asset is opened (or the modal is closed).
+  const [modalImageIndex, setModalImageIndex] = useState(0);
+  const chartScrollRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    setModalImageIndex(0);
   }, [expandedAssetId]);
 
   const openTrades = trades.filter((t) => t.status === 'OPEN');
@@ -757,9 +775,15 @@ export const DashboardView: React.FC = () => {
       const isBearish = expandedAsset.currentBias === 'BEARISH' || expandedAsset.currentBias === 'DISTRIBUTION';
       const accent = isBullish ? 'emerald' : isBearish ? 'rose' : 'slate';
       const BiasIcon = isBullish ? TrendingUp : isBearish ? TrendingDown : Minus;
-      const chart = getBestChartScreenshot(expandedAsset);
+      const charts = getOrderedChartScreenshots(expandedAsset);
       const primaryScenario = getPrimaryScenario(expandedAsset);
       const externalContextLine = getExternalContextSummary(expandedAsset);
+      const activeChart = charts[modalImageIndex];
+      const scrollChartsBy = (dir: -1 | 1) => {
+        const el = chartScrollRef.current;
+        if (!el) return;
+        el.scrollBy({ left: dir * el.clientWidth, behavior: 'smooth' });
+      };
 
       return (
         <div
@@ -777,23 +801,79 @@ export const DashboardView: React.FC = () => {
               <X className="w-4 h-4" />
             </button>
 
-            {/* Bigger chart screenshot — the whole point of tapping in */}
+            {/* Bigger chart screenshot(s) — the whole point of tapping in.
+                Scroll/swipe sideways (or use the arrows) when a desk has
+                more than one. */}
             <div className="relative h-56 sm:h-64 w-full bg-[#0a0f16] rounded-t-xl overflow-hidden">
-              {chart ? (
-                <img
-                  src={chart.url}
-                  alt={`${expandedAsset.symbol} ${chart.timeframe} chart`}
-                  className="w-full h-full object-contain"
-                />
+              {charts.length > 0 ? (
+                <>
+                  <div
+                    key={expandedAsset.id}
+                    ref={chartScrollRef}
+                    onScroll={(e) => {
+                      const el = e.currentTarget;
+                      if (el.clientWidth === 0) return;
+                      setModalImageIndex(Math.round(el.scrollLeft / el.clientWidth));
+                    }}
+                    className="h-full w-full flex overflow-x-auto snap-x snap-mandatory scrollbar-hide"
+                  >
+                    {charts.map((c) => (
+                      <div key={c.id} className="h-full w-full shrink-0 snap-center flex items-center justify-center">
+                        <img
+                          src={c.url}
+                          alt={`${expandedAsset.symbol} ${c.timeframe} chart`}
+                          className="max-w-full max-h-full object-contain"
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  {activeChart && (
+                    <span className="absolute top-2 left-2.5 text-[10px] font-mono font-bold text-slate-200 bg-black/60 px-1.5 py-0.5 rounded pointer-events-none">
+                      {activeChart.timeframe} · {activeChart.title}
+                    </span>
+                  )}
+
+                  {charts.length > 1 && (
+                    <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          scrollChartsBy(-1);
+                        }}
+                        disabled={modalImageIndex === 0}
+                        className="absolute left-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/50 hover:bg-black/70 text-slate-200 transition disabled:opacity-20 disabled:cursor-default"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          scrollChartsBy(1);
+                        }}
+                        disabled={modalImageIndex >= charts.length - 1}
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/50 hover:bg-black/70 text-slate-200 transition disabled:opacity-20 disabled:cursor-default"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+
+                      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
+                        {charts.map((c, i) => (
+                          <span
+                            key={c.id}
+                            className={`w-1.5 h-1.5 rounded-full transition ${
+                              i === modalImageIndex ? 'bg-white' : 'bg-white/30'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </>
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <span className="text-xs font-mono text-slate-600 uppercase">No chart screenshot yet</span>
                 </div>
-              )}
-              {chart && (
-                <span className="absolute bottom-2 right-2.5 text-[10px] font-mono font-bold text-slate-200 bg-black/60 px-1.5 py-0.5 rounded">
-                  {chart.timeframe} · {chart.title}
-                </span>
               )}
             </div>
 

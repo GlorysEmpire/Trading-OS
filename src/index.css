@@ -47,6 +47,17 @@ html, body {
   background: #64748b;
 }
 
+/* Fully hidden scrollbar for carousels (e.g. Market Watch's modal chart
+   carousel) where horizontal scroll/swipe is the interaction and a
+   visible scrollbar track is just noise. */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Ash Theme Specific Color Overrides */
 .ash-theme {
   background-color: #edf0f5 !important;
