@@ -82,6 +82,10 @@ export interface AssetDeskData {
     keySustainedLevel: string;
   };
   charts?: AssetChartScreenshot[];
+  /** Whether this instrument appears in the Dashboard's Market Watch —
+   * opt-in so the watch only shows what's actively being monitored, not
+   * every configured instrument. */
+  watchlisted?: boolean;
 }
 
 export interface RiskRules {

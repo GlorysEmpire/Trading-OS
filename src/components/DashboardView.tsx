@@ -38,6 +38,7 @@ export const DashboardView: React.FC = () => {
   const todayStr = new Date().toISOString().split('T')[0];
   const todayEvents = calendarEvents.filter((e) => e.date === todayStr);
   const activeAlerts = alerts.filter((a) => a.active);
+  const watchedAssets = assets.filter((a) => a.watchlisted);
   const activeRQ = researchQuestions[0];
 
   const handleGenerateDailyBrief = async () => {
@@ -267,13 +268,27 @@ export const DashboardView: React.FC = () => {
             onClick={() => setActiveTab('asset-desks')}
             className="text-xs font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
           >
-            <span>Open Asset Desks</span>
+            <span>Manage Watchlist in Asset Desks</span>
             <ExternalLink className="w-3 h-3" />
           </button>
         </div>
 
+        {watchedAssets.length === 0 ? (
+          <div className="p-5 text-center bg-[#101722] border border-dashed border-slate-800 rounded-lg space-y-2">
+            <p className="text-xs font-mono text-slate-400">
+              Market Watch is empty. Star the instruments you're actively monitoring from Asset Desks to pin them here.
+            </p>
+            <button
+              onClick={() => setActiveTab('asset-desks')}
+              className="text-xs font-mono text-cyan-400 hover:text-cyan-300 inline-flex items-center gap-1"
+            >
+              <span>Open Asset Desks</span>
+              <ExternalLink className="w-3 h-3" />
+            </button>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {assets.map((asset) => {
+          {watchedAssets.map((asset) => {
             const isBullish = asset.currentBias === 'BULLISH' || asset.currentBias === 'ACCUMULATION' || asset.currentBias === 'RE-ACCUMULATION';
             const isBearish = asset.currentBias === 'BEARISH' || asset.currentBias === 'DISTRIBUTION';
 
@@ -322,6 +337,7 @@ export const DashboardView: React.FC = () => {
             );
           })}
         </div>
+        )}
       </section>
 
       {/* SECTION 3: TRADING — Performance & Process Score Matrix */}

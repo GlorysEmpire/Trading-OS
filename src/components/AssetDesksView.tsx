@@ -13,6 +13,7 @@ import {
   Activity,
   Camera,
   ImagePlus,
+  Star,
 } from 'lucide-react';
 import { AssetCategory, BiasType, Scenario, LiquidityZone, AssetChartScreenshot } from '../types';
 import { ImageUploadDropzone } from './ImageUploadDropzone';
@@ -222,6 +223,7 @@ export const AssetDesksView: React.FC = () => {
     try { await updateInstrument(currentDesk.id, { symbol, name, canonicalSymbol, category: category.toUpperCase() as AssetCategory, tradingViewSymbol }); } catch (error) { setInstrumentError(error instanceof Error ? error.message : 'Could not update instrument.'); }
   };
   const archiveCurrentInstrument = async () => { if (!window.confirm(`Archive ${currentDesk.symbol}? Its desk notes and historical data are retained.`)) return; try { await archiveInstrument(currentDesk.id); } catch (error) { setInstrumentError(error instanceof Error ? error.message : 'Could not archive instrument.'); } };
+  const toggleWatchlist = (assetId: string, next: boolean) => { updateAssetDesk(assetId, { watchlisted: next }); };
 
   return (
     <div className="p-4 sm:p-6 space-y-5 max-w-7xl mx-auto">
@@ -231,26 +233,38 @@ export const AssetDesksView: React.FC = () => {
           {assets.map(asset => {
             const isSelected = asset.id === currentDesk.id;
             return (
-              <button
+              <div
                 key={asset.id}
-                onClick={() => setSelectedAssetId(asset.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-xs transition ${
+                className={`flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-lg font-mono text-xs transition ${
                   isSelected ? 'bg-[#182335] text-cyan-300 border border-cyan-500/40 font-bold shadow-sm' : 'bg-[#101722] text-slate-400 hover:text-slate-200 border border-slate-800'
                 }`}
               >
-                <span>{asset.symbol}</span>
-                <span
-                  className={`text-[9px] px-1.5 py-0.2 rounded font-sans ${
-                    asset.currentBias.includes('BULL') || asset.currentBias.includes('ACC')
-                      ? 'bg-emerald-950 text-emerald-300'
-                      : asset.currentBias.includes('BEAR') || asset.currentBias.includes('DIST')
-                      ? 'bg-rose-950 text-rose-300'
-                      : 'bg-slate-800 text-slate-400'
-                  }`}
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); toggleWatchlist(asset.id, !asset.watchlisted); }}
+                  title={asset.watchlisted ? 'Remove from Market Watch' : 'Add to Market Watch'}
+                  className={`p-1 rounded hover:bg-slate-700/60 transition ${asset.watchlisted ? 'text-amber-400' : 'text-slate-600 hover:text-slate-400'}`}
                 >
-                  {asset.currentBias}
-                </span>
-              </button>
+                  <Star className="w-3 h-3" fill={asset.watchlisted ? 'currentColor' : 'none'} />
+                </button>
+                <button
+                  onClick={() => setSelectedAssetId(asset.id)}
+                  className="flex items-center gap-2"
+                >
+                  <span>{asset.symbol}</span>
+                  <span
+                    className={`text-[9px] px-1.5 py-0.2 rounded font-sans ${
+                      asset.currentBias.includes('BULL') || asset.currentBias.includes('ACC')
+                        ? 'bg-emerald-950 text-emerald-300'
+                        : asset.currentBias.includes('BEAR') || asset.currentBias.includes('DIST')
+                        ? 'bg-rose-950 text-rose-300'
+                        : 'bg-slate-800 text-slate-400'
+                    }`}
+                  >
+                    {asset.currentBias}
+                  </span>
+                </button>
+              </div>
             );
           })}
         </div>
@@ -280,6 +294,15 @@ export const AssetDesksView: React.FC = () => {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => toggleWatchlist(currentDesk.id, !currentDesk.watchlisted)}
+            className={`flex items-center gap-1 text-[10px] font-mono px-2 py-1 rounded border ${
+              currentDesk.watchlisted ? 'border-amber-700 text-amber-300 bg-amber-950/40' : 'border-slate-700 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Star className="w-3 h-3" fill={currentDesk.watchlisted ? 'currentColor' : 'none'} />
+            <span>{currentDesk.watchlisted ? 'ON MARKET WATCH' : 'ADD TO MARKET WATCH'}</span>
+          </button>
           <button onClick={editCurrentInstrument} className="text-[10px] font-mono text-cyan-300">EDIT INSTRUMENT</button><button onClick={archiveCurrentInstrument} className="text-[10px] font-mono text-amber-300">ARCHIVE</button>
           <span className="text-[11px] font-mono text-slate-400 uppercase">CURRENT BIAS:</span>
           <select

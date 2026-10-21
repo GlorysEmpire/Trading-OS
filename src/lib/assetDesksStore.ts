@@ -59,6 +59,7 @@ type NotesBundle = {
   liquidityZones?: LiquidityZone[];
   wyckoffEvents?: string[];
   charts?: AssetChartScreenshot[];
+  watchlisted?: boolean;
 };
 
 function safeParse<T>(text: string | null, fallback: T): T {
@@ -95,6 +96,7 @@ function rowToDesk(row: DeskRow): AssetDeskData {
     researchNotes: row.research_notes || '',
     quickLevels,
     charts: notesBundle.charts ?? [],
+    watchlisted: notesBundle.watchlisted ?? false,
   };
 }
 
@@ -163,7 +165,7 @@ export async function saveAssetDeskPatch(supabase: SupabaseClient, deskId: strin
   }
 
   const touchesNotesBundle =
-    patch.liquidityZones !== undefined || patch.charts !== undefined || patch.wyckoffDevelopment?.eventsIdentified !== undefined;
+    patch.liquidityZones !== undefined || patch.charts !== undefined || patch.wyckoffDevelopment?.eventsIdentified !== undefined || patch.watchlisted !== undefined;
 
   if (touchesNotesBundle) {
     const { data: existingRow, error: fetchErr } = await supabase.from('asset_desks').select('notes').eq('id', deskId).single();
@@ -173,6 +175,7 @@ export async function saveAssetDeskPatch(supabase: SupabaseClient, deskId: strin
       liquidityZones: patch.liquidityZones !== undefined ? patch.liquidityZones : current.liquidityZones ?? [],
       wyckoffEvents: patch.wyckoffDevelopment?.eventsIdentified !== undefined ? patch.wyckoffDevelopment.eventsIdentified : current.wyckoffEvents ?? [],
       charts: patch.charts !== undefined ? patch.charts : current.charts ?? [],
+      watchlisted: patch.watchlisted !== undefined ? patch.watchlisted : current.watchlisted ?? false,
     };
     update.notes = JSON.stringify(merged);
   }
