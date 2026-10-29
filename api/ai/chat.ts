@@ -14,7 +14,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const auth = await requireAuthenticatedUser(req.headers as Record<string, string | string[] | undefined>);
-  if (!auth.ok) {
+  if (auth.ok === false) {
     return res.status(auth.status).json({ error: auth.message });
   }
 

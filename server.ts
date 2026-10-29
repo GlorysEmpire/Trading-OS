@@ -26,7 +26,7 @@ app.get("/api/health", (_req, res) => {
 // AI Assistant endpoint
 app.post("/api/ai/chat", async (req, res) => {
   const auth = await requireAuthenticatedUser(req.headers as Record<string, string | string[] | undefined>);
-  if (!auth.ok) return res.status(auth.status).json({ error: auth.message });
+  if (auth.ok === false) return res.status(auth.status).json({ error: auth.message });
   if (!checkRateLimit(auth.userId)) {
     return res.status(429).json({ error: "Too many AI requests. Please wait a moment and try again." });
   }
@@ -74,7 +74,7 @@ Provide clear, objective, professional, and dense feedback. Tone: Calm, discipli
 // AI Trade Critique endpoint
 app.post("/api/ai/analyze-trade", async (req, res) => {
   const auth = await requireAuthenticatedUser(req.headers as Record<string, string | string[] | undefined>);
-  if (!auth.ok) return res.status(auth.status).json({ error: auth.message });
+  if (auth.ok === false) return res.status(auth.status).json({ error: auth.message });
   if (!checkRateLimit(auth.userId)) {
     return res.status(429).json({ error: "Too many AI requests. Please wait a moment and try again." });
   }

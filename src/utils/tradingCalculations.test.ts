@@ -25,6 +25,7 @@ function makeConfig(overrides: Partial<RiskRules> = {}): TradingHQConfig {
     sessions: [],
     processChecks: ['Session', 'Grade', 'Risk', 'Management', 'Structure'],
     mistakeCodes: [],
+    researchFramework: { workflow: [], minSamples: 50, notes: '' },
     notes: '',
   };
 }
