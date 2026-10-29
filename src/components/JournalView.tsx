@@ -14,17 +14,16 @@ import {
   ChevronUp,
   ShieldCheck,
   ShieldAlert,
-  Trash2,
   Image as ImageIcon,
   Plus,
 } from 'lucide-react';
 import { Trade } from '../types';
-import { calculateRealizedR, determineProcessCategory } from '../utils/tradingCalculations';
+import { TradeOutcomePanel } from './TradeOutcomePanel';
 import { ImageViewerModal, LightboxImage } from './ImageViewerModal';
 import { ImageUploadDropzone } from './ImageUploadDropzone';
 
 export const JournalView: React.FC = () => {
-  const { trades, assets, updateTrade, deleteTrade, setQuickTradeModalOpen, tradingHQ, tradesLoading, tradesError, localTradeImportCount, importLocalTrades } = useTrading();
+  const { trades, assets, updateTrade, setQuickTradeModalOpen, tradingHQ, tradesLoading, tradesError, localTradeImportCount, importLocalTrades } = useTrading();
 
   const [filterAsset, setFilterAsset] = useState<string>('ALL');
   const [filterProcess, setFilterProcess] = useState<string>('ALL');
@@ -98,20 +97,6 @@ export const JournalView: React.FC = () => {
     if (filterOutcome !== 'ALL' && t.outcome !== filterOutcome) return false;
     return true;
   });
-
-  const handleUpdateExit = (trade: Trade, exitPriceNum: number) => {
-    const realizedR = calculateRealizedR(trade.direction, trade.entryPrice, trade.stopPrice, exitPriceNum);
-    const outcome: 'WIN' | 'LOSS' | 'SCRATCH' = realizedR > 0 ? 'WIN' : realizedR < 0 ? 'LOSS' : 'SCRATCH';
-    const category = determineProcessCategory(trade.processScore, outcome);
-
-    updateTrade(trade.id, {
-      exitPrice: exitPriceNum,
-      realizedR,
-      outcome,
-      status: 'CLOSED',
-      processCategory: category,
-    });
-  };
 
   const handleAuditTrade = async (trade: Trade) => {
     setAuditingTradeId(trade.id);
@@ -290,6 +275,11 @@ Provide an objective assessment:
                 </div>
 
                 <div className="flex items-center gap-4">
+                  {trade.voided && (
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-rose-950/60 border border-rose-800 text-rose-300 font-mono font-bold" title={trade.voided.reason}>
+                      VOIDED
+                    </span>
+                  )}
                   {/* Process Score Badge */}
                   <div
                     className={`flex items-center gap-1.5 px-2.5 py-1 rounded font-mono text-xs border ${
@@ -312,7 +302,7 @@ Provide an objective assessment:
                   <div className="font-mono text-right min-w-[70px]">
                     {trade.status === 'CLOSED' ? (
                       <span
-                        className={`text-base font-bold ${
+                        className={`text-base font-bold ${trade.voided ? 'line-through opacity-50 ' : ''}${
                           isWin ? 'text-emerald-400' : isLoss ? 'text-rose-400' : 'text-slate-400'
                         }`}
                       >
@@ -455,102 +445,7 @@ Provide an objective assessment:
                       3. AFTER THE TRADE (OUTCOME, PROCESS SCORING & REFLECTION)
                     </span>
 
-                    {/* Exit price & Realized R controls */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono">
-                      <div>
-                        <label className="text-[10px] text-slate-400 block mb-1">EXIT PRICE:</label>
-                        <input
-                          type="number"
-                          step="any"
-                          value={trade.exitPrice || ''}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value);
-                            if (!isNaN(val)) handleUpdateExit(trade, val);
-                          }}
-                          placeholder="Enter exit price"
-                          className="w-full bg-[#162130] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-bold outline-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] text-slate-400 block mb-1">REALIZED R:</label>
-                        <div className="px-2.5 py-1.5 bg-[#162130] border border-slate-700 rounded text-slate-100 font-bold">
-                          {trade.realizedR !== undefined ? `${trade.realizedR}R` : 'Pending Exit'}
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] text-slate-400 block mb-1">OUTCOME STATUS:</label>
-                        <select
-                          value={trade.outcome || 'PENDING'}
-                          onChange={(e) => {
-                            const newOutcome = e.target.value as any;
-                            const category = determineProcessCategory(trade.processScore, newOutcome);
-                            updateTrade(trade.id, {
-                              outcome: newOutcome,
-                              status: newOutcome === 'PENDING' ? 'OPEN' : 'CLOSED',
-                              processCategory: category,
-                            });
-                          }}
-                          className="w-full bg-[#162130] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-bold outline-none"
-                        >
-                          <option value="PENDING">PENDING (OPEN)</option>
-                          <option value="WIN">WIN</option>
-                          <option value="LOSS">LOSS</option>
-                          <option value="SCRATCH">SCRATCH / BREAKEVEN</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* 5 Process Score Checklist */}
-                    <div className="p-3 bg-[#131b26] border border-slate-800 rounded space-y-2">
-                      <span className="text-[11px] font-mono text-slate-300 font-bold uppercase block">
-                        5 Process Integrity Criteria: ({trade.processScore.score}/5 Passed)
-                      </span>
-                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 font-mono text-[11px]">
-                        {[
-                          { key: 'session', label: '1. Session' },
-                          { key: 'grade', label: '2. Setup Grade' },
-                          { key: 'risk', label: '3. 1% Risk Rule' },
-                          { key: 'management', label: '4. Management' },
-                          { key: 'structure', label: '5. HTF Structure' },
-                        ].map((chk) => {
-                          const isChecked = (trade.processScore as any)[chk.key];
-                          return (
-                            <button
-                              key={chk.key}
-                              type="button"
-                              onClick={() => {
-                                const newChecks = {
-                                  ...trade.processScore,
-                                  [chk.key]: !isChecked,
-                                };
-                                const newScore =
-                                  (newChecks.session ? 1 : 0) +
-                                  (newChecks.grade ? 1 : 0) +
-                                  (newChecks.risk ? 1 : 0) +
-                                  (newChecks.management ? 1 : 0) +
-                                  (newChecks.structure ? 1 : 0);
-                                newChecks.score = newScore;
-                                const category = determineProcessCategory(newChecks, trade.outcome);
-                                updateTrade(trade.id, {
-                                  processScore: newChecks,
-                                  processCategory: category,
-                                });
-                              }}
-                              className={`px-2 py-1 rounded border text-left flex items-center justify-between ${
-                                isChecked
-                                  ? 'bg-emerald-950/50 border-emerald-800 text-emerald-300'
-                                  : 'bg-slate-900 border-slate-800 text-slate-500'
-                              }`}
-                            >
-                              <span>{chk.label}</span>
-                              <span>{isChecked ? '✓' : '✗'}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
+                    <TradeOutcomePanel trade={trade} />
 
                     {/* Post-Trade Reflection */}
                     <div>
@@ -591,14 +486,6 @@ Provide an objective assessment:
                       )}
                     </div>
 
-                    <button
-                      onClick={() => {
-                        if (window.confirm('Delete this trade permanently?')) deleteTrade(trade.id);
-                      }}
-                      className="text-slate-500 hover:text-rose-400 p-1 rounded"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
                   </div>
 
                   {/* Audit Result Display */}

@@ -165,7 +165,7 @@ export const DashboardView: React.FC = () => {
     setModalImageIndex(0);
   }, [expandedAssetId]);
 
-  const openTrades = trades.filter((t) => t.status === 'OPEN');
+  const openTrades = trades.filter((t) => t.status === 'OPEN' && !t.voided);
   const todayStr = traderDateString();
   const todayEvents = calendarEvents.filter((e) => e.date === todayStr);
   const activeSession = tradingHQ.sessions.find((s) => isSessionActiveNow(s, nowMinutes));
@@ -672,7 +672,7 @@ export const DashboardView: React.FC = () => {
               <div className="text-emerald-400 font-bold text-xs uppercase">GOOD PROCESS + WIN</div>
               <div className="text-slate-300 text-[11px] mt-1">Systematic execution rewarded by market probability.</div>
               <div className="text-lg font-bold text-emerald-300 mt-2">
-                {trades.filter((t) => t.processCategory === 'GOOD_PROCESS_WIN').length} Trades
+                {trades.filter((t) => !t.voided && t.processCategory === 'GOOD_PROCESS_WIN').length} Trades
               </div>
             </div>
 
@@ -680,7 +680,7 @@ export const DashboardView: React.FC = () => {
               <div className="text-cyan-400 font-bold text-xs uppercase">GOOD PROCESS + LOSS</div>
               <div className="text-slate-300 text-[11px] mt-1">Acceptable business cost. All 5 process checks passed.</div>
               <div className="text-lg font-bold text-cyan-300 mt-2">
-                {trades.filter((t) => t.processCategory === 'GOOD_PROCESS_LOSS').length} Trades ({performanceStats.goodProcessLossPct}%)
+                {trades.filter((t) => !t.voided && t.processCategory === 'GOOD_PROCESS_LOSS').length} Trades ({performanceStats.goodProcessLossPct}%)
               </div>
             </div>
 
@@ -688,7 +688,7 @@ export const DashboardView: React.FC = () => {
               <div className="text-amber-400 font-bold text-xs uppercase">BAD PROCESS + WIN</div>
               <div className="text-slate-300 text-[11px] mt-1">Toxic positive reinforcement. Violated rules yet made PnL.</div>
               <div className="text-lg font-bold text-amber-300 mt-2">
-                {trades.filter((t) => t.processCategory === 'BAD_PROCESS_WIN').length} Trades ({performanceStats.badProcessWinPct}%)
+                {trades.filter((t) => !t.voided && t.processCategory === 'BAD_PROCESS_WIN').length} Trades ({performanceStats.badProcessWinPct}%)
               </div>
             </div>
 
@@ -696,7 +696,7 @@ export const DashboardView: React.FC = () => {
               <div className="text-rose-400 font-bold text-xs uppercase">BAD PROCESS + LOSS</div>
               <div className="text-slate-300 text-[11px] mt-1">Double penalty. Self-sabotage & discipline breakdown.</div>
               <div className="text-lg font-bold text-rose-300 mt-2">
-                {trades.filter((t) => t.processCategory === 'BAD_PROCESS_LOSS').length} Trades
+                {trades.filter((t) => !t.voided && t.processCategory === 'BAD_PROCESS_LOSS').length} Trades
               </div>
             </div>
           </div>

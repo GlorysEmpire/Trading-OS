@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import {
   AssetDeskData,
   Trade,
+  TradeAmendment,
   ResearchQuestion,
   BacktestSample,
   PsychologyEntry,
@@ -19,7 +20,8 @@ import { computePerformanceStats } from '../utils/tradingCalculations';
 import { supabase } from '../lib/supabaseClient';
 import { buildTradingHQConfig, loadHQConfigRows, saveHQCategory, seedMissingHQCategories, type HQCategory, type HQConfigRow } from '../lib/hqStore';
 import { archiveAssetDesk, createAssetDesk, loadAssetDesks, saveAssetDeskPatch, seedAssetDesksIfMissing, updateInstrument, type InstrumentInput } from '../lib/assetDesksStore';
-import { importTradesOnce, loadTrades, removeTrade, saveTrade } from '../lib/tradeStore';
+import { insertAmendment, insertTradesIfNew, loadAmendments, loadTrades, saveTrade } from '../lib/tradeStore';
+import { applyAmendment, assertFreeUpdate, buildClosedTrade, diffEvidence, isTradeLocked, type AmendablePatch, type CloseTradeInput } from '../utils/tradeIntegrity';
 import { importResearchQuestionsOnce, loadResearchQuestions, removeResearchQuestion, saveResearchQuestion } from '../lib/researchStore';
 import { importBacktestSamplesOnce, loadBacktestSamples, removeBacktestSample, saveBacktestSample } from '../lib/backtestStore';
 
@@ -72,8 +74,14 @@ interface TradingContextType {
   tradesError: string | null;
   localTradeImportCount: number;
   addTrade: (trade: Omit<Trade, 'id' | 'timestamp' | 'configVersionUsed'>) => Promise<Trade>;
+  /** Open trades: any field. Locked (closed/voided) trades: documentation only. */
   updateTrade: (id: string, updated: Partial<Trade>) => Promise<void>;
-  deleteTrade: (id: string) => Promise<void>;
+  closeTrade: (id: string, input: CloseTradeInput) => Promise<void>;
+  amendTrade: (id: string, patch: AmendablePatch, reason: string) => Promise<void>;
+  voidTrade: (id: string, reason: string) => Promise<void>;
+  /** Append-only amendment history, keyed by trade id, oldest first. */
+  tradeAmendments: Record<string, TradeAmendment[]>;
+  amendmentsError: string | null;
   importLocalTrades: () => Promise<number>;
   researchQuestions: ResearchQuestion[];
   researchLoading: boolean;
@@ -213,6 +221,8 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
   const [trades, setTrades] = useState<Trade[]>([]);
   const [tradesLoading, setTradesLoading] = useState(true);
   const [tradesError, setTradesError] = useState<string | null>(null);
+  const [amendmentList, setAmendmentList] = useState<TradeAmendment[]>([]);
+  const [amendmentsError, setAmendmentsError] = useState<string | null>(null);
   const [localTradeImportCount, setLocalTradeImportCount] = useState(0);
 
   // ---- Week 3: durable, Supabase-backed research & backtesting; local entries require explicit import ----
@@ -243,6 +253,9 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
     try { setLocalTradeImportCount(raw ? (JSON.parse(raw) as Trade[]).length : 0); } catch { setLocalTradeImportCount(0); }
     setTradesLoading(true);
     loadTrades(supabase, userId).then(setTrades).catch(error => setTradesError(error instanceof Error ? error.message : 'Failed to load journal')).finally(() => setTradesLoading(false));
+    // Amendment history is non-blocking: if the log table isn't migrated yet the
+    // journal still loads, and the Journal shows why amending isn't available.
+    loadAmendments(supabase, userId).then(list => { setAmendmentList(list); setAmendmentsError(null); }).catch(error => setAmendmentsError(error instanceof Error ? error.message : 'Failed to load amendment history'));
   }, [userId]);
   useEffect(() => {
     const raw = localStorage.getItem(key('rqs'));
@@ -266,14 +279,45 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
     setTrades(prev => [newTrade, ...prev]);
     return newTrade;
   };
+  const replaceTrade = (next: Trade) => setTrades(prev => prev.map(trade => (trade.id === next.id ? next : trade)));
   const updateTrade = async (id: string, updated: Partial<Trade>) => {
     const current = trades.find(trade => trade.id === id); if (!current) return;
-    const next = { ...current, ...updated }; await saveTrade(supabase, userId, next); setTrades(prev => prev.map(trade => trade.id === id ? next : trade));
+    assertFreeUpdate(current, updated);
+    const next = { ...current, ...updated }; await saveTrade(supabase, userId, next); replaceTrade(next);
   };
-  const deleteTrade = async (id: string) => { await removeTrade(supabase, id); setTrades(prev => prev.filter(trade => trade.id !== id)); };
+  const closeTrade = async (id: string, input: CloseTradeInput) => {
+    const current = trades.find(trade => trade.id === id); if (!current) return;
+    const next = buildClosedTrade(current, input);
+    await saveTrade(supabase, userId, next); replaceTrade(next);
+  };
+  // Amendment first, trade second: if the trade write then fails, the log
+  // shows an attempted change rather than the trade silently changing with no
+  // log — the DB trigger also refuses the trade write without the log row.
+  const amendTrade = async (id: string, patch: AmendablePatch, reason: string) => {
+    const current = trades.find(trade => trade.id === id); if (!current) return;
+    if (!isTradeLocked(current)) throw new Error('Open trades can be edited directly — amendments are for closed trades.');
+    if (current.voided) throw new Error('A voided trade can\'t be amended.');
+    if (!reason.trim()) throw new Error('Every amendment needs a reason.');
+    const next = applyAmendment(current, patch);
+    const changes = diffEvidence(current, next);
+    if (changes.length === 0) throw new Error('Nothing changed — no amendment logged.');
+    const amendment = await insertAmendment(supabase, userId, { tradeId: id, kind: 'AMEND', reason: reason.trim(), changes });
+    setAmendmentList(prev => [...prev, amendment]);
+    await saveTrade(supabase, userId, next); replaceTrade(next);
+  };
+  const voidTrade = async (id: string, reason: string) => {
+    const current = trades.find(trade => trade.id === id); if (!current) return;
+    if (current.voided) return;
+    if (!reason.trim()) throw new Error('Voiding a trade needs a reason.');
+    const next: Trade = { ...current, voided: { at: Date.now(), reason: reason.trim() } };
+    const amendment = await insertAmendment(supabase, userId, { tradeId: id, kind: 'VOID', reason: reason.trim(), changes: diffEvidence(current, next) });
+    setAmendmentList(prev => [...prev, amendment]);
+    await saveTrade(supabase, userId, next); replaceTrade(next);
+  };
+  const tradeAmendments = amendmentList.reduce<Record<string, TradeAmendment[]>>((acc, a) => { (acc[a.tradeId] = acc[a.tradeId] || []).push(a); return acc; }, {});
   const importLocalTrades = async () => {
     const raw = localStorage.getItem(key('trades')); const local = raw ? JSON.parse(raw) as Trade[] : [];
-    const count = await importTradesOnce(supabase, userId, local); setTrades(await loadTrades(supabase, userId)); setLocalTradeImportCount(0); return count;
+    const count = await insertTradesIfNew(supabase, userId, local); setTrades(await loadTrades(supabase, userId)); setLocalTradeImportCount(0); return count;
   };
 
   const addResearchQuestion = async (rqData: Omit<ResearchQuestion, 'id' | 'createdAt'>) => {
@@ -344,7 +388,7 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
   const performanceStats = computePerformanceStats(trades, tradingHQ);
 
   const exportDataJSON = () => {
-    const data = { exportDate: new Date().toISOString(), tradingHQ, assets, trades, researchQuestions, backtestSamples, psychologyEntries, calendarEvents, alerts };
+    const data = { exportDate: new Date().toISOString(), tradingHQ, assets, trades, tradeAmendments: amendmentList, researchQuestions, backtestSamples, psychologyEntries, calendarEvents, alerts };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -362,7 +406,9 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
       // actually write them through, not just set local state, or the
       // "imported" data would vanish again on next reload.
       if (Array.isArray(parsed.trades)) {
-        for (const trade of parsed.trades as Trade[]) await saveTrade(supabase, userId, trade);
+        // Add-only: a backup can restore missing trades but never overwrite an
+        // existing (possibly locked) one.
+        await insertTradesIfNew(supabase, userId, parsed.trades as Trade[]);
         setTrades(await loadTrades(supabase, userId));
       }
       if (Array.isArray(parsed.researchQuestions)) {
@@ -409,7 +455,11 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
         localTradeImportCount,
         addTrade,
         updateTrade,
-        deleteTrade,
+        closeTrade,
+        amendTrade,
+        voidTrade,
+        tradeAmendments,
+        amendmentsError,
         importLocalTrades,
         researchQuestions,
         researchLoading,

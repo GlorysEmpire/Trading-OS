@@ -74,7 +74,9 @@ export function evaluateRiskViolations(
  * Compute performance analytics across a collection of trades
  */
 export function computePerformanceStats(trades: Trade[], config: TradingHQConfig): PerformanceStats {
-  const closedTrades = trades.filter((t) => t.status === 'CLOSED');
+  // Voided trades (duplicates / logged by mistake) stay visible in the Journal
+  // but never feed the numbers.
+  const closedTrades = trades.filter((t) => t.status === 'CLOSED' && !t.voided);
 
   if (closedTrades.length === 0) {
     return {

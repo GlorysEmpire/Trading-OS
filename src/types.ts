@@ -198,6 +198,30 @@ export interface Trade {
   linkedPsychologyId?: string;
   linkedResearchQuestionId?: string;
   configVersionUsed: string;
+  /** When the trade was closed and locked (ms epoch). Closed trades without
+   * this field predate locking — they're still treated as locked. */
+  closedAt?: number;
+  /** Set when a trade is voided instead of deleted (duplicate entry, logged by
+   * mistake). A voided trade stays visible in the Journal with its reason,
+   * but is excluded from performance stats. */
+  voided?: { at: number; reason: string };
+}
+
+/** One logged change to a locked trade. Append-only: the database grants
+ * insert + select only, so an amendment can never be edited or removed. */
+export interface TradeAmendmentChange {
+  field: string;
+  from: unknown;
+  to: unknown;
+}
+
+export interface TradeAmendment {
+  id: string;
+  tradeId: string;
+  kind: 'AMEND' | 'VOID';
+  reason: string;
+  changes: TradeAmendmentChange[];
+  createdAt: string;
 }
 
 export interface ResearchQuestion {

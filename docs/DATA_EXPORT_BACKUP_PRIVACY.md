@@ -80,10 +80,15 @@ contents.
 Click **Import** in the header and select a previously exported JSON file.
 On import:
 
-- `trades`, `researchQuestions`, and `backtestSamples` are written through
-  to Supabase (one `save` call per record) and then the in-app lists are
-  reloaded from Supabase — so a restore actually persists, rather than only
-  populating local state that would vanish on refresh.
+- `trades` are restored **add-only**: a trade in the file is inserted only if
+  no trade with that id exists yet. An existing trade is never overwritten by
+  a backup — otherwise a hand-edited JSON file would be a way around the
+  trade lock (see "Trade lock & amendments" below).
+- `researchQuestions` and `backtestSamples` are written through to Supabase
+  (one `save` call per record). After any restore the in-app lists are
+  reloaded from Supabase, so a restore actually persists.
+- `tradeAmendments` is included in exports for your records, but is not
+  re-imported — the amendment log is append-only and only the app writes it.
 - `psychologyEntries`, `calendarEvents`, and `alerts` are restored directly
   into local state (and therefore into this browser's `localStorage`) since
   they have no Supabase table yet.
@@ -96,6 +101,24 @@ On import:
   and reports failure without partially corrupting existing data (wrapped in
   try/catch; a thrown error is caught and `false` is returned before any
   writes happen for the fields that failed to parse).
+
+## Trade lock & amendments
+
+- When you close a trade it's locked. From then on, its evidence (prices, R,
+  outcome, process score, mistake codes, grade, date, narrative) only changes
+  through **Amend**, which needs a reason. Every amendment is saved in
+  `trading_os_trade_amendments` with the old value, the new value and a
+  timestamp. The database grants insert + select only on that table, so log
+  rows can't be edited or deleted.
+- Reflection, during-trade notes, screenshots and links stay freely editable
+  after close. They add to the record without changing the trade's numbers.
+- Trades can't be deleted. **Void** (with a reason) is for duplicates or
+  entries logged by mistake. A voided trade stays visible in the Journal and is
+  left out of stats.
+- Enforcement is in the database, not just the UI: a trigger
+  (`trading_os_guard_locked_trade`) refuses any change to a locked trade's
+  evidence unless an amendment for that trade was logged in the previous 2
+  minutes.
 
 ## Known gaps (tracked, not hidden)
 
