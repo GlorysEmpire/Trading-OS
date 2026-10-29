@@ -11,7 +11,7 @@ Trading OS stores data in two places:
 
 | Store | What's in it | Scope |
 |---|---|---|
-| **Supabase (cloud database)** | Trading HQ config (risk rules, setup grades, execution models, sessions, process checks, mistake codes), Asset Desks (including the Market Watch star flag), Trades, Research Questions, Backtest Samples | Synced across devices/browsers, owner-scoped |
+| **Supabase (cloud database)** | Trading HQ config (risk rules, setup grades, execution models, sessions, process checks, mistake codes), Asset Desks (including the Market Watch star flag), Trades + the trade amendment log, Daily Debriefs, Research Questions, Backtest Samples | Synced across devices/browsers, owner-scoped |
 | **Browser `localStorage`** | Psychology entries, Calendar events, Alerts, UI theme (light/dark), Dashboard widget visibility preferences | This browser only — not synced, not backed up by Supabase |
 
 **Why the split exists:** Trading HQ, Asset Desks, Trades, Research
@@ -60,6 +60,8 @@ Click **Export** in the header. This downloads a file named
 - `tradingHQ`
 - `assets` (Asset Desks)
 - `trades`
+- `tradeAmendments` (export only; not re-imported)
+- `debriefs` (export only; not re-imported yet)
 - `researchQuestions`
 - `backtestSamples`
 - `psychologyEntries`

@@ -10,6 +10,7 @@ import { AlertsView } from './components/AlertsView';
 import { TradingHQView } from './components/TradingHQView';
 import { AssetDesksView } from './components/AssetDesksView';
 import { JournalView } from './components/JournalView';
+import { DebriefView } from './components/DebriefView';
 import { BacktestingView } from './components/BacktestingView';
 import { ResearchView } from './components/ResearchView';
 import { PsychologyView } from './components/PsychologyView';
@@ -45,6 +46,8 @@ const MainShell: React.FC = () => {
         return <AssetDesksView />;
       case 'journal':
         return <JournalView />;
+      case 'debrief':
+        return <DebriefView />;
       case 'backtesting':
         return <BacktestingView />;
       case 'research':

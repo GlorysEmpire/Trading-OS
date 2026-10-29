@@ -318,3 +318,48 @@ export interface PerformanceStats {
   lossCountToday: number;
   riskStatus: 'NORMAL' | 'WARNING' | 'MAX_LOSS_HALT';
 }
+
+/** What the day's trades actually show, computed from the Journal (never typed in).
+ * Saved with each debrief as a snapshot of the evidence it was written against. */
+export interface DailyEvidence {
+  date: string;
+  tradesTaken: number;
+  closedTrades: number;
+  openTrades: number;
+  /** Average process score (0–5) across the day's trades; null if none. */
+  processAvg: number | null;
+  gradeCounts: Record<string, number>;
+  totalR: number;
+  wins: number;
+  losses: number;
+  scratches: number;
+  /** Losses as counted by the daily-halt rule (scratches count if scratchCountsAsLoss). */
+  lossCount: number;
+  maxDailyLosses: number;
+  halted: boolean;
+  mistakeCodeCounts: Record<string, number>;
+  /** Trades with at least one mistake code. */
+  ruleBreakTrades: number;
+  /** Trades that broke an HQ rule check at entry (e.g. planned R below minimum). */
+  violationTrades: number;
+  voidedCount: number;
+  tradeIds: string[];
+}
+
+/** The daily debrief template, digitized as is:
+ * process avg · trades taken · A+/B+ count · rule breaks (from evidence) ·
+ * presence quality · yesterday's 1% upgrade executed Y/N · today's 1% upgrade
+ * for tomorrow — plus tomorrow's single assignment from the evening routine. */
+export interface DailyDebrief {
+  date: string;
+  presenceQuality: string;
+  /** YES/NO for the previous debrief's upgrade; NA when there wasn't one. */
+  previousUpgradeExecuted: 'YES' | 'NO' | 'NA' | null;
+  previousUpgradeText?: string;
+  previousUpgradeDate?: string;
+  upgradeForTomorrow: string;
+  tomorrowAssignment: string;
+  evidence: DailyEvidence;
+  createdAt: string;
+  updatedAt: string;
+}

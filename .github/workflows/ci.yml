@@ -27,3 +27,8 @@ jobs:
 
       - name: Run tests
         run: npm run test
+
+      # Verified 2026-10-29: the full build works on Linux; the @rolldown
+      # binding problem from the Sep 25 audit only affects the macOS setup.
+      - name: Build
+        run: npm run build

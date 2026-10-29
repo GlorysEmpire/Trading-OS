@@ -3,6 +3,7 @@ import { useTrading } from '../context/TradingContext';
 import { getAuthHeaders } from '../lib/supabaseClient';
 import { traderDateString, traderNowMinutes, isSessionActiveNow } from '../utils/traderTime';
 import type { AssetDeskData } from '../types';
+import { findPreviousDebrief } from '../utils/debrief';
 import {
   Activity,
   AlertTriangle,
@@ -24,6 +25,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  ClipboardCheck,
 } from 'lucide-react';
 
 /** Which of the Dashboard's secondary panels are shown. The point of a
@@ -118,6 +120,8 @@ export const DashboardView: React.FC = () => {
     setActiveTab,
     setSelectedAssetId,
     setQuickTradeModalOpen,
+    debriefs,
+    setDebriefDate,
   } = useTrading();
 
   const [aiBriefLoading, setAiBriefLoading] = useState(false);
@@ -172,6 +176,16 @@ export const DashboardView: React.FC = () => {
   const activeAlerts = alerts.filter((a) => a.active);
   const watchedAssets = assets.filter((a) => a.watchlisted);
   const activeRQ = researchQuestions[0];
+
+  // Daily Mission: what the last debrief committed today to, and whether
+  // today's debrief is written. The debrief slot is 18:55 Lagos; the nudge
+  // appears from 18:00, or earlier if trades were already taken today.
+  const lastDebrief = findPreviousDebrief(debriefs, todayStr);
+  const todaysDebrief = debriefs.find((d) => d.date === todayStr);
+  const tradedToday = trades.some((t) => t.date === todayStr && !t.voided);
+  const debriefDue = !todaysDebrief && (nowMinutes >= 18 * 60 || tradedToday);
+  const showMission = !!(lastDebrief?.upgradeForTomorrow || lastDebrief?.tomorrowAssignment || debriefDue || todaysDebrief);
+  const openDebrief = () => { setDebriefDate(todayStr); setActiveTab('debrief'); };
 
   const handleGenerateDailyBrief = async () => {
     setAiBriefLoading(true);
@@ -271,6 +285,30 @@ export const DashboardView: React.FC = () => {
               <span>+ LOG TRADE</span>
             </button>
           </div>
+        </div>
+      )}
+
+      {showMission && (
+        <div className="bg-[#101722] border border-slate-800 rounded-lg px-4 py-3 grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3 items-center font-mono text-xs">
+          <div className="min-w-0">
+            <span className="text-[10px] text-slate-500 uppercase tracking-wider block">Upgrade in focus</span>
+            <span className="text-slate-200 font-sans">{lastDebrief?.upgradeForTomorrow || '—'}</span>
+          </div>
+          <div className="min-w-0">
+            <span className="text-[10px] text-slate-500 uppercase tracking-wider block">Today's assignment</span>
+            <span className="text-slate-200 font-sans">{lastDebrief?.tomorrowAssignment || '—'}</span>
+          </div>
+          {todaysDebrief ? (
+            <button onClick={openDebrief} className="flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 justify-self-start md:justify-self-end">
+              <ClipboardCheck className="w-3.5 h-3.5" /> DEBRIEF DONE
+            </button>
+          ) : debriefDue ? (
+            <button onClick={openDebrief} className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-cyan-800 bg-cyan-950/40 text-cyan-300 hover:bg-cyan-900/40 justify-self-start md:justify-self-end">
+              <ClipboardCheck className="w-3.5 h-3.5" /> WRITE TODAY'S DEBRIEF
+            </button>
+          ) : (
+            <span className="text-[10px] text-slate-500 justify-self-start md:justify-self-end">Debrief slot 18:55</span>
+          )}
         </div>
       )}
 

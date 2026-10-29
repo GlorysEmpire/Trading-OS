@@ -3,6 +3,7 @@ import {
   AssetDeskData,
   Trade,
   TradeAmendment,
+  DailyDebrief,
   ResearchQuestion,
   BacktestSample,
   PsychologyEntry,
@@ -21,6 +22,7 @@ import { supabase } from '../lib/supabaseClient';
 import { buildTradingHQConfig, loadHQConfigRows, saveHQCategory, seedMissingHQCategories, type HQCategory, type HQConfigRow } from '../lib/hqStore';
 import { archiveAssetDesk, createAssetDesk, loadAssetDesks, saveAssetDeskPatch, seedAssetDesksIfMissing, updateInstrument, type InstrumentInput } from '../lib/assetDesksStore';
 import { insertAmendment, insertTradesIfNew, loadAmendments, loadTrades, saveTrade } from '../lib/tradeStore';
+import { loadDebriefs, upsertDebrief } from '../lib/debriefStore';
 import { applyAmendment, assertFreeUpdate, buildClosedTrade, diffEvidence, isTradeLocked, type AmendablePatch, type CloseTradeInput } from '../utils/tradeIntegrity';
 import { importResearchQuestionsOnce, loadResearchQuestions, removeResearchQuestion, saveResearchQuestion } from '../lib/researchStore';
 import { importBacktestSamplesOnce, loadBacktestSamples, removeBacktestSample, saveBacktestSample } from '../lib/backtestStore';
@@ -40,6 +42,7 @@ export type NavSection =
   | 'trading-hq'
   | 'asset-desks'
   | 'journal'
+  | 'debrief'
   | 'backtesting'
   | 'research'
   | 'psychology'
@@ -82,6 +85,14 @@ interface TradingContextType {
   /** Append-only amendment history, keyed by trade id, oldest first. */
   tradeAmendments: Record<string, TradeAmendment[]>;
   amendmentsError: string | null;
+  /** Newest first. */
+  debriefs: DailyDebrief[];
+  debriefsLoading: boolean;
+  debriefsError: string | null;
+  saveDebrief: (debrief: Omit<DailyDebrief, 'createdAt' | 'updatedAt'>) => Promise<void>;
+  /** Date (YYYY-MM-DD) the Debrief view should open on, e.g. from a Dashboard link. */
+  debriefDate: string | null;
+  setDebriefDate: (date: string | null) => void;
   importLocalTrades: () => Promise<number>;
   researchQuestions: ResearchQuestion[];
   researchLoading: boolean;
@@ -223,6 +234,24 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
   const [tradesError, setTradesError] = useState<string | null>(null);
   const [amendmentList, setAmendmentList] = useState<TradeAmendment[]>([]);
   const [amendmentsError, setAmendmentsError] = useState<string | null>(null);
+  const [debriefs, setDebriefs] = useState<DailyDebrief[]>([]);
+  const [debriefsLoading, setDebriefsLoading] = useState(true);
+  const [debriefsError, setDebriefsError] = useState<string | null>(null);
+  const [debriefDate, setDebriefDate] = useState<string | null>(null);
+  useEffect(() => {
+    setDebriefsLoading(true);
+    loadDebriefs(supabase, userId)
+      .then((list) => { setDebriefs(list); setDebriefsError(null); })
+      .catch((error) => setDebriefsError(error instanceof Error ? error.message : 'Failed to load debriefs'))
+      .finally(() => setDebriefsLoading(false));
+  }, [userId]);
+  const saveDebrief = async (input: Omit<DailyDebrief, 'createdAt' | 'updatedAt'>) => {
+    const existing = debriefs.find((d) => d.date === input.date);
+    const now = new Date().toISOString();
+    const saved = await upsertDebrief(supabase, userId, { ...input, createdAt: existing?.createdAt ?? now, updatedAt: now });
+    setDebriefs((prev) => [saved, ...prev.filter((d) => d.date !== saved.date)].sort((a, b) => (a.date < b.date ? 1 : -1)));
+    setDebriefsError(null);
+  };
   const [localTradeImportCount, setLocalTradeImportCount] = useState(0);
 
   // ---- Week 3: durable, Supabase-backed research & backtesting; local entries require explicit import ----
@@ -388,7 +417,7 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
   const performanceStats = computePerformanceStats(trades, tradingHQ);
 
   const exportDataJSON = () => {
-    const data = { exportDate: new Date().toISOString(), tradingHQ, assets, trades, tradeAmendments: amendmentList, researchQuestions, backtestSamples, psychologyEntries, calendarEvents, alerts };
+    const data = { exportDate: new Date().toISOString(), tradingHQ, assets, trades, tradeAmendments: amendmentList, debriefs, researchQuestions, backtestSamples, psychologyEntries, calendarEvents, alerts };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -460,6 +489,12 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
         voidTrade,
         tradeAmendments,
         amendmentsError,
+        debriefs,
+        debriefsLoading,
+        debriefsError,
+        saveDebrief,
+        debriefDate,
+        setDebriefDate,
         importLocalTrades,
         researchQuestions,
         researchLoading,
