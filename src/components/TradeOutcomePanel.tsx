@@ -306,6 +306,30 @@ function CloseForm({ trade }: { trade: Trade }) {
       </div>
       <div className="p-3 bg-[#131b26] border border-cyan-900/60 rounded space-y-3">
         <span className="text-[11px] font-mono text-cyan-300 font-bold uppercase block">Close trade</span>
+        <div className="flex flex-wrap gap-2 font-mono text-[11px]">
+          {([
+            { label: 'HIT TP', price: trade.targetPrice, tone: 'border-emerald-800 text-emerald-300 hover:bg-emerald-950/40', be: false },
+            { label: 'HIT SL', price: trade.stopPrice, tone: 'border-rose-800 text-rose-300 hover:bg-rose-950/40', be: false },
+            { label: 'BREAKEVEN', price: trade.entryPrice, tone: 'border-slate-600 text-slate-200 hover:bg-slate-800/60', be: true },
+          ] as const).map((b) => (
+            <button
+              key={b.label}
+              type="button"
+              onClick={() => {
+                setExit(String(b.price));
+                setOutcome('AUTO');
+                // Exiting at entry means the stop was moved to breakeven: record at what R.
+                if (b.be && !be.moved) setBe({ ...be, moved: true });
+              }}
+              className={`px-3 py-1 rounded border font-bold ${b.tone} ${exit === String(b.price) ? 'ring-1 ring-cyan-500' : ''}`}
+            >
+              {b.label} <span className="font-normal opacity-70">{b.price}</span>
+            </button>
+          ))}
+          <button type="button" onClick={() => { setExit(''); setOutcome('AUTO'); }} className="px-3 py-1 rounded border border-slate-700 text-slate-400 hover:text-slate-200">
+            MANUAL EXIT
+          </button>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono">
           <label className="space-y-1"><span className="text-[10px] text-slate-400 block">EXIT PRICE</span>
             <input type="number" step="any" value={exit} onChange={(e) => setExit(e.target.value)} placeholder="Actual fill" className={field} />

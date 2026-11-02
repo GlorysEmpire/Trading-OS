@@ -28,6 +28,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
+  Crosshair,
 } from 'lucide-react';
 
 /** Which of the Dashboard's secondary panels are shown. The point of a
@@ -126,6 +127,8 @@ export const DashboardView: React.FC = () => {
     setDebriefDate,
     weeklyReviews,
     chartMigration,
+    pendingSetups,
+    setDeskTabRequest,
   } = useTrading();
 
   const [aiBriefLoading, setAiBriefLoading] = useState(false);
@@ -194,6 +197,8 @@ export const DashboardView: React.FC = () => {
   const debriefDue = !todaysDebrief && (nowMinutes >= 18 * 60 || tradedToday);
   const showMission = !!(todayFocus || lastDebrief?.upgradeForTomorrow || lastDebrief?.tomorrowAssignment || debriefDue || todaysDebrief);
   const openDebrief = () => { setDebriefDate(todayStr); setActiveTab('debrief'); };
+  const livePending = pendingSetups.filter((p) => p.status === 'PENDING');
+  const openSetups = (deskId: string) => { setSelectedAssetId(deskId); setDeskTabRequest('setups'); setActiveTab('asset-desks'); };
 
   // This week's plan comes from last week's review: its upgrade, and the bias
   // written for today's focus assets.
@@ -352,6 +357,32 @@ export const DashboardView: React.FC = () => {
           ) : (
             <span className="text-[10px] text-slate-500 justify-self-start md:justify-self-end">Debrief slot 18:55</span>
           )}
+        </div>
+      )}
+
+      {livePending.length > 0 && (
+        <div className="bg-[#101722] border border-slate-800 rounded-lg px-4 py-3 space-y-2">
+          <div className="flex items-center justify-between font-mono text-xs">
+            <span className="flex items-center gap-2 text-slate-200 font-bold uppercase tracking-wider"><Crosshair className="w-3.5 h-3.5 text-cyan-400" /> Pending setups ({livePending.length})</span>
+            <span className="text-[10px] text-slate-500">Tap one to open it on its desk</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full font-mono text-[11px] min-w-[520px]">
+              <tbody>
+                {livePending.slice(0, 8).map((p) => (
+                  <tr key={p.id} onClick={() => openSetups(p.deskId)} className="border-t border-slate-800/60 cursor-pointer hover:bg-slate-800/30">
+                    <td className="py-1.5 text-slate-200 font-bold">{p.asset}</td>
+                    <td className={p.direction === 'LONG' ? 'text-emerald-400' : 'text-rose-400'}>{p.direction}</td>
+                    <td className="text-slate-300">@ {p.entryPrice}</td>
+                    <td className="text-slate-500">SL {p.stopPrice} · TP {p.targetPrice}</td>
+                    <td className="text-cyan-300 font-bold">{p.plannedR}R</td>
+                    <td className="text-purple-300">{p.setupGrade}</td>
+                    <td className="text-slate-500 text-right">{p.validUntil && p.validUntil < todayStr ? <span className="text-amber-400">past valid date</span> : p.timeframe}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

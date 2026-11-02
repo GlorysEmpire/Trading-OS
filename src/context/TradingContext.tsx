@@ -5,6 +5,7 @@ import {
   TradeAmendment,
   DailyDebrief,
   WeeklyReview,
+  PendingSetup,
   ResearchQuestion,
   BacktestSample,
   PsychologyEntry,
@@ -26,6 +27,11 @@ import { insertAmendment, insertTradesIfNew, loadAmendments, loadTrades, saveTra
 import { loadDebriefs, upsertDebrief } from '../lib/debriefStore';
 import { isInlineImage, uploadChart } from '../lib/chartStorage';
 import { loadWeeklyReviews, upsertWeeklyReview } from '../lib/weeklyReviewStore';
+import { loadPendingSetups, savePendingSetup as persistPendingSetup } from '../lib/pendingSetupStore';
+import { setupToTrade, type TriggerInput } from '../utils/pendingSetups';
+import { computeDailyEvidence } from '../utils/debrief';
+import { calculatePlannedR } from '../utils/tradingCalculations';
+import { traderDateString as traderDay } from '../utils/traderTime';
 import { applyAmendment, assertFreeUpdate, buildClosedTrade, diffEvidence, isTradeLocked, type AmendablePatch, type CloseTradeInput } from '../utils/tradeIntegrity';
 import { importResearchQuestionsOnce, loadResearchQuestions, removeResearchQuestion, saveResearchQuestion } from '../lib/researchStore';
 import { importBacktestSamplesOnce, loadBacktestSamples, removeBacktestSample, saveBacktestSample } from '../lib/backtestStore';
@@ -53,6 +59,8 @@ export type NavSection =
   | 'market-intelligence'
   | 'scanner'
   | 'ai-assistant';
+
+export type PendingSetupInput = Omit<PendingSetup, 'id' | 'status' | 'resolution' | 'createdAt' | 'updatedAt' | 'configVersionAtPlan' | 'plannedR'>;
 
 interface TradingContextType {
   theme: 'ash' | 'dark';
@@ -102,6 +110,18 @@ interface TradingContextType {
   weeklyReviewsLoading: boolean;
   weeklyReviewsError: string | null;
   saveWeeklyReview: (review: Omit<WeeklyReview, 'createdAt' | 'updatedAt'>) => Promise<void>;
+  /** Newest first. */
+  pendingSetups: PendingSetup[];
+  pendingSetupsError: string | null;
+  addPendingSetup: (input: PendingSetupInput) => Promise<PendingSetup>;
+  /** Only while PENDING. */
+  updatePendingSetup: (id: string, patch: Partial<PendingSetupInput>) => Promise<void>;
+  /** Converts the setup into an open Journal trade; returns the trade. */
+  triggerPendingSetup: (id: string, input: TriggerInput) => Promise<Trade>;
+  resolvePendingSetup: (id: string, status: 'INVALIDATED' | 'EXPIRED', reason: string) => Promise<void>;
+  /** Asset Desk sub-tab to open on (e.g. from a Dashboard link). */
+  deskTabRequest: string | null;
+  setDeskTabRequest: (tab: string | null) => void;
   /** Progress of the one-time move of inline screenshots into file storage. */
   chartMigration: { total: number; done: number; failed: number; error?: string; running: boolean } | null;
   importLocalTrades: () => Promise<number>;
@@ -256,6 +276,60 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
       .catch((error) => setDebriefsError(error instanceof Error ? error.message : 'Failed to load debriefs'))
       .finally(() => setDebriefsLoading(false));
   }, [userId]);
+  const [pendingSetups, setPendingSetups] = useState<PendingSetup[]>([]);
+  const [pendingSetupsError, setPendingSetupsError] = useState<string | null>(null);
+  const [deskTabRequest, setDeskTabRequest] = useState<string | null>(null);
+  useEffect(() => {
+    loadPendingSetups(supabase, userId)
+      .then((list) => { setPendingSetups(list); setPendingSetupsError(null); })
+      .catch((error) => setPendingSetupsError(error instanceof Error ? error.message : 'Failed to load pending setups'));
+  }, [userId]);
+  const putSetup = async (next: PendingSetup) => {
+    await persistPendingSetup(supabase, userId, next);
+    setPendingSetups((prev) => (prev.some((p) => p.id === next.id) ? prev.map((p) => (p.id === next.id ? next : p)) : [next, ...prev]));
+    setPendingSetupsError(null);
+  };
+  const addPendingSetup = async (input: PendingSetupInput) => {
+    const now = new Date().toISOString();
+    const setup: PendingSetup = {
+      ...input,
+      id: genId('ps'),
+      plannedR: calculatePlannedR(input.direction, input.entryPrice, input.stopPrice, input.targetPrice),
+      status: 'PENDING',
+      configVersionAtPlan: tradingHQ.version,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await putSetup(setup);
+    return setup;
+  };
+  const updatePendingSetup = async (id: string, patch: Partial<PendingSetupInput>) => {
+    const current = pendingSetups.find((p) => p.id === id); if (!current) return;
+    if (current.status !== 'PENDING') throw new Error('Only a pending setup can be edited.');
+    const merged = { ...current, ...patch };
+    await putSetup({ ...merged, plannedR: calculatePlannedR(merged.direction, merged.entryPrice, merged.stopPrice, merged.targetPrice), updatedAt: new Date().toISOString() });
+  };
+  const triggerPendingSetup = async (id: string, input: TriggerInput) => {
+    const setup = pendingSetups.find((p) => p.id === id);
+    if (!setup) throw new Error('Setup not found.');
+    // Never convert twice (e.g. if a previous attempt saved the trade but not the setup).
+    const existing = trades.find((t) => t.fromSetupId === id);
+    if (existing) {
+      await putSetup({ ...setup, status: 'TRIGGERED', resolution: { at: new Date().toISOString(), tradeId: existing.id }, updatedAt: new Date().toISOString() });
+      return existing;
+    }
+    const lossCount = computeDailyEvidence(trades, traderDay(input.entryAt), tradingHQ).lossCount;
+    const trade = await addTrade(setupToTrade(setup, input, tradingHQ, lossCount));
+    await putSetup({ ...setup, status: 'TRIGGERED', resolution: { at: new Date().toISOString(), tradeId: trade.id }, updatedAt: new Date().toISOString() });
+    return trade;
+  };
+  const resolvePendingSetup = async (id: string, status: 'INVALIDATED' | 'EXPIRED', reason: string) => {
+    const setup = pendingSetups.find((p) => p.id === id); if (!setup) return;
+    if (setup.status !== 'PENDING') throw new Error('This setup is already resolved.');
+    if (!reason.trim()) throw new Error('Add a short reason.');
+    await putSetup({ ...setup, status, resolution: { at: new Date().toISOString(), reason: reason.trim() }, updatedAt: new Date().toISOString() });
+  };
+
   const [weeklyReviews, setWeeklyReviews] = useState<WeeklyReview[]>([]);
   const [weeklyReviewsLoading, setWeeklyReviewsLoading] = useState(true);
   const [weeklyReviewsError, setWeeklyReviewsError] = useState<string | null>(null);
@@ -519,7 +593,7 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
   const performanceStats = computePerformanceStats(trades, tradingHQ);
 
   const exportDataJSON = () => {
-    const data = { exportDate: new Date().toISOString(), tradingHQ, assets, trades, tradeAmendments: amendmentList, debriefs, weeklyReviews, researchQuestions, backtestSamples, psychologyEntries, calendarEvents, alerts };
+    const data = { exportDate: new Date().toISOString(), tradingHQ, assets, trades, tradeAmendments: amendmentList, debriefs, weeklyReviews, pendingSetups, researchQuestions, backtestSamples, psychologyEntries, calendarEvents, alerts };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -602,6 +676,14 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
         weeklyReviewsError,
         saveWeeklyReview,
         chartMigration,
+        pendingSetups,
+        pendingSetupsError,
+        addPendingSetup,
+        updatePendingSetup,
+        triggerPendingSetup,
+        resolvePendingSetup,
+        deskTabRequest,
+        setDeskTabRequest,
         importLocalTrades,
         researchQuestions,
         researchLoading,

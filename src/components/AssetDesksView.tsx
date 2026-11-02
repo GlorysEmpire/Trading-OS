@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ChartImage } from './ChartImage';
 import { useTrading } from '../context/TradingContext';
 import {
@@ -18,6 +18,7 @@ import {
 import { AssetCategory, BiasType, Scenario, LiquidityZone, AssetChartScreenshot, DeskChartPlacement } from '../types';
 import { MultiImageDropzone, ImageThumbGrid } from './ImageUploadDropzone';
 import { ImageViewerModal, LightboxImage } from './ImageViewerModal';
+import { PendingSetupsPanel } from './PendingSetupsPanel';
 
 const PLACEMENT_LABEL: Record<DeskChartPlacement, string> = {
   narrative: 'Narrative',
@@ -30,11 +31,17 @@ const PLACEMENT_LABEL: Record<DeskChartPlacement, string> = {
 const inputClass = 'bg-[#162130] border border-slate-700 rounded px-2.5 py-1.5 text-slate-200 outline-none focus:border-cyan-500 font-sans';
 
 export const AssetDesksView: React.FC = () => {
-  const { assets, selectedAssetId, setSelectedAssetId, updateAssetDesk, createInstrument, updateInstrument, archiveInstrument, setQuickTradeModalOpen, desksLoading, desksError } = useTrading();
+  const { assets, selectedAssetId, setSelectedAssetId, updateAssetDesk, createInstrument, updateInstrument, archiveInstrument, setQuickTradeModalOpen, desksLoading, desksError, pendingSetups, deskTabRequest, setDeskTabRequest } = useTrading();
 
   const currentDesk = assets.find(a => a.id === selectedAssetId) || assets[0];
+  const pendingCount = currentDesk ? pendingSetups.filter((p) => p.deskId === currentDesk.id && p.status === 'PENDING').length : 0;
 
-  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'liquidity' | 'wyckoff' | 'external' | 'scenarios' | 'charts'>('overview');
+  type DeskTab = 'overview' | 'liquidity' | 'wyckoff' | 'external' | 'scenarios' | 'charts' | 'setups';
+  const [activeSubTab, setActiveSubTab] = useState<DeskTab>('overview');
+  // Open a specific sub-tab when another screen asks (e.g. the Dashboard's pending setups).
+  useEffect(() => {
+    if (deskTabRequest) { setActiveSubTab(deskTabRequest as DeskTab); setDeskTabRequest(null); }
+  }, [deskTabRequest, setDeskTabRequest]);
 
   // Narrative edit
   const [editingNarrative, setEditingNarrative] = useState(false);
@@ -372,6 +379,7 @@ export const AssetDesksView: React.FC = () => {
           { id: 'scenarios', label: '4. Scenarios' },
           { id: 'external', label: '5. External Context' },
           { id: 'charts', label: '6. Charts & Screenshots' },
+          { id: 'setups', label: `7. Pending Setups${pendingCount ? ` (${pendingCount})` : ''}` },
         ].map(tab => (
           <button
             key={tab.id}
@@ -765,6 +773,8 @@ export const AssetDesksView: React.FC = () => {
 
         </div>
       )}
+      {activeSubTab === 'setups' && <PendingSetupsPanel desk={currentDesk} />}
+
       <ImageViewerModal
         images={lightboxImages}
         currentIndex={lightboxIndex}

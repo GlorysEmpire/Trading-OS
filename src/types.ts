@@ -233,6 +233,8 @@ export interface Trade {
    * Older trades without it fall back to `timestamp` (when it was logged). */
   entryAt?: string;
   breakeven?: BreakevenRecord;
+  /** The pending setup this trade was converted from, if any. */
+  fromSetupId?: string;
   /** Set when a trade is voided instead of deleted (duplicate entry, logged by
    * mistake). A voided trade stays visible in the Journal with its reason,
    * but is excluded from performance stats. */
@@ -445,6 +447,36 @@ export interface WeeklyReview {
   previousUpgradeExecuted: 'YES' | 'NO' | 'NA' | null;
   previousUpgradeText?: string;
   evidence: WeeklyEvidence;
+  createdAt: string;
+  updatedAt: string;
+}
+
+
+/** A planned setup on an Asset Desk, waiting for its entry to trigger.
+ * When it triggers it converts into a Journal trade with all its details;
+ * if it never does, it's marked invalidated or expired (never deleted), which
+ * keeps a record of the setups that didn't happen. */
+export interface PendingSetup {
+  id: string;
+  deskId: string;
+  asset: string;
+  direction: 'LONG' | 'SHORT';
+  timeframe: string;
+  modelId: string;
+  setupGrade: string;
+  entryPrice: number;
+  stopPrice: number;
+  targetPrice: number;
+  plannedR: number;
+  narrative: string;
+  setupReasoning: string;
+  screenshots: string[];
+  /** Optional last day (YYYY-MM-DD) the setup is valid. */
+  validUntil?: string;
+  status: 'PENDING' | 'TRIGGERED' | 'INVALIDATED' | 'EXPIRED';
+  resolution?: { at: string; reason?: string; tradeId?: string };
+  /** Trading HQ version when the setup was planned. */
+  configVersionAtPlan: string;
   createdAt: string;
   updatedAt: string;
 }
