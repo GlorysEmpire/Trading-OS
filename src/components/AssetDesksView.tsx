@@ -15,9 +15,17 @@ import {
   Camera,
   Star,
 } from 'lucide-react';
-import { AssetCategory, BiasType, Scenario, LiquidityZone, AssetChartScreenshot } from '../types';
-import { MultiImageDropzone } from './ImageUploadDropzone';
+import { AssetCategory, BiasType, Scenario, LiquidityZone, AssetChartScreenshot, DeskChartPlacement } from '../types';
+import { MultiImageDropzone, ImageThumbGrid } from './ImageUploadDropzone';
 import { ImageViewerModal, LightboxImage } from './ImageViewerModal';
+
+const PLACEMENT_LABEL: Record<DeskChartPlacement, string> = {
+  narrative: 'Narrative',
+  monthly: 'Monthly',
+  weekly: 'Weekly',
+  daily: 'Daily',
+  h4: '4H',
+};
 
 const inputClass = 'bg-[#162130] border border-slate-700 rounded px-2.5 py-1.5 text-slate-200 outline-none focus:border-cyan-500 font-sans';
 
@@ -61,6 +69,12 @@ export const AssetDesksView: React.FC = () => {
   // Chart/screenshot attachments
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [lightboxImages, setLightboxImages] = useState<LightboxImage[]>([]);
+  const openLightbox = (charts: AssetChartScreenshot[], index: number) => {
+    setLightboxImages(charts.map((c): LightboxImage => ({ url: c.url, title: c.title, timeframe: c.timeframe })));
+    setLightboxIndex(index);
+    setLightboxOpen(true);
+  };
   const [newChartTitle, setNewChartTitle] = useState('');
   const [instrumentFormOpen, setInstrumentFormOpen] = useState(false);
   const [instrumentError, setInstrumentError] = useState<string | null>(null);
@@ -130,20 +144,49 @@ export const AssetDesksView: React.FC = () => {
     });
   };
 
-  const addCharts = (urls: string[]) => {
+  const addCharts = (urls: string[], placement?: DeskChartPlacement) => {
     if (!urls.length) return;
-    const base = newChartTitle.trim() || `${currentDesk.symbol} Chart`;
+    const base = placement
+      ? `${currentDesk.symbol} ${PLACEMENT_LABEL[placement]}`
+      : newChartTitle.trim() || `${currentDesk.symbol} Chart`;
     const now = Date.now();
     const charts: AssetChartScreenshot[] = urls.map((url, i) => ({
       id: `chart-${now}-${i}`,
       title: urls.length > 1 ? `${base} (${i + 1})` : base,
-      timeframe: '',
+      timeframe: placement && placement !== 'narrative' ? PLACEMENT_LABEL[placement] : '',
       url,
       uploadedAt: new Date().toISOString(),
-      category: 'GENERAL',
+      category: placement === 'narrative' ? 'BIAS' : 'GENERAL',
+      ...(placement ? { placement } : {}),
     }));
     updateAssetDesk(currentDesk.id, { charts: [...(currentDesk.charts || []), ...charts] });
-    setNewChartTitle('');
+    if (!placement) setNewChartTitle('');
+  };
+  const chartsAt = (placement: DeskChartPlacement) => (currentDesk.charts || []).filter((c) => c.placement === placement);
+  const setChartPlacement = (chartId: string, placement: DeskChartPlacement | '') => {
+    updateAssetDesk(currentDesk.id, {
+      charts: (currentDesk.charts || []).map((c) => {
+        if (c.id !== chartId) return c;
+        const { placement: _old, ...rest } = c;
+        return placement
+          ? { ...rest, placement, timeframe: placement !== 'narrative' ? PLACEMENT_LABEL[placement] : rest.timeframe }
+          : rest;
+      }),
+    });
+  };
+  /** Charts shown next to a block of text, with their own upload area. */
+  const renderPlacedCharts = (placement: DeskChartPlacement) => {
+    const list = chartsAt(placement);
+    return (
+      <div className="space-y-1.5 pt-1">
+        <ImageThumbGrid
+          images={list.map((c) => c.url)}
+          onView={(i) => openLightbox(list, i)}
+          onRemove={(i) => removeChart(list[i].id)}
+        />
+        <MultiImageDropzone compact onAdd={(urls) => addCharts(urls, placement)} sublabel="" />
+      </div>
+    );
   };
   const removeChart = (chartId: string) => {
     updateAssetDesk(currentDesk.id, { charts: (currentDesk.charts || []).filter(c => c.id !== chartId) });
@@ -366,6 +409,7 @@ export const AssetDesksView: React.FC = () => {
                 {currentDesk.currentNarrative || <span className="text-slate-500">Not filled in yet.</span>}
               </p>
             )}
+            {renderPlacedCharts('narrative')}
           </div>
 
           <div className="bg-[#101722] border border-slate-800 rounded-lg p-4 space-y-3">
@@ -391,6 +435,7 @@ export const AssetDesksView: React.FC = () => {
                   ) : (
                     <p className="text-slate-200 font-sans">{currentDesk.htfStructure[tf] || <span className="text-slate-500">Not filled in yet.</span>}</p>
                   )}
+                  {renderPlacedCharts(tf)}
                 </div>
               ))}
             </div>
@@ -692,10 +737,7 @@ export const AssetDesksView: React.FC = () => {
                     src={chart.url}
                     alt={chart.title}
                     className="w-full h-32 object-cover cursor-pointer"
-                    onClick={() => {
-                      setLightboxIndex(idx);
-                      setLightboxOpen(true);
-                    }}
+                    onClick={() => openLightbox(currentDesk.charts || [], idx)}
                   />
                   <div className="p-2 flex items-center justify-between">
                     <span className="text-[11px] font-mono text-slate-300 truncate">{chart.title}</span>
@@ -703,20 +745,33 @@ export const AssetDesksView: React.FC = () => {
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
+                  <div className="px-2 pb-2">
+                    <select
+                      value={chart.placement ?? ''}
+                      onChange={(e) => setChartPlacement(chart.id, e.target.value as DeskChartPlacement | '')}
+                      className="w-full bg-[#0d141f] border border-slate-700 rounded px-1.5 py-1 text-[10px] font-mono text-slate-300 outline-none"
+                      title="Show this chart next to the narrative or an HTF timeframe on the Overview"
+                    >
+                      <option value="">Show under: Charts only</option>
+                      {(Object.keys(PLACEMENT_LABEL) as DeskChartPlacement[]).map((p) => (
+                        <option key={p} value={p}>Show under: {p === 'narrative' ? 'Narrative' : `HTF ${PLACEMENT_LABEL[p]}`}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               ))}
             </div>
           )}
 
-          <ImageViewerModal
-            images={(currentDesk.charts || []).map((c): LightboxImage => ({ url: c.url, title: c.title, timeframe: c.timeframe }))}
-            currentIndex={lightboxIndex}
-            isOpen={lightboxOpen}
-            onClose={() => setLightboxOpen(false)}
-            onNavigate={setLightboxIndex}
-          />
         </div>
       )}
+      <ImageViewerModal
+        images={lightboxImages}
+        currentIndex={lightboxIndex}
+        isOpen={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        onNavigate={setLightboxIndex}
+      />
     </div>
   );
 };

@@ -41,7 +41,12 @@ export interface AssetChartScreenshot {
   caption?: string;
   uploadedAt: string;
   category?: 'BIAS' | 'EXECUTION' | 'WYCKOFF' | 'LIQUIDITY' | 'GENERAL';
+  /** Where on the desk this chart is shown alongside the text: the current
+   * narrative, or one HTF structure timeframe. Unset = Charts tab only. */
+  placement?: DeskChartPlacement;
 }
+
+export type DeskChartPlacement = 'narrative' | 'monthly' | 'weekly' | 'daily' | 'h4';
 
 export interface AssetDeskData {
   id: string;
