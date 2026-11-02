@@ -18,7 +18,7 @@ import {
 import { BacktestSample } from '../types';
 import { calculatePlannedR, calculateRealizedR } from '../utils/tradingCalculations';
 import { ImageViewerModal, LightboxImage } from './ImageViewerModal';
-import { ImageUploadDropzone } from './ImageUploadDropzone';
+import { ImageUploadDropzone, MultiImageDropzone, ImageThumbGrid } from './ImageUploadDropzone';
 
 export const BacktestingView: React.FC = () => {
   const {
@@ -44,21 +44,27 @@ export const BacktestingView: React.FC = () => {
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
-  const openSampleLightbox = (selectedSample: BacktestSample) => {
-    // Build lightbox gallery containing all samples that have screenshots, starting at clicked
-    const samplesWithImages = backtestSamples.filter((s) => s.screenshot);
-    const images: LightboxImage[] = samplesWithImages.map((s) => ({
-      url: s.screenshot!,
-      title: `${s.asset} ${s.direction} — Backtest Sample (${s.date})`,
+  const sampleImages = (s: BacktestSample) =>
+    [s.screenshot, s.outcomeScreenshot, ...(s.screenshots ?? []).map((x) => x.url)].filter((u): u is string => !!u);
+  const openSampleLightbox = (selectedSample: BacktestSample, startAt = 0) => {
+    // Every image of the clicked sample, then the other samples' charts.
+    const toImage = (s: BacktestSample, url: string, i: number, n: number): LightboxImage => ({
+      url,
+      title: `${s.asset} ${s.direction} — Backtest Sample (${s.date})${n > 1 ? ` · ${i + 1}/${n}` : ''}`,
       subtitle: `Model: ${s.setupModel} | Market Regime: ${s.marketRegime}`,
       badge: `${s.result} (${s.realizedR && s.realizedR > 0 ? `+${s.realizedR}` : s.realizedR || 0}R)`,
       notes: `${s.narrative}. Evidence: ${s.evidence}. Notes: ${s.notes || 'N/A'}`,
-    }));
-
-    const targetIdx = samplesWithImages.findIndex((s) => s.id === selectedSample.id);
+    });
+    const own = sampleImages(selectedSample);
+    const images: LightboxImage[] = [
+      ...own.map((u, i) => toImage(selectedSample, u, i, own.length)),
+      ...backtestSamples
+        .filter((s) => s.id !== selectedSample.id)
+        .flatMap((s) => { const list = sampleImages(s); return list.map((u, i) => toImage(s, u, i, list.length)); }),
+    ];
     if (images.length > 0) {
       setLightboxImages(images);
-      setLightboxIndex(targetIdx >= 0 ? targetIdx : 0);
+      setLightboxIndex(Math.min(startAt, images.length - 1));
       setLightboxOpen(true);
     }
   };
@@ -81,7 +87,7 @@ export const BacktestingView: React.FC = () => {
   const [evidence, setEvidence] = useState('ST swept AR high with delta divergence on 5M');
   const [rqId, setRqId] = useState(researchQuestions[0]?.id || 'rq-05');
   const [notes, setNotes] = useState('Clean reaction following AR level test');
-  const [screenshot, setScreenshot] = useState('');
+  const [formScreenshots, setFormScreenshots] = useState<string[]>([]);
 
   const handleAddSample = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,7 +120,11 @@ export const BacktestingView: React.FC = () => {
         realizedR,
         isValidSetup,
         evidence,
-        screenshot: screenshot.trim() || undefined,
+        // First image is the sample's main chart; the rest are extra charts.
+        screenshot: formScreenshots[0] || undefined,
+        screenshots: formScreenshots.length > 1
+          ? formScreenshots.slice(1).map((url, i) => ({ id: `bt-img-${Date.now()}-${i}`, url, title: `Chart ${i + 2}` }))
+          : undefined,
         notes: notes.trim() || 'Empirical sample recorded',
       });
     } catch (error) {
@@ -123,6 +133,7 @@ export const BacktestingView: React.FC = () => {
     }
 
     setShowAddModal(false);
+    setFormScreenshots([]);
   };
 
   // Backtest stats
@@ -375,7 +386,7 @@ export const BacktestingView: React.FC = () => {
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 opacity-80 group-hover:opacity-60 transition" />
                       <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 backdrop-blur-sm text-[10px] font-mono text-cyan-300 border border-slate-700 flex items-center gap-1">
-                        <ImageIcon className="w-3 h-3" /> Zoom Chart
+                        <ImageIcon className="w-3 h-3" /> {sampleImages(s).length > 1 ? `${sampleImages(s).length} charts` : 'Zoom Chart'}
                       </div>
                     </div>
                   ) : (
@@ -611,14 +622,15 @@ export const BacktestingView: React.FC = () => {
                 />
               </div>
 
-              {/* Chart Screenshot Upload Dropzone */}
-              <ImageUploadDropzone
-                value={screenshot}
-                onChange={setScreenshot}
-                label="SAMPLE CHART SCREENSHOT"
-                sublabel="Upload, drag & drop, paste screenshot (Ctrl+V), or paste TradingView URL"
-                compact={false}
-              />
+              {/* Chart screenshots: several at once; the first is the main chart */}
+              <div className="space-y-2">
+                <span className="text-[11px] font-mono font-bold text-slate-300 block">
+                  SAMPLE CHART SCREENSHOTS {formScreenshots.length ? `(${formScreenshots.length})` : ''}
+                  <span className="font-normal text-slate-500"> · the first one is the main chart</span>
+                </span>
+                <ImageThumbGrid images={formScreenshots} onRemove={(i) => setFormScreenshots((prev) => prev.filter((_, j) => j !== i))} />
+                <MultiImageDropzone onAdd={(urls) => setFormScreenshots((prev) => [...prev, ...urls])} />
+              </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
                 <button
@@ -679,10 +691,31 @@ export const BacktestingView: React.FC = () => {
                     onChange={(newUrl) => {
                       updateBacktestSample(currentSample.id, { screenshot: newUrl });
                     }}
-                    label="SAMPLE CHART SCREENSHOT"
+                    label="MAIN CHART"
                     sublabel="Upload, drag & drop, paste screenshot (Ctrl+V), or paste TradingView URL"
                     compact={false}
                   />
+
+                  <div className="space-y-2">
+                    <span className="text-[11px] font-mono font-bold text-slate-300 block">
+                      MORE CHARTS {(currentSample.screenshots ?? []).length ? `(${(currentSample.screenshots ?? []).length})` : ''}
+                    </span>
+                    <ImageThumbGrid
+                      images={(currentSample.screenshots ?? []).map((x) => x.url)}
+                      onView={(i) => openSampleLightbox(currentSample, (currentSample.screenshot ? 1 : 0) + (currentSample.outcomeScreenshot ? 1 : 0) + i)}
+                      onRemove={(i) => updateBacktestSample(currentSample.id, { screenshots: (currentSample.screenshots ?? []).filter((_, j) => j !== i) })}
+                    />
+                    <MultiImageDropzone
+                      compact
+                      onAdd={(urls) => {
+                        const existing = currentSample.screenshots ?? [];
+                        const now = Date.now();
+                        updateBacktestSample(currentSample.id, {
+                          screenshots: [...existing, ...urls.map((url, i) => ({ id: `bt-img-${now}-${i}`, url, title: `Chart ${existing.length + i + 2}` }))],
+                        });
+                      }}
+                    />
+                  </div>
 
                   <div className="flex justify-end pt-2 border-t border-slate-800">
                     <button

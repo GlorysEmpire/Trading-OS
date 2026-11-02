@@ -21,7 +21,7 @@ import { Trade } from '../types';
 import { TradeOutcomePanel } from './TradeOutcomePanel';
 import { ChartLink } from './ChartImage';
 import { ImageViewerModal, LightboxImage } from './ImageViewerModal';
-import { ImageUploadDropzone } from './ImageUploadDropzone';
+import { ImageUploadDropzone, MultiImageDropzone, ImageThumbGrid } from './ImageUploadDropzone';
 
 export const JournalView: React.FC = () => {
   const { trades, assets, updateTrade, setQuickTradeModalOpen, tradingHQ, tradesLoading, tradesError, localTradeImportCount, importLocalTrades } = useTrading();
@@ -86,6 +86,21 @@ export const JournalView: React.FC = () => {
       setLightboxIndex(Math.min(initialIndex, list.length - 1));
       setLightboxOpen(true);
     }
+  };
+
+  const additionalUrls = (trade: Trade) => (trade.screenshots.additional ?? []).map((a) => (typeof a === 'string' ? a : a.url));
+  const hasCharts = (trade: Trade) =>
+    !!(trade.screenshots.before || trade.screenshots.during || trade.screenshots.after || additionalUrls(trade).length);
+  const slotCount = (trade: Trade) => [trade.screenshots.before, trade.screenshots.during, trade.screenshots.after].filter(Boolean).length;
+  const addMoreCharts = (trade: Trade, urls: string[]) => {
+    const existing = (trade.screenshots.additional ?? []).map((a, i) => (typeof a === 'string' ? { id: `add-${i}`, url: a, title: `Chart ${i + 1}` } : a));
+    const now = Date.now();
+    const added = urls.map((url, i) => ({ id: `add-${now}-${i}`, url, title: `Chart ${existing.length + i + 1}` }));
+    updateTrade(trade.id, { screenshots: { ...trade.screenshots, additional: [...existing, ...added] } });
+  };
+  const removeMoreChart = (trade: Trade, index: number) => {
+    const next = (trade.screenshots.additional ?? []).filter((_, i) => i !== index);
+    updateTrade(trade.id, { screenshots: { ...trade.screenshots, additional: next } });
   };
 
   // AI Audit state
@@ -259,7 +274,7 @@ Provide an objective assessment:
                   <span className="text-xs px-2 py-0.5 rounded bg-purple-950/60 border border-purple-800 text-purple-300 font-mono">
                     {trade.setupGrade} (Planned {trade.plannedR}R)
                   </span>
-                  {(trade.screenshots.before || trade.screenshots.during || trade.screenshots.after) && (
+                  {hasCharts(trade) && (
                     <button
                       type="button"
                       onClick={(e) => {
@@ -365,7 +380,7 @@ Provide an objective assessment:
                         <ImageIcon className="w-3.5 h-3.5 text-sky-400" />
                         Visual Position Setup & Chart Markups
                       </span>
-                      {(trade.screenshots.before || trade.screenshots.during || trade.screenshots.after) && (
+                      {hasCharts(trade) && (
                         <button
                           type="button"
                           onClick={() => openTradeLightbox(trade, 0)}
@@ -423,6 +438,19 @@ Provide an objective assessment:
                           )
                         }
                       />
+                    </div>
+
+                    <div className="space-y-2">
+                      <span className="text-[11px] font-mono font-bold text-slate-300 block">
+                        MORE CHARTS {additionalUrls(trade).length ? `(${additionalUrls(trade).length})` : ''}
+                        <span className="font-normal text-slate-500"> · HTF context, other timeframes, extra markups</span>
+                      </span>
+                      <ImageThumbGrid
+                        images={additionalUrls(trade)}
+                        onView={(i) => openTradeLightbox(trade, slotCount(trade) + i)}
+                        onRemove={(i) => removeMoreChart(trade, i)}
+                      />
+                      <MultiImageDropzone compact onAdd={(urls) => addMoreCharts(trade, urls)} />
                     </div>
                   </div>
 

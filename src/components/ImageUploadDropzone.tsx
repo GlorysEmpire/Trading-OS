@@ -1,8 +1,33 @@
 import React, { useState, useRef } from 'react';
 import { ChartImage } from './ChartImage';
-import { UploadCloud, Image as ImageIcon, X, Link as LinkIcon, Check, Eye } from 'lucide-react';
+import { UploadCloud, Image as ImageIcon, X, Link as LinkIcon, Check, Eye, Images } from 'lucide-react';
 import { compressImage } from '../utils/imageUtils';
 import { uploadChart } from '../lib/chartStorage';
+
+/** Compress an image file and upload it to chart storage. Falls back to an
+ * inline data URL (with a note) if storage isn't available, so a screenshot
+ * is never lost. */
+export async function processImageFile(file: File): Promise<{ url: string; note?: string }> {
+  let dataUrl: string;
+  try {
+    dataUrl = await compressImage(file, 1600, 1200, 0.82);
+  } catch (err) {
+    console.error('Failed to compress image', err);
+    dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+  try {
+    return { url: await uploadChart(dataUrl) };
+  } catch (err) {
+    return { url: dataUrl, note: `Saved inline, not in file storage: ${err instanceof Error ? err.message : 'upload failed'}` };
+  }
+}
+
+const imageFiles = (list: FileList | File[] | null | undefined) => Array.from(list ?? []).filter((f) => f.type.startsWith('image/'));
 
 interface ImageUploadDropzoneProps {
   value?: string;
@@ -39,25 +64,10 @@ export const ImageUploadDropzone: React.FC<ImageUploadDropzoneProps> = ({
     }
     setIsProcessing(true);
     setUploadNote(null);
-    let dataUrl: string;
     try {
-      dataUrl = await compressImage(file, 1600, 1200, 0.82);
-    } catch (err) {
-      console.error('Failed to compress image', err);
-      dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-    }
-    try {
-      // Store the file in Supabase Storage and keep only a short reference.
-      onChange(await uploadChart(dataUrl));
-    } catch (err) {
-      // Never lose the screenshot: fall back to storing it inline, and say so.
-      onChange(dataUrl);
-      setUploadNote(`Saved inline, not in file storage: ${err instanceof Error ? err.message : 'upload failed'}`);
+      const { url, note } = await processImageFile(file);
+      onChange(url);
+      if (note) setUploadNote(note);
     } finally {
       setIsProcessing(false);
     }
@@ -252,6 +262,123 @@ export const ImageUploadDropzone: React.FC<ImageUploadDropzoneProps> = ({
         onChange={handleFileChange}
         className="hidden"
       />
+    </div>
+  );
+};
+
+
+interface MultiImageDropzoneProps {
+  /** Called once per batch with every uploaded image, in the order given. */
+  onAdd: (urls: string[]) => void;
+  label?: string;
+  sublabel?: string;
+  className?: string;
+  compact?: boolean;
+}
+
+/** Drop area for several screenshots at once: pick multiple files, drag a
+ * batch in, or paste. Each image is compressed and uploaded to chart storage. */
+export const MultiImageDropzone: React.FC<MultiImageDropzoneProps> = ({
+  onAdd,
+  label,
+  sublabel = 'Select or drag several screenshots at once, or paste (Ctrl+V)',
+  className = '',
+  compact = false,
+}) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleFiles = async (files: File[]) => {
+    if (!files.length) return;
+    setNote(null);
+    setProgress({ done: 0, total: files.length });
+    const urls: string[] = [];
+    let lastNote: string | undefined;
+    for (const file of files) {
+      const r = await processImageFile(file);
+      urls.push(r.url);
+      if (r.note) lastNote = r.note;
+      setProgress({ done: urls.length, total: files.length });
+    }
+    onAdd(urls);
+    setProgress(null);
+    if (lastNote) setNote(lastNote);
+  };
+
+  return (
+    <div
+      className={`space-y-1.5 ${className}`}
+      onPaste={(e) => {
+        const files = Array.from(e.clipboardData?.items ?? [])
+          .filter((i) => i.type.startsWith('image/'))
+          .map((i) => i.getAsFile())
+          .filter((f): f is File => !!f);
+        if (files.length) { e.preventDefault(); void handleFiles(files); }
+      }}
+    >
+      {label && <label className="text-[11px] font-mono font-bold text-slate-700 dark:text-slate-300 block">{label}</label>}
+      <div
+        tabIndex={0}
+        onClick={() => !progress && inputRef.current?.click()}
+        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={(e) => { e.preventDefault(); setIsDragging(false); void handleFiles(imageFiles(e.dataTransfer.files)); }}
+        className={`rounded-md border-2 border-dashed cursor-pointer transition flex items-center justify-center gap-2 text-center outline-none focus:border-cyan-600 ${
+          compact ? 'px-3 py-2' : 'px-4 py-5'
+        } ${isDragging ? 'border-cyan-500 bg-cyan-950/30' : 'border-slate-700 bg-[#0d131d] hover:border-slate-500'}`}
+      >
+        <Images className="w-4 h-4 text-cyan-400 shrink-0" />
+        <div className="text-left">
+          <span className="block text-xs font-mono font-bold text-slate-200">
+            {progress ? `Uploading ${progress.done}/${progress.total}…` : 'Add screenshots'}
+          </span>
+          {!compact && !progress && <span className="block text-[10px] font-mono text-slate-500">{sublabel}</span>}
+        </div>
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={async (e) => {
+          const files = imageFiles(e.target.files);
+          e.target.value = '';
+          await handleFiles(files);
+        }}
+      />
+      {note && <p className="text-[10px] font-mono text-amber-400">{note}</p>}
+    </div>
+  );
+};
+
+/** Thumbnail strip for a list of screenshots, with view and remove. */
+export const ImageThumbGrid: React.FC<{
+  images: string[];
+  onView?: (index: number) => void;
+  onRemove?: (index: number) => void;
+  className?: string;
+}> = ({ images, onView, onRemove, className = '' }) => {
+  if (!images.length) return null;
+  return (
+    <div className={`grid grid-cols-3 sm:grid-cols-5 gap-2 ${className}`}>
+      {images.map((src, i) => (
+        <div key={`${src.slice(-24)}-${i}`} className="relative group rounded border border-slate-800 overflow-hidden bg-slate-900">
+          <ChartImage src={src} className="w-full h-16 object-cover cursor-pointer" onClick={() => onView?.(i)} />
+          {onRemove && (
+            <button
+              type="button"
+              onClick={() => onRemove(i)}
+              className="absolute top-1 right-1 p-0.5 rounded bg-slate-950/80 text-rose-300 opacity-0 group-hover:opacity-100 transition"
+              title="Remove"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      ))}
     </div>
   );
 };

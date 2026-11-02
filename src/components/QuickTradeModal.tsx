@@ -4,7 +4,7 @@ import { calculatePlannedR, evaluateRiskViolations, determineProcessCategory } f
 import { traderDateString, evaluateSessionCheck, minutesInZone, minutesToHhmm, SESSION_TIMEZONE } from '../utils/traderTime';
 import { X, AlertTriangle, ShieldCheck, CheckSquare, Square, Calculator } from 'lucide-react';
 import { Trade } from '../types';
-import { ImageUploadDropzone } from './ImageUploadDropzone';
+import { MultiImageDropzone, ImageThumbGrid } from './ImageUploadDropzone';
 
 export const QuickTradeModal: React.FC = () => {
   const {
@@ -27,7 +27,8 @@ export const QuickTradeModal: React.FC = () => {
   const [targetPrice, setTargetPrice] = useState<string>('');
   const [narrative, setNarrative] = useState('');
   const [setupReasoning, setSetupReasoning] = useState('');
-  const [screenshot, setScreenshot] = useState('');
+  const [screenshots, setScreenshots] = useState<string[]>([]);
+  const [chartLink, setChartLink] = useState('');
 
   // 5 Process Checks
   const [checkSession, setCheckSession] = useState(true);
@@ -133,7 +134,11 @@ export const QuickTradeModal: React.FC = () => {
       violations,
       mistakeCodes: sessionCheck.outWindow ? ['OUT_WINDOW'] : [],
       screenshots: {
-        before: screenshot.trim() || undefined,
+        // First image is the entry chart; the rest go to "More charts".
+        before: screenshots[0] || undefined,
+        additional: screenshots.length > 1
+          ? screenshots.slice(1).map((url, i) => ({ id: `add-${Date.now()}-${i}`, url, title: `Chart ${i + 1}` }))
+          : undefined,
       },
       notesDuring: '',
       reflectionAfter: '',
@@ -153,7 +158,8 @@ export const QuickTradeModal: React.FC = () => {
     setTargetPrice('');
     setNarrative('');
     setSetupReasoning('');
-    setScreenshot('');
+    setScreenshots([]);
+    setChartLink('');
   };
 
   return (
@@ -444,14 +450,31 @@ export const QuickTradeModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Chart / Screenshot Upload & Preview */}
-          <ImageUploadDropzone
-            value={screenshot}
-            onChange={setScreenshot}
-            label="SETUP CHART SCREENSHOT"
-            sublabel="Upload, drag & drop, paste screenshot (Ctrl+V), or paste TradingView URL"
-            compact={false}
-          />
+          {/* Chart screenshots: several at once; the first is the entry chart */}
+          <div className="space-y-2">
+            <span className="text-[11px] font-mono font-bold text-slate-300 block">
+              SETUP CHART SCREENSHOTS {screenshots.length ? `(${screenshots.length})` : ''}
+              <span className="font-normal text-slate-500"> · the first one is saved as the entry chart</span>
+            </span>
+            <ImageThumbGrid images={screenshots} onRemove={(i) => setScreenshots((prev) => prev.filter((_, j) => j !== i))} />
+            <MultiImageDropzone onAdd={(urls) => setScreenshots((prev) => [...prev, ...urls])} />
+            <div className="flex gap-2">
+              <input
+                value={chartLink}
+                onChange={(e) => setChartLink(e.target.value)}
+                placeholder="Or paste a TradingView snapshot link"
+                className="flex-1 bg-[#182232] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono text-xs focus:border-cyan-500 outline-none"
+              />
+              <button
+                type="button"
+                disabled={!/^https?:\/\//.test(chartLink.trim())}
+                onClick={() => { setScreenshots((prev) => [...prev, chartLink.trim()]); setChartLink(''); }}
+                className="px-3 py-1.5 rounded border border-slate-700 text-cyan-300 font-mono text-xs disabled:opacity-40"
+              >
+                ADD LINK
+              </button>
+            </div>
+          </div>
 
           {/* Action Buttons */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">

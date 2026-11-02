@@ -13,11 +13,10 @@ import {
   Shield,
   Activity,
   Camera,
-  ImagePlus,
   Star,
 } from 'lucide-react';
 import { AssetCategory, BiasType, Scenario, LiquidityZone, AssetChartScreenshot } from '../types';
-import { ImageUploadDropzone } from './ImageUploadDropzone';
+import { MultiImageDropzone } from './ImageUploadDropzone';
 import { ImageViewerModal, LightboxImage } from './ImageViewerModal';
 
 const inputClass = 'bg-[#162130] border border-slate-700 rounded px-2.5 py-1.5 text-slate-200 outline-none focus:border-cyan-500 font-sans';
@@ -63,7 +62,6 @@ export const AssetDesksView: React.FC = () => {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [newChartTitle, setNewChartTitle] = useState('');
-  const [pendingChartUrl, setPendingChartUrl] = useState('');
   const [instrumentFormOpen, setInstrumentFormOpen] = useState(false);
   const [instrumentError, setInstrumentError] = useState<string | null>(null);
   const [instrumentDraft, setInstrumentDraft] = useState({ symbol: '', name: '', canonicalSymbol: '', category: 'CRYPTO' as AssetCategory, tradingViewSymbol: '' });
@@ -132,18 +130,19 @@ export const AssetDesksView: React.FC = () => {
     });
   };
 
-  const addChart = () => {
-    if (!pendingChartUrl) return;
-    const chart: AssetChartScreenshot = {
-      id: `chart-${Date.now()}`,
-      title: newChartTitle.trim() || `${currentDesk.symbol} Chart`,
+  const addCharts = (urls: string[]) => {
+    if (!urls.length) return;
+    const base = newChartTitle.trim() || `${currentDesk.symbol} Chart`;
+    const now = Date.now();
+    const charts: AssetChartScreenshot[] = urls.map((url, i) => ({
+      id: `chart-${now}-${i}`,
+      title: urls.length > 1 ? `${base} (${i + 1})` : base,
       timeframe: '',
-      url: pendingChartUrl,
+      url,
       uploadedAt: new Date().toISOString(),
       category: 'GENERAL',
-    };
-    updateAssetDesk(currentDesk.id, { charts: [...(currentDesk.charts || []), chart] });
-    setPendingChartUrl('');
+    }));
+    updateAssetDesk(currentDesk.id, { charts: [...(currentDesk.charts || []), ...charts] });
     setNewChartTitle('');
   };
   const removeChart = (chartId: string) => {
@@ -670,27 +669,17 @@ export const AssetDesksView: React.FC = () => {
           </div>
 
           <div className="p-3 bg-[#131b26] border border-slate-800 rounded-md space-y-2">
-            <label className="text-[11px] font-mono font-bold text-slate-400 block">ADD CHART / SCREENSHOT</label>
+            <label className="text-[11px] font-mono font-bold text-slate-400 block">ADD CHARTS / SCREENSHOTS</label>
             <input
               value={newChartTitle}
               onChange={e => setNewChartTitle(e.target.value)}
               placeholder={`Title (defaults to \"${currentDesk.symbol} Chart\")`}
               className={`${inputClass} w-full`}
             />
-            <ImageUploadDropzone
-              value={pendingChartUrl}
-              onChange={url => setPendingChartUrl(url)}
-              sublabel="Drag & drop, click to upload, or paste screenshot (Ctrl+V)"
+            <MultiImageDropzone
+              onAdd={addCharts}
+              sublabel={`Select or drag several charts at once, or paste (Ctrl+V). They attach to the ${currentDesk.symbol} desk straight away.`}
             />
-            {pendingChartUrl && (
-              <button
-                onClick={addChart}
-                className="w-full flex items-center justify-center gap-2 py-2 rounded bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-mono font-bold"
-              >
-                <ImagePlus className="w-3.5 h-3.5" />
-                Attach to {currentDesk.symbol} Desk
-              </button>
-            )}
           </div>
 
           {(currentDesk.charts || []).length === 0 ? (
