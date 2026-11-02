@@ -89,21 +89,25 @@ export const Header: React.FC = () => {
     e.target.value = '';
   };
 
+  // Ordered by how often each screen is used: the daily trading loop first
+  // (analyse → trade → debrief → backtest), then the weekly and planning
+  // screens, then setup screens that change rarely, with the not-yet-connected
+  // intelligence screens last.
   const navItems: Array<{ id: NavSection; label: string; icon: any; category: string }> = [
-    { id: 'dashboard', label: 'Dashboard', icon: Activity, category: 'COMMAND' },
-    { id: 'calendar', label: 'Calendar', icon: Calendar, category: 'COMMAND' },
-    { id: 'alerts', label: 'Alerts', icon: AlertTriangle, category: 'COMMAND' },
-    { id: 'trading-hq', label: 'Trading HQ', icon: Sliders, category: 'TRADING' },
-    { id: 'asset-desks', label: 'Asset Desks', icon: TrendingUp, category: 'TRADING' },
-    { id: 'journal', label: 'Journal', icon: BookOpen, category: 'TRADING' },
-    { id: 'debrief', label: 'Debrief', icon: ClipboardCheck, category: 'TRADING' },
-    { id: 'weekly-review', label: 'Weekly Review', icon: CalendarRange, category: 'TRADING' },
-    { id: 'backtesting', label: 'Backtesting', icon: Search, category: 'RESEARCH' },
-    { id: 'research', label: 'Research Engine', icon: Radar, category: 'RESEARCH' },
-    { id: 'psychology', label: 'Psychology', icon: Brain, category: 'RESEARCH' },
+    { id: 'dashboard', label: 'Dashboard', icon: Activity, category: 'DAILY' },
+    { id: 'asset-desks', label: 'Asset Desks', icon: TrendingUp, category: 'DAILY' },
+    { id: 'journal', label: 'Journal', icon: BookOpen, category: 'DAILY' },
+    { id: 'debrief', label: 'Debrief', icon: ClipboardCheck, category: 'DAILY' },
+    { id: 'backtesting', label: 'Backtesting', icon: Search, category: 'DAILY' },
+    { id: 'research', label: 'Research Engine', icon: Radar, category: 'DAILY' },
+    { id: 'weekly-review', label: 'Weekly Review', icon: CalendarRange, category: 'WEEKLY' },
+    { id: 'calendar', label: 'Calendar', icon: Calendar, category: 'WEEKLY' },
+    { id: 'psychology', label: 'Psychology', icon: Brain, category: 'AS NEEDED' },
+    { id: 'trading-hq', label: 'Trading HQ', icon: Sliders, category: 'SETUP' },
+    { id: 'ai-assistant', label: 'AI Assistant', icon: Sparkles, category: 'AI' },
+    { id: 'alerts', label: 'Alerts', icon: AlertTriangle, category: 'SETUP' },
     { id: 'market-intelligence', label: 'Market Intel', icon: Activity, category: 'INTELLIGENCE' },
     { id: 'scanner', label: 'Scanner', icon: Radar, category: 'INTELLIGENCE' },
-    { id: 'ai-assistant', label: 'AI Assistant', icon: Sparkles, category: 'AI' },
   ];
 
   return (
