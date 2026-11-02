@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { Lock, PenLine, Ban, History, X, CheckCircle2 } from 'lucide-react';
 import { useTrading } from '../context/TradingContext';
-import type { ProcessScore, Trade, TradeAmendmentChange } from '../types';
+import type { BreakevenRecord, ProcessScore, Trade, TradeAmendmentChange } from '../types';
 import { calculateRealizedR } from '../utils/tradingCalculations';
-import { applyAmendment, diffEvidence, outcomeFromR, scoreProcess, type AmendablePatch } from '../utils/tradeIntegrity';
+import { applyAmendment, breakevenVerdict, diffEvidence, outcomeFromR, scoreProcess, type AmendablePatch } from '../utils/tradeIntegrity';
 
 type Outcome = 'WIN' | 'LOSS' | 'SCRATCH';
 const CHECK_KEYS = ['session', 'grade', 'risk', 'management', 'structure'] as const;
@@ -47,9 +47,12 @@ function ProcessChecks({ score, onToggle }: { score: ProcessScore; onToggle?: (k
   );
 }
 
-function MistakeCodePicker({ value, onChange }: { value: string[]; onChange: (codes: string[]) => void }) {
+function MistakeCodePicker({ value, onChange, forced = [] }: { value: string[]; onChange: (codes: string[]) => void; forced?: string[] }) {
   const { tradingHQ } = useTrading();
-  const toggle = (code: string) => onChange(value.includes(code) ? value.filter((c) => c !== code) : [...value, code]);
+  const toggle = (code: string) => {
+    if (forced.includes(code)) return;
+    onChange(value.includes(code) ? value.filter((c) => c !== code) : [...value, code]);
+  };
   if (!tradingHQ.mistakeCodes.length) return <p className="text-[11px] text-slate-500">No mistake codes defined in Trading HQ.</p>;
   return (
     <div className="flex flex-wrap gap-1.5">
@@ -57,13 +60,63 @@ function MistakeCodePicker({ value, onChange }: { value: string[]; onChange: (co
         <button
           key={m.code}
           type="button"
-          title={m.description}
+          title={forced.includes(m.code) ? 'Set by a Trading HQ rule' : m.description}
           onClick={() => toggle(m.code)}
-          className={`px-2 py-0.5 rounded border font-mono text-[10px] ${value.includes(m.code) ? 'bg-amber-950/60 border-amber-700 text-amber-300' : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300'}`}
+          className={`px-2 py-0.5 rounded border font-mono text-[10px] ${value.includes(m.code) || forced.includes(m.code) ? 'bg-amber-950/60 border-amber-700 text-amber-300' : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300'}`}
         >
-          {m.code}
+          {m.code}{forced.includes(m.code) ? ' · rule' : ''}
         </button>
       ))}
+    </div>
+  );
+}
+
+interface BeDraft { moved: boolean; atR: string; structural: boolean; note: string }
+
+function beDraftFrom(be?: BreakevenRecord): BeDraft {
+  return be ? { moved: true, atR: String(be.movedAtR), structural: be.structural, note: be.note ?? '' } : { moved: false, atR: '', structural: false, note: '' };
+}
+
+function beRecordFrom(d: BeDraft): BreakevenRecord | undefined {
+  if (!d.moved) return undefined;
+  const r = Number(d.atR);
+  if (d.atR.trim() === '' || !Number.isFinite(r)) return undefined;
+  return { movedAtR: r, structural: d.structural, ...(d.note.trim() ? { note: d.note.trim() } : {}) };
+}
+
+/** Breakeven entry + the Trading HQ verdict for this trade's grade. */
+function useBreakeven(trade: Trade, draft: BeDraft) {
+  const { tradingHQ } = useTrading();
+  const grade = tradingHQ.setupGrades.find((g) => g.grade === trade.setupGrade);
+  const record = beRecordFrom(draft);
+  const verdict = breakevenVerdict(record, grade);
+  return { record, verdict, forced: verdict?.early ? ['BE_EARLY'] : [] };
+}
+
+function BreakevenFields({ draft, onChange, verdict }: { draft: BeDraft; onChange: (d: BeDraft) => void; verdict: { early: boolean; reason: string } | null }) {
+  return (
+    <div className="space-y-2">
+      <label className="flex items-center gap-2 font-mono text-[11px] text-slate-300 cursor-pointer">
+        <input type="checkbox" checked={draft.moved} onChange={(e) => onChange({ ...draft, moved: e.target.checked })} className="accent-cyan-500" />
+        Stop was moved to breakeven
+      </label>
+      {draft.moved && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pl-5">
+          <label className="space-y-1"><span className="text-[10px] font-mono text-slate-400 block">MOVED AT (R)</span>
+            <input type="number" step="0.1" value={draft.atR} onChange={(e) => onChange({ ...draft, atR: e.target.value })} className={field} placeholder="e.g. 3" />
+          </label>
+          <label className="flex items-center gap-2 font-mono text-[11px] text-slate-300 cursor-pointer sm:pt-4" title="New structure formed a new invalidation zone beyond the entry">
+            <input type="checkbox" checked={draft.structural} onChange={(e) => onChange({ ...draft, structural: e.target.checked })} className="accent-cyan-500" />
+            Structural reason
+          </label>
+          <label className="space-y-1"><span className="text-[10px] font-mono text-slate-400 block">NOTE {draft.structural ? '(what structure?)' : '(optional)'}</span>
+            <input value={draft.note} onChange={(e) => onChange({ ...draft, note: e.target.value })} className={field} placeholder="e.g. 15M HL formed above entry" />
+          </label>
+        </div>
+      )}
+      {verdict && (
+        <p className={`pl-5 font-mono text-[11px] ${verdict.early ? 'text-amber-300' : 'text-emerald-400'}`}>{verdict.reason}</p>
+      )}
     </div>
   );
 }
@@ -105,6 +158,8 @@ function AmendModal({ trade, onClose }: { trade: Trade; onClose: () => void }) {
   const [outcome, setOutcome] = useState<'AUTO' | Outcome>('AUTO');
   const [checks, setChecks] = useState<ProcessScore>(trade.processScore);
   const [codes, setCodes] = useState<string[]>(trade.mistakeCodes);
+  const [be, setBe] = useState<BeDraft>(beDraftFrom(trade.breakeven));
+  const beState = useBreakeven(trade, be);
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -120,9 +175,11 @@ function AmendModal({ trade, onClose }: { trade: Trade; onClose: () => void }) {
     if (setupGrade !== trade.setupGrade) p.setupGrade = setupGrade;
     if (outcome !== 'AUTO' && outcome !== trade.outcome) p.outcome = outcome;
     if (CHECK_KEYS.some((k) => checks[k] !== trade.processScore[k])) p.processScore = scoreProcess(checks);
-    if (JSON.stringify([...codes].sort()) !== JSON.stringify([...trade.mistakeCodes].sort())) p.mistakeCodes = codes;
+    const finalCodes = [...new Set([...codes, ...beState.forced])];
+    if (JSON.stringify([...finalCodes].sort()) !== JSON.stringify([...trade.mistakeCodes].sort())) p.mistakeCodes = finalCodes;
+    if (JSON.stringify(beState.record ?? null) !== JSON.stringify(trade.breakeven ?? null)) p.breakeven = beState.record;
     return p;
-  }, [exitPrice, entryPrice, stopPrice, targetPrice, date, setupGrade, outcome, checks, codes, trade]);
+  }, [exitPrice, entryPrice, stopPrice, targetPrice, date, setupGrade, outcome, checks, codes, trade, beState.record, beState.forced]);
 
   const preview = useMemo(() => diffEvidence(trade, applyAmendment(trade, patch)), [trade, patch]);
 
@@ -160,8 +217,11 @@ function AmendModal({ trade, onClose }: { trade: Trade; onClose: () => void }) {
       <div className="space-y-1.5"><span className="text-[10px] font-mono text-slate-400 block">PROCESS CHECKS</span>
         <ProcessChecks score={checks} onToggle={(k) => setChecks((prev) => ({ ...prev, [k]: !prev[k] }))} />
       </div>
+      <div className="space-y-1.5"><span className="text-[10px] font-mono text-slate-400 block">BREAKEVEN</span>
+        <BreakevenFields draft={be} onChange={setBe} verdict={beState.verdict} />
+      </div>
       <div className="space-y-1.5"><span className="text-[10px] font-mono text-slate-400 block">MISTAKE CODES</span>
-        <MistakeCodePicker value={codes} onChange={setCodes} />
+        <MistakeCodePicker value={codes} onChange={setCodes} forced={beState.forced} />
       </div>
       <label className="space-y-1 block"><span className="text-[10px] font-mono text-slate-400 block">REASON (REQUIRED)</span>
         <textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Typed the exit wrong; MT5 history shows 2391.4" className={`${field} font-sans resize-none`} />
@@ -217,6 +277,8 @@ function CloseForm({ trade }: { trade: Trade }) {
   const [exit, setExit] = useState('');
   const [outcome, setOutcome] = useState<'AUTO' | Outcome>('AUTO');
   const [codes, setCodes] = useState<string[]>(trade.mistakeCodes);
+  const [be, setBe] = useState<BeDraft>(beDraftFrom(trade.breakeven));
+  const beState = useBreakeven(trade, be);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -228,8 +290,10 @@ function CloseForm({ trade }: { trade: Trade }) {
 
   const submit = async () => {
     if (!window.confirm('Close and lock this trade? After this, the numbers, outcome, process score and mistake codes can only change through a logged amendment.')) return;
+    if (be.moved && !beState.record) { setError('Enter the R at which the stop was moved to breakeven.'); return; }
     setSaving(true); setError(null);
-    try { await closeTrade(trade.id, { exitPrice: exitNum, outcome: outcome === 'AUTO' ? undefined : outcome, processScore: trade.processScore, mistakeCodes: codes }); }
+    const finalCodes = [...new Set([...codes, ...beState.forced])];
+    try { await closeTrade(trade.id, { exitPrice: exitNum, outcome: outcome === 'AUTO' ? undefined : outcome, processScore: trade.processScore, mistakeCodes: finalCodes, breakeven: beState.record }); }
     catch (e) { setError(e instanceof Error ? e.message : 'Could not close the trade.'); }
     finally { setSaving(false); }
   };
@@ -255,8 +319,11 @@ function CloseForm({ trade }: { trade: Trade }) {
             </select>
           </label>
         </div>
+        <div className="space-y-1.5"><span className="text-[10px] font-mono text-slate-400 block">BREAKEVEN</span>
+          <BreakevenFields draft={be} onChange={setBe} verdict={beState.verdict} />
+        </div>
         <div className="space-y-1.5"><span className="text-[10px] font-mono text-slate-400 block">MISTAKE CODES (if any)</span>
-          <MistakeCodePicker value={codes} onChange={setCodes} />
+          <MistakeCodePicker value={codes} onChange={setCodes} forced={beState.forced} />
         </div>
         {error && <p className="text-rose-400 font-mono text-[11px]">{error}</p>}
         <div className="flex justify-end">
@@ -281,6 +348,11 @@ function LockedView({ trade }: { trade: Trade }) {
         <span className="text-[11px] font-mono text-slate-300 font-bold uppercase block">Process checks ({trade.processScore.score}/5 passed)</span>
         <ProcessChecks score={trade.processScore} />
       </div>
+      {trade.breakeven && (
+        <p className="font-mono text-[11px] text-slate-300">
+          <span className="text-slate-400">BREAKEVEN:</span> moved at {trade.breakeven.movedAtR}R{trade.breakeven.structural ? ' · structural' : ''}{trade.breakeven.note ? ` · ${trade.breakeven.note}` : ''}
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-1.5 font-mono text-[10px]">
         <span className="text-slate-400">MISTAKE CODES:</span>
         {trade.mistakeCodes.length ? trade.mistakeCodes.map((c) => <span key={c} className="px-2 py-0.5 rounded border bg-amber-950/60 border-amber-700 text-amber-300">{c}</span>) : <span className="text-slate-500">none</span>}

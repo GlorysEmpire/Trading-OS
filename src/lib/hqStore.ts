@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { toSupabaseError } from './supabaseErrors';
-import type { ExecutionModel, MistakeCode, ResearchFramework, RiskRules, SessionWindow, SetupGradeRule, TradingHQConfig } from '../types';
+import type { ExecutionModel, FocusDay, MistakeCode, ResearchFramework, RiskRules, SessionWindow, SetupGradeRule, TradingHQConfig } from '../types';
 
 /** One row per category, versioned: editing never overwrites — it
  * deactivates the old row and inserts the next version, so historical
@@ -11,10 +11,11 @@ import type { ExecutionModel, MistakeCode, ResearchFramework, RiskRules, Session
  * `process_score`), which caused every HQ load to fail seeding it with a
  * 23514 violation until supabase/migrations/20261021_widen_hq_category_check.sql
  * was run. If you add another HQCategory value here, the DB constraint
- * needs a matching migration — it does not grow on its own. */
-export type HQCategory = 'risk' | 'setup_quality' | 'execution_model' | 'session' | 'process_score' | 'research_framework' | 'mistake_code';
+ * needs a matching migration — it does not grow on its own. `focus_rotation`
+ * (added 2026-11-02) is allowed by supabase/migrations/20261102000000_hq_update_nov.sql. */
+export type HQCategory = 'risk' | 'setup_quality' | 'execution_model' | 'session' | 'process_score' | 'research_framework' | 'mistake_code' | 'focus_rotation';
 
-export const HQ_CATEGORIES: HQCategory[] = ['risk', 'setup_quality', 'execution_model', 'session', 'process_score', 'mistake_code', 'research_framework'];
+export const HQ_CATEGORIES: HQCategory[] = ['risk', 'setup_quality', 'execution_model', 'session', 'process_score', 'mistake_code', 'research_framework', 'focus_rotation'];
 
 export interface HQConfigRow {
   id: string;
@@ -37,8 +38,8 @@ const REAL_RISK_RULES: RiskRules = {
 };
 
 const REAL_SETUP_GRADES: SetupGradeRule[] = [
-  { grade: 'A+', minR: 5.0, description: '≥5.0R, OR structural ≥3.0R with multi-timeframe confluence.' },
-  { grade: 'B+', minR: 3.0, description: '≥3.0R with standard HTF narrative alignment and clear invalidation.' },
+  { grade: 'A+', minR: 5.0, breakevenAtR: 5, description: '≥5.0R, OR 3R where the structure itself makes 3R the reasonable ceiling. Breakeven only after 5R or for a structural reason; otherwise hold to TP.' },
+  { grade: 'B+', minR: 3.0, breakevenAtR: 3, description: '≥3.0R with HTF narrative alignment and clear invalidation. Breakeven at 3R or for a structural reason (especially retracement trades).' },
   { grade: 'Standard minimum', minR: 3.0, description: 'Minimum acceptable trade threshold across all models.' },
 ];
 
@@ -71,52 +72,39 @@ const REAL_EXECUTION_MODELS: ExecutionModel[] = [
   },
 ];
 
-/** Four back-to-back sessions tiling the full 24h day in NY time, each
- * mapped to Lagos time at the standard +5h offset (NY EDT / UTC-4 to
- * Lagos WAT / UTC+1). Corrected 2026-10-21 per the trader's own confirmed
- * windows — this is the single source of truth for both NY and Lagos
- * times; don't let the two drift independently again. */
+/** Session windows in New York time — the source of truth (Trading HQ,
+ * confirmed 2026-11-02; supersedes the 4-session day). Local times are
+ * derived at display/scoring time and follow US daylight saving: London is
+ * 06:00–11:00 Lagos in US winter (EST) and 05:00–10:00 in US summer (EDT). */
 export const REAL_SESSIONS: SessionWindow[] = [
   {
     id: 'sess-london',
     name: 'London',
     nyStart: '00:00',
     nyEnd: '05:00',
-    lagosStart: '05:00',
-    lagosEnd: '10:00',
     activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-    notes: 'Sub-5m execution only within this window. 15m+ setups have no window restriction.',
+    notes: 'Morning session. Sub-5M execution only inside this window; 15M+ entries are not window-restricted.',
   },
   {
     id: 'sess-new-york',
     name: 'New York',
-    nyStart: '05:00',
+    nyStart: '07:00',
     nyEnd: '12:00',
-    lagosStart: '10:00',
-    lagosEnd: '17:00',
     activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-    notes: 'Sub-5m execution only within this window. 15m+ setups have no window restriction.',
+    notes: 'Sub-5M execution only inside this window; 15M+ entries are not window-restricted.',
   },
-  {
-    id: 'sess-afternoon',
-    name: 'Afternoon',
-    nyStart: '12:00',
-    nyEnd: '18:00',
-    lagosStart: '17:00',
-    lagosEnd: '23:00',
-    activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-    notes: 'Sub-5m execution only within this window. 15m+ setups have no window restriction.',
-  },
-  {
-    id: 'sess-tokyo',
-    name: 'Tokyo',
-    nyStart: '18:00',
-    nyEnd: '00:00',
-    lagosStart: '23:00',
-    lagosEnd: '05:00',
-    activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-    notes: 'Crosses midnight NY time (18:00–00:00). Sub-5m execution only within this window. 15m+ setups have no window restriction.',
-  },
+];
+
+/** Weekly focus rotation (Trading HQ, 2026-11-02). A focus, not a restriction:
+ * a qualified setup on another asset can still be traded. */
+export const REAL_FOCUS_ROTATION: FocusDay[] = [
+  { day: 'Monday', assets: ['BTC', 'ETH'], activity: 'Trade + Backtest' },
+  { day: 'Tuesday', assets: ['NAS'], activity: 'Trade + Backtest' },
+  { day: 'Wednesday', assets: ['Gold', 'Silver'], activity: 'Trade + Backtest' },
+  { day: 'Thursday', assets: ['GU', 'EU'], activity: 'Trade + Backtest' },
+  { day: 'Friday', assets: ['GER40'], activity: 'Trade + Backtest' },
+  { day: 'Saturday', assets: ['JP225'], activity: 'Backtest / Research' },
+  { day: 'Sunday', assets: ['USDCAD', 'USDCHF', 'USDJPY'], activity: 'Backtest / Research' },
 ];
 
 const REAL_PROCESS_CHECKS = ['Session', 'Grade', 'Risk', 'Management', 'Structure'];
@@ -125,13 +113,14 @@ const REAL_PROCESS_CHECKS = ['Session', 'Grade', 'Risk', 'Management', 'Structur
 // re-invented — the audit flagged these as the ones that trace back to real
 // context, unlike Build B's own M-01..M-06 list.
 const REAL_MISTAKE_CODES: MistakeCode[] = [
-  { code: 'BE_EARLY', label: 'Moved to break-even too early', category: 'MANAGEMENT', description: 'Suffocated the trade before a natural structural milestone was reached.' },
-  { code: 'OUT_WINDOW', label: 'Traded outside session window', category: 'EXECUTION', description: 'Execution taken outside the defined NY/Lagos liquidity windows.' },
+  { code: 'BE_EARLY', label: 'Moved to break-even too early', category: 'MANAGEMENT', description: 'Moved to breakeven before the grade allows it (A+: 5R, B+: 3R) without a structural reason — new structure forming a new invalidation zone beyond the entry.' },
+  { code: 'OUT_WINDOW', label: 'Traded outside session window', category: 'EXECUTION', description: 'A sub-5M entry outside the session windows (NY time). 15M+ entries are not window-restricted.' },
   { code: 'GREED_TP', label: 'Moved target for more', category: 'MANAGEMENT', description: 'Adjusted target further away mid-trade chasing additional R.' },
   { code: 'COMMUNITY_PRESSURE', label: 'Influenced by community pressure', category: 'PSYCHOLOGY', description: 'Decision was influenced by outside opinion rather than the trader’s own process.' },
   { code: 'SIZE_ANXIETY', label: 'Sizing driven by anxiety', category: 'PSYCHOLOGY', description: 'Position size changed because of fear or overconfidence rather than the risk plan.' },
   { code: 'CORRELATED_OVEREXPOSURE', label: 'Correlated overexposure', category: 'RISK', description: 'Held simultaneous correlated positions (e.g. BTC + ETH) without accounting for combined risk.' },
   { code: 'REENTRY', label: 'Re-entered after stop-out', category: 'RISK', description: 'Violated the no re-entry rule after the initial stop was hit.' },
+  { code: 'UNTESTED_MODEL', label: 'Traded an untested model', category: 'EXECUTION', description: 'Traded a model before its backtest sample was complete (12–15 clean samples).' },
   { code: 'OTHER', label: 'Other', category: 'EXECUTION', description: 'Any deviation not covered by the codes above — record what happened in the trade notes.' },
 ];
 
@@ -149,7 +138,14 @@ const REAL_DEFAULTS: Record<HQCategory, unknown> = {
   process_score: REAL_PROCESS_CHECKS,
   mistake_code: REAL_MISTAKE_CODES,
   research_framework: REAL_RESEARCH_FRAMEWORK,
+  focus_rotation: REAL_FOCUS_ROTATION,
 };
+
+/** The shipped defaults for a category — used by Trading HQ to offer items
+ * (e.g. a newly added mistake code) that an existing account doesn't have yet. */
+export function defaultContent<T>(category: HQCategory): T {
+  return REAL_DEFAULTS[category] as T;
+}
 
 export async function loadHQConfigRows(supabase: SupabaseClient, userId: string): Promise<HQConfigRow[]> {
   const { data, error } = await supabase
@@ -259,6 +255,7 @@ export function buildTradingHQConfig(rows: HQConfigRow[]): { config: TradingHQCo
     processChecks: content<string[]>('process_score', REAL_PROCESS_CHECKS),
     mistakeCodes: content<MistakeCode[]>('mistake_code', REAL_MISTAKE_CODES),
     researchFramework: content<ResearchFramework>('research_framework', REAL_RESEARCH_FRAMEWORK),
+    focusRotation: content<FocusDay[]>('focus_rotation', REAL_FOCUS_ROTATION),
     notes: 'Trading HQ is the operational source of truth. Every category above is versioned in Supabase — editing writes a new version rather than rewriting history.',
   };
 

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useTrading } from '../context/TradingContext';
-import { Sliders, ShieldCheck, Clock, AlertOctagon, Save, Tag, Info, Layers, History, Plus, Trash2, ListChecks, FlaskConical } from 'lucide-react';
+import { Sliders, ShieldCheck, Clock, AlertOctagon, Save, Tag, Info, Layers, History, Plus, Trash2, ListChecks, FlaskConical, CalendarDays } from 'lucide-react';
 import type { HQCategory } from '../lib/hqStore';
-import { REAL_SESSIONS } from '../lib/hqStore';
-import type { ExecutionModel, MistakeCode, SessionWindow, SetupGradeRule } from '../types';
+import { REAL_SESSIONS, defaultContent } from '../lib/hqStore';
+import { deviceTimeZone, nyTimeIn } from '../utils/traderTime';
+import type { ExecutionModel, FocusDay, MistakeCode, SessionWindow, SetupGradeRule } from '../types';
 
 function CategoryVersionBadge({ label }: { label: string }) {
   return (
@@ -95,6 +96,19 @@ export const TradingHQView: React.FC = () => {
   // changes how they read everywhere else they're shown.
   const [processChecks, setProcessChecks] = useState<string[]>(tradingHQ.processChecks);
 
+  // ---- Section 8: Focus Rotation ----
+  const [focusRotation, setFocusRotation] = useState<FocusDay[]>(tradingHQ.focusRotation);
+  const updateFocusDay = (idx: number, patch: Partial<FocusDay>) =>
+    setFocusRotation((prev) => prev.map((d, i) => (i === idx ? { ...d, ...patch } : d)));
+  const handleSaveFocusRotation = () => saveCategory('focus_rotation', focusRotation);
+
+  // Default mistake codes this account doesn't have yet (e.g. UNTESTED_MODEL,
+  // added to the defaults after the account was created).
+  const missingDefaultCodes = defaultContent<MistakeCode[]>('mistake_code').filter((d) => !mistakeCodes.some((m) => m.code === d.code));
+
+  const localTz = deviceTimeZone();
+  const localTzLabel = localTz.split('/').pop()?.replace(/_/g, ' ') ?? localTz;
+
   // ---- Section 7: Research Framework ----
   const [minSamples, setMinSamples] = useState(tradingHQ.researchFramework.minSamples);
   const [researchNotes, setResearchNotes] = useState(tradingHQ.researchFramework.notes);
@@ -148,8 +162,6 @@ export const TradingHQView: React.FC = () => {
         name: 'New Session',
         nyStart: '00:00',
         nyEnd: '00:00',
-        lagosStart: '00:00',
-        lagosEnd: '00:00',
         activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
         notes: '',
       },
@@ -324,6 +336,17 @@ export const TradingHQView: React.FC = () => {
                   className={fieldClass}
                 />
               </div>
+              <div className="flex items-center gap-2" title="Earliest R at which breakeven is allowed for this grade. A structural reason is always allowed; anything earlier is BE_EARLY.">
+                <span className="text-[10px] font-mono text-slate-500 uppercase shrink-0">BE from R</span>
+                <input
+                  type="number"
+                  step="0.5"
+                  value={g.breakevenAtR ?? ''}
+                  placeholder="no rule"
+                  onChange={(e) => updateSetupGrade(idx, { breakevenAtR: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
+                  className={fieldClass}
+                />
+              </div>
               <textarea
                 value={g.description}
                 onChange={(e) => updateSetupGrade(idx, { description: e.target.value })}
@@ -376,8 +399,9 @@ export const TradingHQView: React.FC = () => {
               <div className="pt-1 space-y-1">
                 <span className="text-[10px] font-mono text-slate-400 uppercase">Key Criteria (one per line):</span>
                 <textarea
-                  value={model.keyCriteria.join('\n')}
-                  onChange={(e) =>
+                  key={`${model.id}-${model.keyCriteria.join('|')}`}
+                  defaultValue={model.keyCriteria.join('\n')}
+                  onBlur={(e) =>
                     updateExecutionModel(model.id, {
                       keyCriteria: e.target.value.split('\n').map((c) => c.trim()).filter(Boolean),
                     })
@@ -411,9 +435,9 @@ export const TradingHQView: React.FC = () => {
                 onClick={resetSessionsToStandard}
                 disabled={savingCategory === 'session'}
                 className="text-[10px] font-mono text-cyan-300 hover:text-cyan-200 border border-slate-700 rounded px-2 py-1"
-                title="Reset to London / New York / Afternoon / Tokyo, each mapped to Lagos time — the default methodology's sessions"
+                title="Reset to the Trading HQ default windows: London 00:00–05:00 and New York 07:00–12:00 (NY time)"
               >
-                {savingCategory === 'session' ? 'SAVING…' : 'RESET TO DEFAULT 4-SESSION DAY'}
+                {savingCategory === 'session' ? 'SAVING…' : 'RESET TO DEFAULT SESSIONS'}
               </button>
             </>
           }
@@ -434,7 +458,7 @@ export const TradingHQView: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
                 <div className="space-y-1">
-                  <span className="text-slate-400 text-[10px] block">NEW YORK TIME:</span>
+                  <span className="text-slate-400 text-[10px] block">NEW YORK TIME (SOURCE OF TRUTH):</span>
                   <div className="flex items-center gap-1">
                     <input value={sess.nyStart} onChange={(e) => updateSession(sess.id, { nyStart: e.target.value })} className={`${fieldClass} text-cyan-300`} placeholder="HH:MM" />
                     <span className="text-slate-500">–</span>
@@ -442,19 +466,18 @@ export const TradingHQView: React.FC = () => {
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <span className="text-slate-400 text-[10px] block">LAGOS TIME:</span>
-                  <div className="flex items-center gap-1">
-                    <input value={sess.lagosStart} onChange={(e) => updateSession(sess.id, { lagosStart: e.target.value })} className={`${fieldClass} text-emerald-300`} placeholder="HH:MM" />
-                    <span className="text-slate-500">–</span>
-                    <input value={sess.lagosEnd} onChange={(e) => updateSession(sess.id, { lagosEnd: e.target.value })} className={`${fieldClass} text-emerald-300`} placeholder="HH:MM" />
+                  <span className="text-slate-400 text-[10px] block">{localTzLabel.toUpperCase()} TIME TODAY:</span>
+                  <div className="px-2.5 py-1.5 rounded border border-slate-800 bg-[#0d131d] text-emerald-300" title="Derived from NY time with today's daylight-saving offsets; changes automatically when US clocks change">
+                    {nyTimeIn(sess.nyStart, localTz)} – {nyTimeIn(sess.nyEnd, localTz)}
                   </div>
                 </div>
               </div>
               <div className="space-y-1 pt-1">
                 <span className="text-[10px] font-mono text-slate-400 uppercase">Active Days (comma-separated)</span>
                 <input
-                  value={sess.activeDays.join(', ')}
-                  onChange={(e) => updateSession(sess.id, { activeDays: e.target.value.split(',').map((d) => d.trim()).filter(Boolean) })}
+                  key={`${sess.id}-${sess.activeDays.join(',')}`}
+                  defaultValue={sess.activeDays.join(', ')}
+                  onBlur={(e) => updateSession(sess.id, { activeDays: e.target.value.split(',').map((d) => d.trim()).filter(Boolean) })}
                   className={fieldClass}
                   placeholder="Monday, Tuesday, …"
                 />
@@ -487,6 +510,22 @@ export const TradingHQView: React.FC = () => {
             </button>
           }
         />
+        {missingDefaultCodes.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 p-2.5 rounded border border-cyan-900/60 bg-cyan-950/20 text-[11px] font-mono">
+            <span className="text-cyan-300">In the defaults but not in your list:</span>
+            {missingDefaultCodes.map((d) => (
+              <button
+                key={d.code}
+                onClick={() => setMistakeCodes((prev) => [...prev, d])}
+                title={d.description}
+                className="flex items-center gap-1 px-2 py-0.5 rounded border border-slate-700 text-slate-200 hover:text-cyan-200"
+              >
+                <Plus className="w-3 h-3" /> {d.code}
+              </button>
+            ))}
+            <span className="text-slate-500">Adding fills the form; press SAVE to version it.</span>
+          </div>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {mistakeCodes.map((m, idx) => (
             <div key={idx} className="p-3 rounded bg-[#162130] border border-slate-800 space-y-2">
@@ -588,6 +627,49 @@ export const TradingHQView: React.FC = () => {
             <label className="block text-slate-400 mb-1 text-xs font-mono">NOTES</label>
             <textarea value={researchNotes} onChange={(e) => setResearchNotes(e.target.value)} className={textareaClass} rows={2} />
           </div>
+        </div>
+      </div>
+
+      {/* Section 8: Focus Rotation */}
+      <div className="bg-[#101722] border border-slate-800 rounded-lg p-5 space-y-4">
+        <SectionHeader
+          icon={<CalendarDays className="w-4 h-4 text-cyan-400" />}
+          title="8. WEEKLY FOCUS ROTATION"
+          onSave={handleSaveFocusRotation}
+          saving={savingCategory === 'focus_rotation'}
+        />
+        <p className="text-[11px] text-slate-400 font-sans">
+          Which assets get focused study, scalping attention and backtesting on each day. This drives the weekly watchlist.
+          It's a focus, not a restriction: a qualified setup on another asset can still be traded.
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs font-mono min-w-[520px]">
+            <thead>
+              <tr className="text-[10px] text-slate-500 text-left border-b border-slate-800">
+                <th className="py-1.5 font-normal w-28">DAY</th>
+                <th className="font-normal">FOCUS ASSETS (comma-separated)</th>
+                <th className="font-normal w-56">PRIMARY ACTIVITY</th>
+              </tr>
+            </thead>
+            <tbody>
+              {focusRotation.map((d, idx) => (
+                <tr key={d.day} className="border-b border-slate-800/60">
+                  <td className="py-1.5 text-slate-200">{d.day}</td>
+                  <td className="pr-2">
+                    <input
+                      key={`${d.day}-${d.assets.join(',')}`}
+                      defaultValue={d.assets.join(', ')}
+                      onBlur={(e) => updateFocusDay(idx, { assets: e.target.value.split(',').map((a) => a.trim()).filter(Boolean) })}
+                      className={fieldClass}
+                    />
+                  </td>
+                  <td>
+                    <input value={d.activity} onChange={(e) => updateFocusDay(idx, { activity: e.target.value })} className={fieldClass} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

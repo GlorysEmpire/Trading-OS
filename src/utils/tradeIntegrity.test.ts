@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Trade } from '../types';
-import { applyAmendment, assertFreeUpdate, buildClosedTrade, diffEvidence, isCountedTrade, isTradeLocked } from './tradeIntegrity';
+import { applyAmendment, assertFreeUpdate, breakevenVerdict, buildClosedTrade, diffEvidence, isCountedTrade, isTradeLocked } from './tradeIntegrity';
 import { computePerformanceStats } from './tradingCalculations';
 
 const checks = { session: true, grade: true, risk: true, management: true, structure: false, score: 4 };
@@ -71,5 +71,25 @@ describe('locking', () => {
     const dup = { ...buildClosedTrade(openTrade({ id: 'b' }), { exitPrice: 130, processScore: checks, mistakeCodes: [] }), voided: { at: 1, reason: 'duplicate' } };
     expect(isCountedTrade(dup)).toBe(false);
     expect(computePerformanceStats([a, dup], hq).totalTrades).toBe(1);
+  });
+});
+
+describe('breakevenVerdict (breakeven rule by grade)', () => {
+  const aPlus = { grade: 'A+', minR: 5, description: '', breakevenAtR: 5 };
+  const bPlus = { grade: 'B+', minR: 3, description: '', breakevenAtR: 3 };
+  it('A+ at 3R without structure is BE_EARLY; B+ at 3R is fine', () => {
+    expect(breakevenVerdict({ movedAtR: 3, structural: false }, aPlus)?.early).toBe(true);
+    expect(breakevenVerdict({ movedAtR: 3, structural: false }, bPlus)?.early).toBe(false);
+  });
+  it('a structural breakeven is always allowed', () => {
+    expect(breakevenVerdict({ movedAtR: 0.8, structural: true }, aPlus)?.early).toBe(false);
+  });
+  it('returns null when no BE move was recorded or the grade has no R rule', () => {
+    expect(breakevenVerdict(undefined, aPlus)).toBeNull();
+    expect(breakevenVerdict({ movedAtR: 1, structural: false }, { grade: 'X', minR: 3, description: '' })).toBeNull();
+  });
+  it('closing a trade keeps the breakeven record', () => {
+    const closed = buildClosedTrade(openTrade(), { exitPrice: 100, processScore: checks, mistakeCodes: ['BE_EARLY'], breakeven: { movedAtR: 2, structural: false } });
+    expect(closed.breakeven).toEqual({ movedAtR: 2, structural: false });
   });
 });

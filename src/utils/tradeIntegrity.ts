@@ -1,4 +1,4 @@
-import type { ProcessScore, Trade, TradeAmendmentChange } from '../types';
+import type { BreakevenRecord, ProcessScore, SetupGradeRule, Trade, TradeAmendmentChange } from '../types';
 import { calculatePlannedR, calculateRealizedR, determineProcessCategory } from './tradingCalculations';
 
 /**
@@ -16,6 +16,7 @@ export const EVIDENCE_FIELDS = [
   'narrative', 'setupReasoning', 'entryPrice', 'stopPrice', 'targetPrice', 'exitPrice',
   'plannedR', 'realizedR', 'status', 'outcome', 'processScore', 'processCategory',
   'mistakeCodes', 'violations', 'configVersionUsed', 'closedAt', 'voided',
+  'entryAt', 'breakeven',
 ] as const;
 
 /** Documentation that can still be added to after a trade closes: a reflection
@@ -31,7 +32,8 @@ export const FREE_AFTER_CLOSE_FIELDS = [
  * (plannedR, realizedR, processCategory, score) are recomputed, never typed. */
 export type AmendablePatch = Partial<Pick<Trade,
   'date' | 'asset' | 'direction' | 'timeframe' | 'session' | 'modelId' | 'setupGrade' |
-  'entryPrice' | 'stopPrice' | 'targetPrice' | 'exitPrice' | 'outcome' | 'processScore' | 'mistakeCodes'
+  'entryPrice' | 'stopPrice' | 'targetPrice' | 'exitPrice' | 'outcome' | 'processScore' | 'mistakeCodes' |
+  'entryAt' | 'breakeven'
 >>;
 
 export function isTradeLocked(trade: Trade): boolean {
@@ -55,6 +57,8 @@ export function outcomeFromR(realizedR: number): 'WIN' | 'LOSS' | 'SCRATCH' {
 
 export interface CloseTradeInput {
   exitPrice: number;
+  /** Set if the stop was moved to breakeven during the trade. */
+  breakeven?: BreakevenRecord;
   /** Optional override, e.g. a tiny positive R the trader counts as a scratch. */
   outcome?: 'WIN' | 'LOSS' | 'SCRATCH';
   processScore: ProcessScore;
@@ -75,6 +79,7 @@ export function buildClosedTrade(trade: Trade, input: CloseTradeInput, now = Dat
     processScore,
     processCategory: determineProcessCategory(processScore, outcome),
     mistakeCodes: [...input.mistakeCodes],
+    ...(input.breakeven ? { breakeven: { ...input.breakeven } } : {}),
     status: 'CLOSED',
     closedAt: now,
   };
@@ -115,4 +120,21 @@ export function assertFreeUpdate(trade: Trade, patch: Partial<Trade>) {
   if (blocked.length > 0) {
     throw new Error(`This trade is locked. ${blocked.join(', ')} can only change through an amendment with a reason.`);
   }
+}
+
+/** The breakeven rule by grade (Trading HQ 2026-11-02): BE is allowed at the
+ * grade's `breakevenAtR` or later, or any time for a structural reason. Anything
+ * else is BE_EARLY. Returns null when no BE move was recorded or the grade has
+ * no R rule. */
+export function breakevenVerdict(
+  breakeven: BreakevenRecord | undefined,
+  grade: SetupGradeRule | undefined,
+): { early: boolean; reason: string } | null {
+  if (!breakeven) return null;
+  if (breakeven.structural) return { early: false, reason: 'Structural breakeven: allowed at any R.' };
+  if (grade?.breakevenAtR === undefined) return null;
+  if (breakeven.movedAtR + 1e-9 >= grade.breakevenAtR) {
+    return { early: false, reason: `Moved at ${breakeven.movedAtR}R; ${grade.grade} allows breakeven from ${grade.breakevenAtR}R.` };
+  }
+  return { early: true, reason: `Moved at ${breakeven.movedAtR}R without a structural reason; ${grade.grade} only allows breakeven from ${grade.breakevenAtR}R → BE_EARLY.` };
 }

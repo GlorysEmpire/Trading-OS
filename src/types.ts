@@ -102,6 +102,24 @@ export interface SetupGradeRule {
   grade: string;
   minR: number;
   description: string;
+  /** Earliest R at which moving the stop to breakeven is allowed for this grade
+   * (A+ = 5, B+ = 3). A structural reason is always allowed. Unset = no R rule. */
+  breakevenAtR?: number;
+}
+
+/** One day of the weekly focus rotation (drives the weekly watchlist). */
+export interface FocusDay {
+  day: string; // 'Monday' … 'Sunday'
+  assets: string[];
+  activity: string; // e.g. 'Trade + Backtest', 'Backtest / Research'
+}
+
+/** How the stop was moved to breakeven on a trade, if it was. */
+export interface BreakevenRecord {
+  movedAtR: number;
+  /** New structure formed a new invalidation zone beyond the entry. */
+  structural: boolean;
+  note?: string;
 }
 
 export interface ExecutionModel {
@@ -111,13 +129,17 @@ export interface ExecutionModel {
   keyCriteria: string[];
 }
 
+/** A trading session window, defined in New York time (America/New_York).
+ * Local times are always derived from the NY times, never stored. */
 export interface SessionWindow {
   id: string;
   name: string;
   nyStart: string;
   nyEnd: string;
-  lagosStart: string;
-  lagosEnd: string;
+  /** @deprecated Legacy stored Lagos times (fixed +5h, wrong in US winter). Ignored. */
+  lagosStart?: string;
+  /** @deprecated See lagosStart. */
+  lagosEnd?: string;
   activeDays: string[];
   notes?: string;
 }
@@ -151,6 +173,7 @@ export interface TradingHQConfig {
   processChecks: string[]; // ['Session', 'Grade', 'Risk', 'Management', 'Structure']
   mistakeCodes: MistakeCode[];
   researchFramework: ResearchFramework;
+  focusRotation: FocusDay[];
   notes: string;
 }
 
@@ -201,6 +224,10 @@ export interface Trade {
   /** When the trade was closed and locked (ms epoch). Closed trades without
    * this field predate locking — they're still treated as locked. */
   closedAt?: number;
+  /** When the trade was entered (ISO). Session scoring uses this, in NY time.
+   * Older trades without it fall back to `timestamp` (when it was logged). */
+  entryAt?: string;
+  breakeven?: BreakevenRecord;
   /** Set when a trade is voided instead of deleted (duplicate entry, logged by
    * mistake). A voided trade stays visible in the Journal with its reason,
    * but is excluded from performance stats. */

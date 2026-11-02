@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTrading } from '../context/TradingContext';
 import { getAuthHeaders } from '../lib/supabaseClient';
-import { traderDateString, traderNowMinutes, isSessionActiveNow } from '../utils/traderTime';
+import { traderDateString, traderNowMinutes, isSessionActiveAt, nyTimeIn, deviceTimeZone, weekdayInZone } from '../utils/traderTime';
 import type { AssetDeskData } from '../types';
 import { findPreviousDebrief } from '../utils/debrief';
 import {
@@ -172,7 +172,11 @@ export const DashboardView: React.FC = () => {
   const openTrades = trades.filter((t) => t.status === 'OPEN' && !t.voided);
   const todayStr = traderDateString();
   const todayEvents = calendarEvents.filter((e) => e.date === todayStr);
-  const activeSession = tradingHQ.sessions.find((s) => isSessionActiveNow(s, nowMinutes));
+  // Judged in NY time (sessions are defined there); nowMinutes ticking keeps it live.
+  const activeSession = tradingHQ.sessions.find((s) => isSessionActiveAt(s, new Date()));
+  const localTz = deviceTimeZone();
+  const localTzLabel = localTz.split('/').pop()?.replace(/_/g, ' ') ?? localTz;
+  const todayFocus = tradingHQ.focusRotation.find((d) => d.day === weekdayInZone(new Date()));
   const activeAlerts = alerts.filter((a) => a.active);
   const watchedAssets = assets.filter((a) => a.watchlisted);
   const activeRQ = researchQuestions[0];
@@ -184,7 +188,7 @@ export const DashboardView: React.FC = () => {
   const todaysDebrief = debriefs.find((d) => d.date === todayStr);
   const tradedToday = trades.some((t) => t.date === todayStr && !t.voided);
   const debriefDue = !todaysDebrief && (nowMinutes >= 18 * 60 || tradedToday);
-  const showMission = !!(lastDebrief?.upgradeForTomorrow || lastDebrief?.tomorrowAssignment || debriefDue || todaysDebrief);
+  const showMission = !!(todayFocus || lastDebrief?.upgradeForTomorrow || lastDebrief?.tomorrowAssignment || debriefDue || todaysDebrief);
   const openDebrief = () => { setDebriefDate(todayStr); setActiveTab('debrief'); };
 
   const handleGenerateDailyBrief = async () => {
@@ -195,9 +199,12 @@ export const DashboardView: React.FC = () => {
         headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
         body: JSON.stringify({
           prompt:
-            'Generate a high-density daily operational executive briefing for the trader: review today\'s session windows, active risk limits (1% risk, max 2 losses, no re-entry), current market biases for BTC/ETH/NQ, today\'s backtest assignment (ETH RQ-05), and psychological vigilance.',
+            `Generate a concise daily operational briefing for the trader using only the context provided: today's session windows (defined in NY time), active risk limits, today's focus assets${todayFocus ? ` (${todayFocus.assets.join(', ')}, ${todayFocus.activity})` : ''} and their current desk biases, the active research question, and the upgrade in focus from the last debrief. Do not invent market data.`,
           context: {
             rules: tradingHQ.riskRules,
+            sessionsNY: tradingHQ.sessions.map((s) => ({ name: s.name, ny: `${s.nyStart}-${s.nyEnd}` })),
+            todayFocus: todayFocus ?? null,
+            upgradeInFocus: lastDebrief?.upgradeForTomorrow ?? null,
             stats: performanceStats,
             activeAssets: assets.map((a) => ({
               symbol: a.symbol,
@@ -218,7 +225,7 @@ export const DashboardView: React.FC = () => {
       setAiBriefText(data.text || 'Operational briefing generated.');
     } catch (e: any) {
       setAiBriefText(
-        'Operational Briefing: You are operating under active Trading HQ rules. Max 2 losses daily limit, strict 1% risk per setup. No re-entry allowed after stop. Focus on high-timeframe liquidity sweeps inside prime NY/Lagos windows. Tuesday focus: ETH RQ-05 backtest session.'
+        `The AI briefing is unavailable right now. From Trading HQ: ${tradingHQ.riskRules.riskPerSetupPct}% risk per setup, max ${tradingHQ.riskRules.maxDailyLosses} losses today${tradingHQ.riskRules.noReEntry ? ', no re-entry' : ''}.${todayFocus ? ` Today's focus: ${todayFocus.assets.join(' / ')} (${todayFocus.activity}).` : ''}`
       );
     } finally {
       setAiBriefLoading(false);
@@ -289,7 +296,12 @@ export const DashboardView: React.FC = () => {
       )}
 
       {showMission && (
-        <div className="bg-[#101722] border border-slate-800 rounded-lg px-4 py-3 grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3 items-center font-mono text-xs">
+        <div className="bg-[#101722] border border-slate-800 rounded-lg px-4 py-3 grid grid-cols-1 md:grid-cols-[auto_1fr_1fr_auto] gap-3 items-center font-mono text-xs">
+          <div className="min-w-0">
+            <span className="text-[10px] text-slate-500 uppercase tracking-wider block">Today's focus</span>
+            <span className="text-cyan-300 font-bold">{todayFocus?.assets.join(' / ') || '—'}</span>
+            {todayFocus?.activity && <span className="block text-[10px] text-slate-500">{todayFocus.activity}</span>}
+          </div>
           <div className="min-w-0">
             <span className="text-[10px] text-slate-500 uppercase tracking-wider block">Upgrade in focus</span>
             <span className="text-slate-200 font-sans">{lastDebrief?.upgradeForTomorrow || '—'}</span>
@@ -401,7 +413,7 @@ export const DashboardView: React.FC = () => {
                       )}
                     </div>
                     <div className="text-[11px] text-slate-400 mt-1 font-mono">
-                      NY: {s.nyStart} – {s.nyEnd} | Lagos: {s.lagosStart} – {s.lagosEnd}
+                      NY {s.nyStart} – {s.nyEnd} | {localTzLabel} {nyTimeIn(s.nyStart, localTz)} – {nyTimeIn(s.nyEnd, localTz)}
                     </div>
                   </div>
                 );

@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useTrading } from '../context/TradingContext';
 import { calculatePlannedR, evaluateRiskViolations, determineProcessCategory } from '../utils/tradingCalculations';
-import { traderDateString } from '../utils/traderTime';
+import { traderDateString, evaluateSessionCheck, minutesInZone, minutesToHhmm, SESSION_TIMEZONE } from '../utils/traderTime';
 import { X, AlertTriangle, ShieldCheck, CheckSquare, Square, Calculator } from 'lucide-react';
 import { Trade } from '../types';
 import { ImageUploadDropzone } from './ImageUploadDropzone';
@@ -36,6 +36,27 @@ export const QuickTradeModal: React.FC = () => {
   const [checkManagement, setCheckManagement] = useState(true);
   const [checkStructure, setCheckStructure] = useState(true);
 
+  // Entry time (device-local in the input). The session and the Session
+  // check are derived from it in NY time, so DST and travel can't break them.
+  const toLocalInput = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const [entryLocal, setEntryLocal] = useState(() => toLocalInput(new Date()));
+  useEffect(() => {
+    if (quickTradeModalOpen) setEntryLocal(toLocalInput(new Date()));
+  }, [quickTradeModalOpen]);
+  const entryDate = useMemo(() => {
+    const d = new Date(entryLocal);
+    return Number.isNaN(d.getTime()) ? new Date() : d;
+  }, [entryLocal]);
+  const sessionCheck = useMemo(() => evaluateSessionCheck(tradingHQ.sessions, entryDate, timeframe), [tradingHQ.sessions, entryDate, timeframe]);
+  const entryNyLabel = minutesToHhmm(minutesInZone(entryDate, SESSION_TIMEZONE));
+  useEffect(() => {
+    setSession(sessionCheck.session?.name ?? 'Outside windows');
+    setCheckSession(sessionCheck.pass);
+  }, [sessionCheck.session?.id, sessionCheck.pass]);
+
   const numEntry = parseFloat(entryPrice);
   const numStop = parseFloat(stopPrice);
   const numTarget = parseFloat(targetPrice);
@@ -48,7 +69,7 @@ export const QuickTradeModal: React.FC = () => {
   }, [direction, numEntry, numStop, numTarget]);
 
   const violations = useMemo(() => {
-    return evaluateRiskViolations(
+    const list = evaluateRiskViolations(
       {
         plannedR: calculatedR,
         setupGrade,
@@ -56,7 +77,11 @@ export const QuickTradeModal: React.FC = () => {
       tradingHQ,
       performanceStats.lossCountToday
     );
-  }, [calculatedR, setupGrade, tradingHQ, performanceStats.lossCountToday]);
+    if (sessionCheck.outWindow) {
+      list.push(`${timeframe} entry at ${entryNyLabel} NY is outside the session windows. Sub-5M entries are window-restricted (OUT_WINDOW).`);
+    }
+    return list;
+  }, [calculatedR, setupGrade, tradingHQ, performanceStats.lossCountToday, sessionCheck.outWindow, timeframe, entryNyLabel]);
 
   const processScoreTotal =
     (checkSession ? 1 : 0) +
@@ -89,7 +114,8 @@ export const QuickTradeModal: React.FC = () => {
     };
 
     const newTrade: Omit<Trade, 'id' | 'timestamp' | 'configVersionUsed'> = {
-      date: traderDateString(),
+      date: traderDateString(entryDate),
+      entryAt: entryDate.toISOString(),
       asset,
       direction,
       timeframe,
@@ -105,7 +131,7 @@ export const QuickTradeModal: React.FC = () => {
       status: 'OPEN',
       processScore,
       violations,
-      mistakeCodes: [],
+      mistakeCodes: sessionCheck.outWindow ? ['OUT_WINDOW'] : [],
       screenshots: {
         before: screenshot.trim() || undefined,
       },
@@ -227,19 +253,37 @@ export const QuickTradeModal: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-slate-400 font-mono mb-1">SESSION</label>
-              <select
-                value={session}
-                onChange={(e) => setSession(e.target.value)}
-                className="w-full bg-[#182232] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none"
+              <label className="block text-slate-400 font-mono mb-1">SESSION (NY TIME)</label>
+              <div
+                className={`w-full rounded px-2.5 py-1.5 font-mono border ${
+                  sessionCheck.outWindow
+                    ? 'bg-rose-950/40 border-rose-800 text-rose-300'
+                    : sessionCheck.session
+                    ? 'bg-[#182232] border-slate-700 text-cyan-300'
+                    : 'bg-[#182232] border-slate-700 text-slate-400'
+                }`}
+                title="Worked out from the entry time in New York time"
               >
-                {tradingHQ.sessions.map((s) => (
-                  <option key={s.id} value={s.name}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+                {sessionCheck.session ? sessionCheck.session.name : 'Outside windows'} · {entryNyLabel} NY
+              </div>
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-400 font-mono mb-1">ENTRY TIME (YOUR LOCAL TIME)</label>
+              <input
+                type="datetime-local"
+                value={entryLocal}
+                onChange={(e) => setEntryLocal(e.target.value)}
+                className="w-full bg-[#182232] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none"
+              />
+            </div>
+            <p className="text-[10px] text-slate-500 font-mono self-end pb-1.5">
+              {sessionCheck.restricted
+                ? 'Sub-5M entry: must be inside a session window.'
+                : `${timeframe} entry: not window-restricted (only sub-5M entries are).`}
+            </p>
           </div>
 
           {/* Row 2: Model, Grade, & Calculated R Display */}
