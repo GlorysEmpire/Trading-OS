@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
+import { ChartImage } from './ChartImage';
 import { UploadCloud, Image as ImageIcon, X, Link as LinkIcon, Check, Eye } from 'lucide-react';
 import { compressImage } from '../utils/imageUtils';
+import { uploadChart } from '../lib/chartStorage';
 
 interface ImageUploadDropzoneProps {
   value?: string;
@@ -27,6 +29,7 @@ export const ImageUploadDropzone: React.FC<ImageUploadDropzoneProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   const [showUrlInput, setShowUrlInput] = useState(false);
+  const [uploadNote, setUploadNote] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const processFile = async (file: File) => {
@@ -35,15 +38,26 @@ export const ImageUploadDropzone: React.FC<ImageUploadDropzoneProps> = ({
       return;
     }
     setIsProcessing(true);
+    setUploadNote(null);
+    let dataUrl: string;
     try {
-      const compressedDataUrl = await compressImage(file, 1600, 1200, 0.82);
-      onChange(compressedDataUrl);
+      dataUrl = await compressImage(file, 1600, 1200, 0.82);
     } catch (err) {
       console.error('Failed to compress image', err);
-      // Fallback: direct file reader
-      const reader = new FileReader();
-      reader.onload = () => onChange(reader.result as string);
-      reader.readAsDataURL(file);
+      dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+    try {
+      // Store the file in Supabase Storage and keep only a short reference.
+      onChange(await uploadChart(dataUrl));
+    } catch (err) {
+      // Never lose the screenshot: fall back to storing it inline, and say so.
+      onChange(dataUrl);
+      setUploadNote(`Saved inline, not in file storage: ${err instanceof Error ? err.message : 'upload failed'}`);
     } finally {
       setIsProcessing(false);
     }
@@ -104,7 +118,7 @@ export const ImageUploadDropzone: React.FC<ImageUploadDropzoneProps> = ({
       <div className={`space-y-1.5 ${className}`}>
         {label && <label className="text-[11px] font-mono font-bold text-slate-700 dark:text-slate-300 block">{label}</label>}
         <div className="relative group rounded-md border border-slate-300 dark:border-slate-700 overflow-hidden bg-slate-100 dark:bg-slate-900">
-          <img
+          <ChartImage
             src={value}
             alt="Chart screenshot preview"
             className="w-full h-36 object-cover object-center cursor-pointer transition hover:opacity-95"
@@ -146,6 +160,7 @@ export const ImageUploadDropzone: React.FC<ImageUploadDropzoneProps> = ({
             className="hidden"
           />
         </div>
+        {uploadNote && <p className="text-[10px] font-mono text-amber-400">{uploadNote}</p>}
       </div>
     );
   }

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Trade } from '../types';
 import { TradeOutcomePanel } from './TradeOutcomePanel';
+import { ChartLink } from './ChartImage';
 import { ImageViewerModal, LightboxImage } from './ImageViewerModal';
 import { ImageUploadDropzone } from './ImageUploadDropzone';
 
@@ -475,14 +476,12 @@ Provide an objective assessment:
                       </button>
 
                       {trade.screenshots.before && (
-                        <a
-                          href={trade.screenshots.before}
-                          target="_blank"
-                          rel="noreferrer"
+                        <ChartLink
+                          src={trade.screenshots.before}
                           className="text-xs font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
                         >
                           <ExternalLink className="w-3 h-3" /> Chart Link
-                        </a>
+                        </ChartLink>
                       )}
                     </div>
 

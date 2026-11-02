@@ -1,4 +1,6 @@
 import React, { useEffect } from 'react';
+import { ChartImage } from './ChartImage';
+import { resolveChartUrl } from '../lib/chartStorage';
 import { X, ZoomIn, ZoomOut, Maximize2, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export interface LightboxImage {
@@ -48,9 +50,16 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
   const currentImg = images[currentIndex] || images[0];
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     const link = document.createElement('a');
-    link.href = currentImg.url;
+    // Storage references resolve to a signed URL; fetch it as a blob so the
+    // browser downloads instead of navigating to the cross-origin link.
+    let href = currentImg.url;
+    try {
+      const resolved = await resolveChartUrl(currentImg.url);
+      href = resolved.startsWith('data:') ? resolved : URL.createObjectURL(await (await fetch(resolved)).blob());
+    } catch { /* fall back to the raw value */ }
+    link.href = href;
     link.download = `${currentImg.title.replace(/\s+/g, '_') || 'chart'}.png`;
     document.body.appendChild(link);
     link.click();
@@ -167,7 +176,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
           className="transition-transform duration-100 max-h-[85vh] flex items-center justify-center"
           style={{ transform: `scale(${zoom})` }}
         >
-          <img
+          <ChartImage
             src={currentImg.url}
             alt={currentImg.title}
             className="max-h-[80vh] max-w-[90vw] object-contain rounded-md shadow-2xl border border-slate-800 select-none"

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { ChartImage } from './ChartImage';
 import { useTrading } from '../context/TradingContext';
 import { getAuthHeaders } from '../lib/supabaseClient';
 import { traderDateString, traderNowMinutes, isSessionActiveAt, nyTimeIn, deviceTimeZone, weekdayInZone } from '../utils/traderTime';
@@ -124,6 +125,7 @@ export const DashboardView: React.FC = () => {
     debriefs,
     setDebriefDate,
     weeklyReviews,
+    chartMigration,
   } = useTrading();
 
   const [aiBriefLoading, setAiBriefLoading] = useState(false);
@@ -302,6 +304,14 @@ export const DashboardView: React.FC = () => {
               <span>+ LOG TRADE</span>
             </button>
           </div>
+        </div>
+      )}
+
+      {chartMigration && (chartMigration.running || chartMigration.error) && (
+        <div className={`rounded border px-3 py-2 font-mono text-[11px] ${chartMigration.error ? 'border-amber-900 bg-amber-950/30 text-amber-300' : 'border-slate-800 bg-[#101722] text-slate-400'}`}>
+          {chartMigration.error
+            ? `Moving screenshots to file storage stopped (${chartMigration.done}/${chartMigration.total} moved): ${chartMigration.error} Nothing was lost; the rest stay where they are and the move retries next time the app loads.`
+            : `Moving saved screenshots to file storage… ${chartMigration.done}/${chartMigration.total}`}
         </div>
       )}
 
@@ -587,7 +597,7 @@ export const DashboardView: React.FC = () => {
                 {/* Chart screenshot — the fastest visual read of current price action */}
                 <div className="relative h-28 w-full bg-[#0a0f16] border-b border-slate-800 overflow-hidden">
                   {chart ? (
-                    <img
+                    <ChartImage
                       src={chart.url}
                       alt={`${asset.symbol} ${chart.timeframe} chart`}
                       className="w-full h-full object-cover group-hover:opacity-90 transition"
@@ -890,7 +900,7 @@ export const DashboardView: React.FC = () => {
                   >
                     {charts.map((c) => (
                       <div key={c.id} className="h-full w-full shrink-0 snap-center flex items-center justify-center">
-                        <img
+                        <ChartImage
                           src={c.url}
                           alt={`${expandedAsset.symbol} ${c.timeframe} chart`}
                           className="max-w-full max-h-full object-contain"

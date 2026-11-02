@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ChartImage } from './ChartImage';
 import { useTrading } from '../context/TradingContext';
 import {
   Search,
@@ -258,7 +259,7 @@ export const BacktestingView: React.FC = () => {
                       className="group relative w-16 h-12 rounded overflow-hidden border border-slate-700 bg-black/40 flex-shrink-0 cursor-pointer shadow-sm"
                       title="Click to view chart screenshot in lightbox"
                     >
-                      <img
+                      <ChartImage
                         src={s.screenshot}
                         alt="Backtest chart"
                         className="w-full h-full object-cover group-hover:scale-105 transition"
@@ -366,7 +367,7 @@ export const BacktestingView: React.FC = () => {
                       onClick={() => openSampleLightbox(s)}
                       className="group w-full h-full cursor-pointer relative"
                     >
-                      <img
+                      <ChartImage
                         src={s.screenshot}
                         alt={`${s.asset} backtest`}
                         className="w-full h-full object-cover group-hover:scale-105 transition duration-300"

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
   AssetDeskData,
   Trade,
@@ -24,6 +24,7 @@ import { buildTradingHQConfig, loadHQConfigRows, saveHQCategory, seedMissingHQCa
 import { archiveAssetDesk, createAssetDesk, loadAssetDesks, saveAssetDeskPatch, seedAssetDesksIfMissing, updateInstrument, type InstrumentInput } from '../lib/assetDesksStore';
 import { insertAmendment, insertTradesIfNew, loadAmendments, loadTrades, saveTrade } from '../lib/tradeStore';
 import { loadDebriefs, upsertDebrief } from '../lib/debriefStore';
+import { isInlineImage, uploadChart } from '../lib/chartStorage';
 import { loadWeeklyReviews, upsertWeeklyReview } from '../lib/weeklyReviewStore';
 import { applyAmendment, assertFreeUpdate, buildClosedTrade, diffEvidence, isTradeLocked, type AmendablePatch, type CloseTradeInput } from '../utils/tradeIntegrity';
 import { importResearchQuestionsOnce, loadResearchQuestions, removeResearchQuestion, saveResearchQuestion } from '../lib/researchStore';
@@ -101,6 +102,8 @@ interface TradingContextType {
   weeklyReviewsLoading: boolean;
   weeklyReviewsError: string | null;
   saveWeeklyReview: (review: Omit<WeeklyReview, 'createdAt' | 'updatedAt'>) => Promise<void>;
+  /** Progress of the one-time move of inline screenshots into file storage. */
+  chartMigration: { total: number; done: number; failed: number; error?: string; running: boolean } | null;
   importLocalTrades: () => Promise<number>;
   researchQuestions: ResearchQuestion[];
   researchLoading: boolean;
@@ -439,6 +442,80 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
   };
   const toggleAlert = (id: string) => setAlerts(prev => prev.map(al => (al.id === id ? { ...al, active: !al.active } : al)));
 
+  // One-time background move of legacy inline (base64) screenshots into
+  // Supabase Storage, so records stay small and the app stays fast. Runs once
+  // per session after everything has loaded; stops at the first storage error
+  // (e.g. the chart-storage migration hasn't been run) without changing data.
+  const [chartMigration, setChartMigration] = useState<TradingContextType['chartMigration']>(null);
+  const chartMigrationStarted = useRef(false);
+  useEffect(() => {
+    if (chartMigrationStarted.current || tradesLoading || backtestLoading || desksLoading) return;
+    chartMigrationStarted.current = true;
+
+    const tradeJobs = trades.filter((t) => {
+      const s = t.screenshots || {};
+      return [s.before, s.during, s.after, ...(s.additional ?? []).map((a) => (typeof a === 'string' ? a : a.url))].some(isInlineImage);
+    });
+    const backtestJobs = backtestSamples.filter((b) => [b.screenshot, b.outcomeScreenshot, ...(b.screenshots ?? []).map((x) => x.url)].some(isInlineImage));
+    const deskJobs = assets.filter((a) => (a.charts ?? []).some((c) => isInlineImage(c.url)));
+    const total =
+      tradeJobs.reduce((n, t) => n + [t.screenshots.before, t.screenshots.during, t.screenshots.after, ...(t.screenshots.additional ?? []).map((a) => (typeof a === 'string' ? a : a.url))].filter(isInlineImage).length, 0) +
+      backtestJobs.reduce((n, b) => n + [b.screenshot, b.outcomeScreenshot, ...(b.screenshots ?? []).map((x) => x.url)].filter(isInlineImage).length, 0) +
+      deskJobs.reduce((n, a) => n + (a.charts ?? []).filter((c) => isInlineImage(c.url)).length, 0);
+    if (total === 0) return;
+
+    let done = 0;
+    const progress = (patch: Partial<NonNullable<TradingContextType['chartMigration']>> = {}) =>
+      setChartMigration((prev) => ({ total, failed: 0, running: true, ...(prev ?? {}), ...patch, done }));
+    const move = async (src?: string) => {
+      if (!isInlineImage(src)) return src;
+      const ref = await uploadChart(src);
+      done++;
+      progress();
+      return ref;
+    };
+
+    (async () => {
+      progress();
+      try {
+        for (const t of tradeJobs) {
+          const s = t.screenshots;
+          const screenshots = {
+            ...s,
+            before: await move(s.before),
+            during: await move(s.during),
+            after: await move(s.after),
+            additional: s.additional
+              ? await Promise.all(s.additional.map(async (a, i) => (typeof a === 'string' ? { id: `add-${i}`, url: (await move(a)) as string, title: `Additional #${i + 1}` } : { ...a, url: (await move(a.url)) as string })))
+              : undefined,
+          };
+          const next = { ...t, screenshots };
+          await saveTrade(supabase, userId, next);
+          setTrades((prev) => prev.map((x) => (x.id === t.id ? { ...x, screenshots } : x)));
+        }
+        for (const b of backtestJobs) {
+          const next = {
+            ...b,
+            screenshot: await move(b.screenshot),
+            outcomeScreenshot: await move(b.outcomeScreenshot),
+            screenshots: b.screenshots ? await Promise.all(b.screenshots.map(async (x) => ({ ...x, url: (await move(x.url)) as string }))) : undefined,
+          };
+          await saveBacktestSample(supabase, userId, next);
+          setBacktestSamples((prev) => prev.map((x) => (x.id === b.id ? next : x)));
+        }
+        for (const a of deskJobs) {
+          const charts = await Promise.all((a.charts ?? []).map(async (c) => ({ ...c, url: (await move(c.url)) as string })));
+          await saveAssetDeskPatch(supabase, a.id, { charts });
+          setAssets((prev) => prev.map((x) => (x.id === a.id ? { ...x, charts } : x)));
+        }
+        progress({ running: false });
+      } catch (e) {
+        progress({ running: false, failed: total - done, error: e instanceof Error ? e.message : 'Chart upload failed' });
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tradesLoading, backtestLoading, desksLoading]);
+
   const performanceStats = computePerformanceStats(trades, tradingHQ);
 
   const exportDataJSON = () => {
@@ -524,6 +601,7 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
         weeklyReviewsLoading,
         weeklyReviewsError,
         saveWeeklyReview,
+        chartMigration,
         importLocalTrades,
         researchQuestions,
         researchLoading,

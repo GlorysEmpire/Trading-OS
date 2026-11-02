@@ -170,7 +170,7 @@ export async function saveAssetDeskPatch(supabase: SupabaseClient, deskId: strin
 
   if (touchesNotesBundle) {
     const { data: existingRow, error: fetchErr } = await supabase.from('asset_desks').select('notes').eq('id', deskId).single();
-    if (fetchErr) throw fetchErr;
+    if (fetchErr) throw toSupabaseError(fetchErr);
     const current = safeParse<NotesBundle>((existingRow as { notes: string | null } | null)?.notes ?? null, {});
     const merged: NotesBundle = {
       liquidityZones: patch.liquidityZones !== undefined ? patch.liquidityZones : current.liquidityZones ?? [],

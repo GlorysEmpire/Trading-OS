@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ChartImage } from './ChartImage';
 import { useTrading } from '../context/TradingContext';
 import {
   Layers,
@@ -698,7 +699,7 @@ export const AssetDesksView: React.FC = () => {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {(currentDesk.charts || []).map((chart, idx) => (
                 <div key={chart.id} className="relative group rounded-md border border-slate-800 overflow-hidden bg-[#162130]">
-                  <img
+                  <ChartImage
                     src={chart.url}
                     alt={chart.title}
                     className="w-full h-32 object-cover cursor-pointer"
