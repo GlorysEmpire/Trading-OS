@@ -435,7 +435,7 @@ export const TradingHQView: React.FC = () => {
                 onClick={resetSessionsToStandard}
                 disabled={savingCategory === 'session'}
                 className="text-[10px] font-mono text-cyan-300 hover:text-cyan-200 border border-slate-700 rounded px-2 py-1"
-                title="Reset to the Trading HQ default windows: London 00:00–05:00 and New York 07:00–12:00 (NY time)"
+                title="Reset to the default 4-session day in NY time: London 00–05, New York 05–12, Afternoon 12–18, Tokyo 18–00"
               >
                 {savingCategory === 'session' ? 'SAVING…' : 'RESET TO DEFAULT SESSIONS'}
               </button>

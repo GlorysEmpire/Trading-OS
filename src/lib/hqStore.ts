@@ -72,10 +72,11 @@ const REAL_EXECUTION_MODELS: ExecutionModel[] = [
   },
 ];
 
-/** Session windows in New York time — the source of truth (Trading HQ,
- * confirmed 2026-11-02; supersedes the 4-session day). Local times are
- * derived at display/scoring time and follow US daylight saving: London is
- * 06:00–11:00 Lagos in US winter (EST) and 05:00–10:00 in US summer (EDT). */
+/** Session windows in New York time — the source of truth. Four
+ * back-to-back sessions tiling the full NY day (confirmed by the trader; the
+ * only problem with the old setup was that its stored Lagos times ignored US
+ * daylight saving). Local times are now derived from these NY times at
+ * display/scoring time, so DST and travel are handled automatically. */
 export const REAL_SESSIONS: SessionWindow[] = [
   {
     id: 'sess-london',
@@ -83,15 +84,31 @@ export const REAL_SESSIONS: SessionWindow[] = [
     nyStart: '00:00',
     nyEnd: '05:00',
     activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-    notes: 'Morning session. Sub-5M execution only inside this window; 15M+ entries are not window-restricted.',
+    notes: 'Sub-5M execution only within this window. 15M+ setups have no window restriction.',
   },
   {
     id: 'sess-new-york',
     name: 'New York',
-    nyStart: '07:00',
+    nyStart: '05:00',
     nyEnd: '12:00',
     activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-    notes: 'Sub-5M execution only inside this window; 15M+ entries are not window-restricted.',
+    notes: 'Sub-5M execution only within this window. 15M+ setups have no window restriction.',
+  },
+  {
+    id: 'sess-afternoon',
+    name: 'Afternoon',
+    nyStart: '12:00',
+    nyEnd: '18:00',
+    activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+    notes: 'Sub-5M execution only within this window. 15M+ setups have no window restriction.',
+  },
+  {
+    id: 'sess-tokyo',
+    name: 'Tokyo',
+    nyStart: '18:00',
+    nyEnd: '00:00',
+    activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+    notes: 'Crosses midnight NY time (18:00–00:00). Sub-5M execution only within this window. 15M+ setups have no window restriction.',
   },
 ];
 
