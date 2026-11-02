@@ -4,6 +4,7 @@ import { getAuthHeaders } from '../lib/supabaseClient';
 import { traderDateString, traderNowMinutes, isSessionActiveAt, nyTimeIn, deviceTimeZone, weekdayInZone } from '../utils/traderTime';
 import type { AssetDeskData } from '../types';
 import { findPreviousDebrief } from '../utils/debrief';
+import { addDays, findPreviousWeeklyReview, matchDesk, weekStartOf } from '../utils/weekly';
 import {
   Activity,
   AlertTriangle,
@@ -122,6 +123,7 @@ export const DashboardView: React.FC = () => {
     setQuickTradeModalOpen,
     debriefs,
     setDebriefDate,
+    weeklyReviews,
   } = useTrading();
 
   const [aiBriefLoading, setAiBriefLoading] = useState(false);
@@ -190,6 +192,14 @@ export const DashboardView: React.FC = () => {
   const debriefDue = !todaysDebrief && (nowMinutes >= 18 * 60 || tradedToday);
   const showMission = !!(todayFocus || lastDebrief?.upgradeForTomorrow || lastDebrief?.tomorrowAssignment || debriefDue || todaysDebrief);
   const openDebrief = () => { setDebriefDate(todayStr); setActiveTab('debrief'); };
+
+  // This week's plan comes from last week's review: its upgrade, and the bias
+  // written for today's focus assets.
+  const weekPlan = findPreviousWeeklyReview(weeklyReviews, weekStartOf(todayStr));
+  const weekPlanIsCurrent = weekPlan?.weekStart === addDays(weekStartOf(todayStr), -7);
+  const todayBiases = weekPlanIsCurrent && todayFocus
+    ? weekPlan!.watchlist.filter((w) => w.day === todayFocus.day && (w.bias || w.keyLevels))
+    : [];
 
   const handleGenerateDailyBrief = async () => {
     setAiBriefLoading(true);
@@ -301,10 +311,21 @@ export const DashboardView: React.FC = () => {
             <span className="text-[10px] text-slate-500 uppercase tracking-wider block">Today's focus</span>
             <span className="text-cyan-300 font-bold">{todayFocus?.assets.join(' / ') || '—'}</span>
             {todayFocus?.activity && <span className="block text-[10px] text-slate-500">{todayFocus.activity}</span>}
+            {todayBiases.map((w) => {
+              const desk = matchDesk(assets, w.asset);
+              return (
+                <button key={w.asset} onClick={() => { if (desk) { setSelectedAssetId(desk.id); setActiveTab('asset-desks'); } }} className="block text-left text-[10px] text-slate-300 font-sans hover:text-cyan-300" title={w.keyLevels}>
+                  <span className="font-mono text-slate-500">{w.asset}:</span> {w.bias || w.keyLevels}
+                </button>
+              );
+            })}
           </div>
           <div className="min-w-0">
             <span className="text-[10px] text-slate-500 uppercase tracking-wider block">Upgrade in focus</span>
             <span className="text-slate-200 font-sans">{lastDebrief?.upgradeForTomorrow || '—'}</span>
+            {weekPlan?.upgradeForNextWeek && (
+              <span className="block text-[10px] text-slate-400 font-sans mt-0.5"><span className="font-mono text-slate-500">WEEK:</span> {weekPlan.upgradeForNextWeek}</span>
+            )}
           </div>
           <div className="min-w-0">
             <span className="text-[10px] text-slate-500 uppercase tracking-wider block">Today's assignment</span>

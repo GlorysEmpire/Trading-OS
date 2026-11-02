@@ -390,3 +390,56 @@ export interface DailyDebrief {
   createdAt: string;
   updatedAt: string;
 }
+
+/** The week's evidence, computed from the Journal and the week's debriefs. */
+export interface WeeklyEvidence {
+  weekStart: string; // Monday, YYYY-MM-DD
+  weekEnd: string; // Sunday
+  tradesTaken: number;
+  closedTrades: number;
+  processAvg: number | null;
+  /** Process average per day, Monday first; null where no trades. */
+  processByDay: Array<{ date: string; processAvg: number | null; trades: number; totalR: number }>;
+  gradeCounts: Record<string, number>;
+  mistakeCodeCounts: Record<string, number>;
+  mostCommonMistake: string | null;
+  totalR: number;
+  wins: number;
+  losses: number;
+  scratches: number;
+  haltDays: number;
+  ruleBreakTrades: number;
+  tradingDays: number;
+  debriefsWritten: number;
+  tradingDaysWithoutDebrief: string[];
+  /** Daily 1% upgrades checked in the week's debriefs. */
+  upgradesYes: number;
+  upgradesNo: number;
+}
+
+export interface WatchlistEntry {
+  day: string;
+  asset: string;
+  /** One-sentence bias for next week. */
+  bias: string;
+  keyLevels: string;
+}
+
+/** The weekly review template, digitized as is: process avg · most common
+ * mistake code · A+ vs B+ (evidence) · biggest process leak · watchlist
+ * (now the focus rotation, one-sentence bias + key levels each) ·
+ * red-folder events next week · personal/energy notes · one upgrade. */
+export interface WeeklyReview {
+  weekStart: string;
+  biggestLeak: string;
+  personalNotes: string;
+  redFolderEvents: string;
+  watchlist: WatchlistEntry[];
+  upgradeForNextWeek: string;
+  /** Whether last week's upgrade held; NA when there wasn't one. */
+  previousUpgradeExecuted: 'YES' | 'NO' | 'NA' | null;
+  previousUpgradeText?: string;
+  evidence: WeeklyEvidence;
+  createdAt: string;
+  updatedAt: string;
+}

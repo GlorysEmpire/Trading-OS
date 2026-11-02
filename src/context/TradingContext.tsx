@@ -4,6 +4,7 @@ import {
   Trade,
   TradeAmendment,
   DailyDebrief,
+  WeeklyReview,
   ResearchQuestion,
   BacktestSample,
   PsychologyEntry,
@@ -23,6 +24,7 @@ import { buildTradingHQConfig, loadHQConfigRows, saveHQCategory, seedMissingHQCa
 import { archiveAssetDesk, createAssetDesk, loadAssetDesks, saveAssetDeskPatch, seedAssetDesksIfMissing, updateInstrument, type InstrumentInput } from '../lib/assetDesksStore';
 import { insertAmendment, insertTradesIfNew, loadAmendments, loadTrades, saveTrade } from '../lib/tradeStore';
 import { loadDebriefs, upsertDebrief } from '../lib/debriefStore';
+import { loadWeeklyReviews, upsertWeeklyReview } from '../lib/weeklyReviewStore';
 import { applyAmendment, assertFreeUpdate, buildClosedTrade, diffEvidence, isTradeLocked, type AmendablePatch, type CloseTradeInput } from '../utils/tradeIntegrity';
 import { importResearchQuestionsOnce, loadResearchQuestions, removeResearchQuestion, saveResearchQuestion } from '../lib/researchStore';
 import { importBacktestSamplesOnce, loadBacktestSamples, removeBacktestSample, saveBacktestSample } from '../lib/backtestStore';
@@ -43,6 +45,7 @@ export type NavSection =
   | 'asset-desks'
   | 'journal'
   | 'debrief'
+  | 'weekly-review'
   | 'backtesting'
   | 'research'
   | 'psychology'
@@ -93,6 +96,11 @@ interface TradingContextType {
   /** Date (YYYY-MM-DD) the Debrief view should open on, e.g. from a Dashboard link. */
   debriefDate: string | null;
   setDebriefDate: (date: string | null) => void;
+  /** Newest first. */
+  weeklyReviews: WeeklyReview[];
+  weeklyReviewsLoading: boolean;
+  weeklyReviewsError: string | null;
+  saveWeeklyReview: (review: Omit<WeeklyReview, 'createdAt' | 'updatedAt'>) => Promise<void>;
   importLocalTrades: () => Promise<number>;
   researchQuestions: ResearchQuestion[];
   researchLoading: boolean;
@@ -245,6 +253,23 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
       .catch((error) => setDebriefsError(error instanceof Error ? error.message : 'Failed to load debriefs'))
       .finally(() => setDebriefsLoading(false));
   }, [userId]);
+  const [weeklyReviews, setWeeklyReviews] = useState<WeeklyReview[]>([]);
+  const [weeklyReviewsLoading, setWeeklyReviewsLoading] = useState(true);
+  const [weeklyReviewsError, setWeeklyReviewsError] = useState<string | null>(null);
+  useEffect(() => {
+    setWeeklyReviewsLoading(true);
+    loadWeeklyReviews(supabase, userId)
+      .then((list) => { setWeeklyReviews(list); setWeeklyReviewsError(null); })
+      .catch((error) => setWeeklyReviewsError(error instanceof Error ? error.message : 'Failed to load weekly reviews'))
+      .finally(() => setWeeklyReviewsLoading(false));
+  }, [userId]);
+  const saveWeeklyReview = async (input: Omit<WeeklyReview, 'createdAt' | 'updatedAt'>) => {
+    const existing = weeklyReviews.find((r) => r.weekStart === input.weekStart);
+    const now = new Date().toISOString();
+    const saved = await upsertWeeklyReview(supabase, userId, { ...input, createdAt: existing?.createdAt ?? now, updatedAt: now });
+    setWeeklyReviews((prev) => [saved, ...prev.filter((r) => r.weekStart !== saved.weekStart)].sort((a, b) => (a.weekStart < b.weekStart ? 1 : -1)));
+    setWeeklyReviewsError(null);
+  };
   const saveDebrief = async (input: Omit<DailyDebrief, 'createdAt' | 'updatedAt'>) => {
     const existing = debriefs.find((d) => d.date === input.date);
     const now = new Date().toISOString();
@@ -417,7 +442,7 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
   const performanceStats = computePerformanceStats(trades, tradingHQ);
 
   const exportDataJSON = () => {
-    const data = { exportDate: new Date().toISOString(), tradingHQ, assets, trades, tradeAmendments: amendmentList, debriefs, researchQuestions, backtestSamples, psychologyEntries, calendarEvents, alerts };
+    const data = { exportDate: new Date().toISOString(), tradingHQ, assets, trades, tradeAmendments: amendmentList, debriefs, weeklyReviews, researchQuestions, backtestSamples, psychologyEntries, calendarEvents, alerts };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -495,6 +520,10 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
         saveDebrief,
         debriefDate,
         setDebriefDate,
+        weeklyReviews,
+        weeklyReviewsLoading,
+        weeklyReviewsError,
+        saveWeeklyReview,
         importLocalTrades,
         researchQuestions,
         researchLoading,
