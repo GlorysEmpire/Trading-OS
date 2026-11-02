@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useTrading, NavSection } from '../context/TradingContext';
 import { useAuth } from '../context/AuthContext';
 import {
-  Plus,
   Download,
   Upload,
   LogOut,
@@ -37,7 +36,6 @@ export const Header: React.FC = () => {
     performanceStats,
     exportDataJSON,
     importDataJSON,
-    setQuickTradeModalOpen,
   } = useTrading();
   const { user, signOut } = useAuth();
 
@@ -158,14 +156,6 @@ export const Header: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          <button
-            id="btn-log-trade"
-            onClick={() => setQuickTradeModalOpen(true)}
-            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-3.5 py-2 rounded-lg transition shadow-sm mr-1"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Log trade</span>
-          </button>
           <button onClick={() => setGlossaryOpen(true)} title="What does this mean? Plain-English glossary" className={iconBtn}>
             <HelpCircle className="w-[18px] h-[18px]" />
           </button>
