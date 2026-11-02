@@ -77,13 +77,16 @@ const REAL_EXECUTION_MODELS: ExecutionModel[] = [
  * only problem with the old setup was that its stored Lagos times ignored US
  * daylight saving). Local times are now derived from these NY times at
  * display/scoring time, so DST and travel are handled automatically. */
+/** Sessions run every day, weekends included (confirmed 2026-11-02). */
+const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
 export const REAL_SESSIONS: SessionWindow[] = [
   {
     id: 'sess-london',
     name: 'London',
     nyStart: '00:00',
     nyEnd: '05:00',
-    activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+    activeDays: ALL_DAYS,
     notes: 'Sub-5M execution only within this window. 15M+ setups have no window restriction.',
   },
   {
@@ -91,7 +94,7 @@ export const REAL_SESSIONS: SessionWindow[] = [
     name: 'New York',
     nyStart: '05:00',
     nyEnd: '12:00',
-    activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+    activeDays: ALL_DAYS,
     notes: 'Sub-5M execution only within this window. 15M+ setups have no window restriction.',
   },
   {
@@ -99,7 +102,7 @@ export const REAL_SESSIONS: SessionWindow[] = [
     name: 'Afternoon',
     nyStart: '12:00',
     nyEnd: '18:00',
-    activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+    activeDays: ALL_DAYS,
     notes: 'Sub-5M execution only within this window. 15M+ setups have no window restriction.',
   },
   {
@@ -107,7 +110,7 @@ export const REAL_SESSIONS: SessionWindow[] = [
     name: 'Tokyo',
     nyStart: '18:00',
     nyEnd: '00:00',
-    activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+    activeDays: ALL_DAYS,
     notes: 'Crosses midnight NY time (18:00–00:00). Sub-5M execution only within this window. 15M+ setups have no window restriction.',
   },
 ];

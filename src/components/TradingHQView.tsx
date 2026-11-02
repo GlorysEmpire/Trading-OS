@@ -162,7 +162,7 @@ export const TradingHQView: React.FC = () => {
         name: 'New Session',
         nyStart: '00:00',
         nyEnd: '00:00',
-        activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+        activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
         notes: '',
       },
     ]);
