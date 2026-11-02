@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PageTitle } from './PageTitle';
 import { ChartImage } from './ChartImage';
 import { useTrading } from '../context/TradingContext';
 import {
@@ -147,23 +148,14 @@ export const BacktestingView: React.FC = () => {
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <div className="flex items-center gap-2 font-mono text-xs font-bold text-cyan-400 uppercase tracking-wider">
-            <Search className="w-4 h-4" />
-            EMPIRICAL VALIDATION LABORATORY
-          </div>
-          <h2 className="text-xl font-mono font-bold text-slate-100 mt-1">BACKTESTING WORKSPACE</h2>
-          <p className="text-xs text-slate-400 font-sans mt-0.5">
-            Backtesting shares the exact conceptual schema as live trading: identical fields, direction-aware R, and direct linking to active research questions.
-          </p>
-        </div>
+        <PageTitle icon={Search} title="Backtesting" description="Test ideas on past charts. Each example you record counts toward this month's research question." />
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-1.5 px-4 py-2 rounded bg-cyan-600 hover:bg-cyan-500 text-white font-mono text-xs font-bold transition shadow-sm cursor-pointer"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold transition shadow-sm cursor-pointer"
         >
           <Plus className="w-4 h-4" />
-          <span>+ LOG BACKTEST SAMPLE</span>
+          <span>Log backtest sample</span>
         </button>
         {localBacktestImportCount > 0 && (
           <button
@@ -177,26 +169,26 @@ export const BacktestingView: React.FC = () => {
 
       {/* Analytics Comparison: Live vs Backtest */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
-        <div className="p-4 rounded-lg bg-[#101722] border border-slate-800">
-          <span className="text-[10px] text-slate-400 block uppercase">BACKTEST SAMPLES</span>
+        <div className="p-4 rounded-lg bg-panel border border-slate-800">
+          <span className="text-[10px] text-slate-400 block uppercase">Backtest samples</span>
           <div className="text-xl font-bold text-slate-100 mt-1">{totalSamples}</div>
           <span className="text-[10px] text-slate-500">Historical dataset size</span>
         </div>
 
-        <div className="p-4 rounded-lg bg-[#101722] border border-slate-800">
-          <span className="text-[10px] text-slate-400 block uppercase">BACKTEST WIN RATE</span>
+        <div className="p-4 rounded-lg bg-panel border border-slate-800">
+          <span className="text-[10px] text-slate-400 block uppercase">Backtest win rate</span>
           <div className="text-xl font-bold text-purple-400 mt-1">{btWinRate}%</div>
           <span className="text-[10px] text-slate-500">vs {performanceStats.winRate}% Live</span>
         </div>
 
-        <div className="p-4 rounded-lg bg-[#101722] border border-slate-800">
-          <span className="text-[10px] text-slate-400 block uppercase">CUMULATIVE BACKTEST R</span>
+        <div className="p-4 rounded-lg bg-panel border border-slate-800">
+          <span className="text-[10px] text-slate-400 block uppercase">Cumulative backtest R</span>
           <div className="text-xl font-bold text-emerald-400 mt-1">+{totalBtR.toFixed(1)}R</div>
           <span className="text-[10px] text-slate-500">vs +{performanceStats.totalR}R Live</span>
         </div>
 
-        <div className="p-4 rounded-lg bg-[#101722] border border-slate-800">
-          <span className="text-[10px] text-slate-400 block uppercase">AVG R PER SAMPLE</span>
+        <div className="p-4 rounded-lg bg-panel border border-slate-800">
+          <span className="text-[10px] text-slate-400 block uppercase">Avg R per sample</span>
           <div className="text-xl font-bold text-cyan-400 mt-1">+{avgBtR}R</div>
           <span className="text-[10px] text-slate-500">Expected sample payoff</span>
         </div>
@@ -210,7 +202,7 @@ export const BacktestingView: React.FC = () => {
       )}
 
       {/* Samples Table / List / Visual Gallery */}
-      <div className="bg-[#101722] border border-slate-800 rounded-lg overflow-hidden">
+      <div className="bg-panel border border-slate-800 rounded-xl overflow-hidden">
         <div className="p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <FileSpreadsheet className="w-4 h-4 text-cyan-400" />
@@ -225,7 +217,7 @@ export const BacktestingView: React.FC = () => {
             </span>
 
             {/* View Mode Toggle: List vs Visual Chart Gallery */}
-            <div className="flex items-center bg-[#162130] p-0.5 rounded border border-slate-700">
+            <div className="flex items-center bg-raised p-0.5 rounded border border-slate-700">
               <button
                 type="button"
                 onClick={() => setViewMode('list')}
@@ -260,7 +252,7 @@ export const BacktestingView: React.FC = () => {
             {backtestSamples.map((s) => (
               <div
                 key={s.id}
-                className="p-4 flex flex-wrap items-center justify-between gap-4 text-xs font-mono hover:bg-[#131b26] transition"
+                className="p-4 flex flex-wrap items-center justify-between gap-4 text-xs font-mono hover:bg-raised transition"
               >
                 <div className="flex items-start gap-3.5">
                   {/* Chart Thumbnail or Upload Trigger */}
@@ -284,7 +276,7 @@ export const BacktestingView: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setEditingSampleChartId(s.id)}
-                      className="w-16 h-12 rounded border border-dashed border-slate-700 hover:border-cyan-500 bg-[#162130] flex flex-col items-center justify-center gap-0.5 text-slate-500 hover:text-cyan-300 transition flex-shrink-0 cursor-pointer"
+                      className="w-16 h-12 rounded border border-dashed border-slate-700 hover:border-cyan-500 bg-raised flex flex-col items-center justify-center gap-0.5 text-slate-500 hover:text-cyan-300 transition flex-shrink-0 cursor-pointer"
                       title="Attach chart screenshot to sample"
                     >
                       <Upload className="w-3.5 h-3.5" />
@@ -325,7 +317,7 @@ export const BacktestingView: React.FC = () => {
 
                 <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <div className="text-[10px] text-slate-500 uppercase">REALIZED R</div>
+                    <div className="text-[10px] text-slate-500 uppercase">Realized R</div>
                     <div
                       className={`text-base font-bold ${
                         s.result === 'WIN'
@@ -369,7 +361,7 @@ export const BacktestingView: React.FC = () => {
             {backtestSamples.map((s) => (
               <div
                 key={s.id}
-                className="rounded-lg border border-slate-800 bg-[#0d131d] overflow-hidden flex flex-col hover:border-slate-700 transition"
+                className="rounded-lg border border-slate-800 bg-well overflow-hidden flex flex-col hover:border-slate-700 transition"
               >
                 {/* Visual Chart Header Box */}
                 <div className="relative w-full h-44 bg-black/50 border-b border-slate-800 flex items-center justify-center overflow-hidden">
@@ -396,7 +388,7 @@ export const BacktestingView: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setEditingSampleChartId(s.id)}
-                        className="px-2.5 py-1 rounded bg-[#162130] border border-slate-700 text-cyan-400 hover:text-cyan-300 text-xs font-mono transition"
+                        className="px-2.5 py-1 rounded bg-raised border border-slate-700 text-cyan-400 hover:text-cyan-300 text-xs font-mono transition"
                       >
                         + Upload Screenshot
                       </button>
@@ -481,9 +473,9 @@ export const BacktestingView: React.FC = () => {
       {/* Add Sample Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-[#0f141d] border border-slate-700 rounded-lg max-w-xl w-full text-slate-200 p-6 space-y-4 my-8">
+          <div className="bg-panel border border-slate-700 rounded-lg max-w-xl w-full text-slate-200 p-6 space-y-4 my-8">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="font-mono text-sm font-bold text-slate-100 uppercase">LOG BACKTEST SAMPLE</h3>
+              <h3 className="font-mono text-sm font-bold text-slate-100 uppercase">Log backtest sample</h3>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-200">
                 ✕
               </button>
@@ -492,21 +484,21 @@ export const BacktestingView: React.FC = () => {
             <form onSubmit={handleAddSample} className="space-y-3 text-xs font-mono">
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1">DATE</label>
+                  <label className="block text-slate-400 mb-1">Date</label>
                   <input
                     type="date"
                     required
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
-                    className="w-full bg-[#162130] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 outline-none"
+                    className="w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1">ASSET</label>
+                  <label className="block text-slate-400 mb-1">Asset</label>
                   <select
                     value={asset}
                     onChange={(e) => setAsset(e.target.value)}
-                    className="w-full bg-[#162130] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 outline-none"
+                    className="w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 outline-none"
                   >
                     {assets.length === 0 && <option value="">No configured instruments yet</option>}
                     {assets.map(a => (
@@ -515,35 +507,35 @@ export const BacktestingView: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1">DIRECTION</label>
+                  <label className="block text-slate-400 mb-1">Direction</label>
                   <select
                     value={direction}
                     onChange={(e) => setDirection(e.target.value as any)}
-                    className="w-full bg-[#162130] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 outline-none"
+                    className="w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 outline-none"
                   >
-                    <option value="LONG">LONG</option>
-                    <option value="SHORT">SHORT</option>
+                    <option value="LONG">Long</option>
+                    <option value="SHORT">Short</option>
                   </select>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1">MARKET REGIME</label>
+                  <label className="block text-slate-400 mb-1">Market regime</label>
                   <input
                     type="text"
                     value={regime}
                     onChange={(e) => setRegime(e.target.value)}
                     placeholder="e.g. Wyckoff Range Phase B"
-                    className="w-full bg-[#162130] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 outline-none"
+                    className="w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1">LINKED RESEARCH QUESTION</label>
+                  <label className="block text-slate-400 mb-1">Linked research question</label>
                   <select
                     value={rqId}
                     onChange={(e) => setRqId(e.target.value)}
-                    className="w-full bg-[#162130] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 outline-none text-[11px]"
+                    className="w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 outline-none text-[11px]"
                   >
                     {researchQuestions.map((rq) => (
                       <option key={rq.id} value={rq.id}>
@@ -557,68 +549,68 @@ export const BacktestingView: React.FC = () => {
               {/* Prices */}
               <div className="grid grid-cols-4 gap-2">
                 <div>
-                  <label className="block text-slate-400 mb-1">ENTRY</label>
+                  <label className="block text-slate-400 mb-1">Entry</label>
                   <input
                     type="number"
                     step="any"
                     required
                     value={entryPrice}
                     onChange={(e) => setEntryPrice(e.target.value)}
-                    className="w-full bg-[#162130] border border-slate-700 rounded px-2 py-1.5 text-slate-100 outline-none"
+                    className="w-full bg-raised border border-slate-700 rounded px-2 py-1.5 text-slate-100 outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1">STOP</label>
+                  <label className="block text-slate-400 mb-1">Stop</label>
                   <input
                     type="number"
                     step="any"
                     required
                     value={stopPrice}
                     onChange={(e) => setStopPrice(e.target.value)}
-                    className="w-full bg-[#162130] border border-slate-700 rounded px-2 py-1.5 text-slate-100 outline-none"
+                    className="w-full bg-raised border border-slate-700 rounded px-2 py-1.5 text-slate-100 outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1">TARGET</label>
+                  <label className="block text-slate-400 mb-1">Target</label>
                   <input
                     type="number"
                     step="any"
                     required
                     value={targetPrice}
                     onChange={(e) => setTargetPrice(e.target.value)}
-                    className="w-full bg-[#162130] border border-slate-700 rounded px-2 py-1.5 text-slate-100 outline-none"
+                    className="w-full bg-raised border border-slate-700 rounded px-2 py-1.5 text-slate-100 outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1">EXIT</label>
+                  <label className="block text-slate-400 mb-1">Exit</label>
                   <input
                     type="number"
                     step="any"
                     required
                     value={exitPrice}
                     onChange={(e) => setExitPrice(e.target.value)}
-                    className="w-full bg-[#162130] border border-slate-700 rounded px-2 py-1.5 text-slate-100 outline-none"
+                    className="w-full bg-raised border border-slate-700 rounded px-2 py-1.5 text-slate-100 outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">NARRATIVE & STRUCTURE</label>
+                <label className="block text-slate-400 mb-1">Narrative & structure</label>
                 <textarea
                   rows={2}
                   value={narrative}
                   onChange={(e) => setNarrative(e.target.value)}
-                  className="w-full bg-[#162130] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 outline-none font-sans"
+                  className="w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 outline-none font-sans"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">SETUP EVIDENCE / CONFIRMATION</label>
+                <label className="block text-slate-400 mb-1">Setup evidence / confirmation</label>
                 <input
                   type="text"
                   value={evidence}
                   onChange={(e) => setEvidence(e.target.value)}
-                  className="w-full bg-[#162130] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 outline-none font-sans"
+                  className="w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 outline-none font-sans"
                 />
               </div>
 
@@ -642,7 +634,7 @@ export const BacktestingView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded text-white font-bold cursor-pointer"
+                  className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-white font-bold cursor-pointer"
                 >
                   Save Sample
                 </button>
@@ -655,7 +647,7 @@ export const BacktestingView: React.FC = () => {
       {/* Quick Chart Edit Modal for Backtest Sample */}
       {editingSampleChartId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-[#0f141d] border border-slate-700 rounded-lg max-w-lg w-full text-slate-200 p-5 space-y-4">
+          <div className="bg-panel border border-slate-700 rounded-lg max-w-lg w-full text-slate-200 p-5 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <span className="font-mono text-xs font-bold text-slate-100 uppercase flex items-center gap-2">
                 <ImageIcon className="w-4 h-4 text-cyan-400" />
@@ -675,7 +667,7 @@ export const BacktestingView: React.FC = () => {
 
               return (
                 <div className="space-y-4">
-                  <div className="p-2.5 rounded bg-[#162130] border border-slate-800 text-xs font-mono flex items-center justify-between">
+                  <div className="p-2.5 rounded bg-raised border border-slate-800 text-xs font-mono flex items-center justify-between">
                     <div>
                       <span className="text-slate-400 mr-2">{currentSample.date}</span>
                       <strong className="text-slate-100 mr-2">{currentSample.asset}</strong>
@@ -721,7 +713,7 @@ export const BacktestingView: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setEditingSampleChartId(null)}
-                      className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded text-white font-mono text-xs font-bold cursor-pointer"
+                      className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-white text-sm font-semibold cursor-pointer"
                     >
                       Done
                     </button>

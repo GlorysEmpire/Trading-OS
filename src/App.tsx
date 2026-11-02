@@ -68,12 +68,16 @@ const MainShell: React.FC = () => {
     }
   };
 
+  // Apply the theme to the whole document, so the page background, scrollbars
+  // and anything rendered outside this tree use the same tokens.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle('ash-theme', theme === 'ash');
+    root.classList.toggle('dark-theme', theme !== 'ash');
+  }, [theme]);
+
   return (
-    <div
-      className={`min-h-screen flex flex-col font-sans transition-colors duration-200 ${
-        theme === 'ash' ? 'bg-[#edf0f5] text-slate-900 ash-theme' : 'bg-[#080c14] text-slate-100 dark-theme'
-      }`}
-    >
+    <div className="min-h-screen flex flex-col font-sans bg-canvas text-ink transition-colors duration-200">
       <Header />
       <main className="flex-1 overflow-x-hidden">{renderActiveView()}</main>
       <QuickTradeModal />
@@ -86,7 +90,7 @@ const AuthGate: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#080c14] flex items-center justify-center">
+      <div className="min-h-screen bg-canvas flex items-center justify-center">
         <span className="font-mono text-xs text-slate-500">Loading…</span>
       </div>
     );

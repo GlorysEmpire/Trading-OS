@@ -248,7 +248,7 @@ export const ImageUploadDropzone: React.FC<ImageUploadDropzoneProps> = ({
           />
           <button
             type="submit"
-            className="px-3 py-1.5 rounded bg-sky-600 hover:bg-sky-500 text-white font-mono text-xs font-bold"
+            className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold"
           >
             Attach
           </button>
@@ -327,7 +327,7 @@ export const MultiImageDropzone: React.FC<MultiImageDropzoneProps> = ({
         onDrop={(e) => { e.preventDefault(); setIsDragging(false); void handleFiles(imageFiles(e.dataTransfer.files)); }}
         className={`rounded-md border-2 border-dashed cursor-pointer transition flex items-center justify-center gap-2 text-center outline-none focus:border-cyan-600 ${
           compact ? 'px-3 py-2' : 'px-4 py-5'
-        } ${isDragging ? 'border-cyan-500 bg-cyan-950/30' : 'border-slate-700 bg-[#0d131d] hover:border-slate-500'}`}
+        } ${isDragging ? 'border-cyan-500 bg-cyan-950/30' : 'border-slate-700 bg-well hover:border-slate-500'}`}
       >
         <Images className="w-4 h-4 text-cyan-400 shrink-0" />
         <div className="text-left">

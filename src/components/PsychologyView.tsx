@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PageTitle } from './PageTitle';
 import { useTrading } from '../context/TradingContext';
 import {
   Brain,
@@ -86,39 +87,30 @@ export const PsychologyView: React.FC = () => {
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <div className="flex items-center gap-2 font-mono text-xs font-bold text-cyan-400 uppercase tracking-wider">
-            <Brain className="w-4 h-4" />
-            DISCRETIONARY PSYCHOLOGY & COGNITIVE VIGILANCE
-          </div>
-          <h2 className="text-xl font-mono font-bold text-slate-100 mt-1">PSYCHOLOGY LAB</h2>
-          <p className="text-xs text-slate-400 font-sans mt-0.5">
-            Observing internal cognitive friction: hesitation, fear of loss, impatience, and behavioral pattern tracking.
-          </p>
-        </div>
+        <PageTitle icon={Brain} title="Psychology" description="Notes on your mindset (hesitation, fear, impatience) and the patterns behind your decisions." />
 
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-1.5 px-4 py-2 rounded bg-cyan-600 hover:bg-cyan-500 text-white font-mono text-xs font-bold transition shadow-sm cursor-pointer"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold transition shadow-sm cursor-pointer"
         >
           <Plus className="w-4 h-4" />
-          <span>+ LOG PSYCHOLOGY ENTRY</span>
+          <span>New entry</span>
         </button>
       </div>
 
       {/* Behavioral Pattern Frequency Radar */}
-      <div className="bg-[#101722] border border-slate-800 rounded-lg p-4 space-y-3">
+      <div className="bg-panel border border-slate-800 rounded-xl p-4 space-y-3">
         <div className="flex items-center justify-between border-b border-slate-800 pb-2">
           <span className="font-mono text-xs font-bold text-slate-200 uppercase flex items-center gap-2">
             <Activity className="w-4 h-4 text-rose-400" />
-            RECURRING BEHAVIORAL PATTERNS DETECTED
+            Recurring behavioral patterns detected
           </span>
           <span className="text-[11px] font-mono text-slate-400">Systemic friction radar</span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {Object.entries(patternCounts).map(([pattern, count]) => (
-            <div key={pattern} className="p-3 rounded bg-[#162130] border border-slate-800 space-y-1">
+            <div key={pattern} className="p-3 rounded bg-raised border border-slate-800 space-y-1">
               <div className="flex items-center justify-between font-mono">
                 <span className="text-xs text-slate-200 font-semibold">{pattern}</span>
                 <span className="px-2 py-0.5 rounded bg-rose-950/80 border border-rose-800 text-rose-300 font-bold text-xs">
@@ -136,7 +128,7 @@ export const PsychologyView: React.FC = () => {
       {/* Entries List */}
       <div className="space-y-3">
         {psychologyEntries.map((entry) => (
-          <div key={entry.id} className="bg-[#101722] border border-slate-800 rounded-lg p-4 space-y-3">
+          <div key={entry.id} className="bg-panel border border-slate-800 rounded-xl p-4 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-2">
               <div className="flex items-center gap-2 font-mono text-xs">
                 <span className="font-bold text-slate-300">{entry.date}</span>
@@ -185,9 +177,9 @@ export const PsychologyView: React.FC = () => {
       {/* Add Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-[#0f141d] border border-slate-700 rounded-lg max-w-lg w-full text-slate-200 p-6 space-y-4">
+          <div className="bg-panel border border-slate-700 rounded-lg max-w-lg w-full text-slate-200 p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="font-mono text-sm font-bold text-slate-100 uppercase">LOG PSYCHOLOGY REFLECTION</h3>
+              <h3 className="font-mono text-sm font-bold text-slate-100 uppercase">Log psychology reflection</h3>
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-200">
                 ✕
               </button>
@@ -195,11 +187,11 @@ export const PsychologyView: React.FC = () => {
 
             <form onSubmit={handleCreate} className="space-y-4 text-xs font-mono">
               <div>
-                <label className="block text-slate-400 mb-1">LINKED TRADE (OPTIONAL)</label>
+                <label className="block text-slate-400 mb-1">Linked trade (optional)</label>
                 <select
                   value={tradeId}
                   onChange={(e) => setTradeId(e.target.value)}
-                  className="w-full bg-[#162130] border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none"
+                  className="w-full bg-raised border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none"
                 >
                   <option value="">None / Standalone session</option>
                   {trades.map((t) => (
@@ -213,7 +205,7 @@ export const PsychologyView: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-400 mb-1">
-                    CONFIDENCE: <strong className="text-cyan-400">{confidence} / 10</strong>
+                    Confidence: <strong className="text-cyan-400">{confidence} / 10</strong>
                   </label>
                   <input
                     type="range"
@@ -226,7 +218,7 @@ export const PsychologyView: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-slate-400 mb-1">
-                    FEAR / STRESS: <strong className="text-rose-400">{fear} / 10</strong>
+                    Fear / stress: <strong className="text-rose-400">{fear} / 10</strong>
                   </label>
                   <input
                     type="range"
@@ -241,9 +233,9 @@ export const PsychologyView: React.FC = () => {
 
               {/* Behavior Flags */}
               <div className="space-y-2">
-                <span className="text-slate-400 uppercase text-[10px] block font-bold">BEHAVIORAL FRICTION FLAGS:</span>
+                <span className="text-slate-400 uppercase text-[10px] block font-bold">Behavioral friction flags:</span>
                 <div className="grid grid-cols-2 gap-2">
-                  <label className="flex items-center gap-2 p-2 rounded bg-[#162130] border border-slate-800 cursor-pointer">
+                  <label className="flex items-center gap-2 p-2 rounded bg-raised border border-slate-800 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={hesitation}
@@ -253,7 +245,7 @@ export const PsychologyView: React.FC = () => {
                     <span className="text-slate-200 text-[11px]">Hesitated on Entry</span>
                   </label>
 
-                  <label className="flex items-center gap-2 p-2 rounded bg-[#162130] border border-slate-800 cursor-pointer">
+                  <label className="flex items-center gap-2 p-2 rounded bg-raised border border-slate-800 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={protectingPnL}
@@ -263,7 +255,7 @@ export const PsychologyView: React.FC = () => {
                     <span className="text-slate-200 text-[11px]">Protecting PnL Early</span>
                   </label>
 
-                  <label className="flex items-center gap-2 p-2 rounded bg-[#162130] border border-slate-800 cursor-pointer">
+                  <label className="flex items-center gap-2 p-2 rounded bg-raised border border-slate-800 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={frustration}
@@ -273,7 +265,7 @@ export const PsychologyView: React.FC = () => {
                     <span className="text-slate-200 text-[11px]">Frustration / Impatience</span>
                   </label>
 
-                  <label className="flex items-center gap-2 p-2 rounded bg-[#162130] border border-slate-800 cursor-pointer">
+                  <label className="flex items-center gap-2 p-2 rounded bg-raised border border-slate-800 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={fearOfMissingOut}
@@ -286,24 +278,24 @@ export const PsychologyView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">HONEST INTERNAL REFLECTION</label>
+                <label className="block text-slate-400 mb-1">Honest internal reflection</label>
                 <textarea
                   rows={3}
                   required
                   placeholder="What were you thinking and feeling? Were you adhering strictly to the process, or feeling defensive about paper gains?"
                   value={thoughtsText}
                   onChange={(e) => setThoughtsText(e.target.value)}
-                  className="w-full bg-[#162130] border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none font-sans"
+                  className="w-full bg-raised border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none font-sans"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">KEY TAKEAWAY / LESSON</label>
+                <label className="block text-slate-400 mb-1">Key takeaway / lesson</label>
                 <input
                   type="text"
                   value={keyLesson}
                   onChange={(e) => setKeyLesson(e.target.value)}
-                  className="w-full bg-[#162130] border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none font-sans"
+                  className="w-full bg-raised border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none font-sans"
                 />
               </div>
 
@@ -317,7 +309,7 @@ export const PsychologyView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded text-white font-bold"
+                  className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-white font-bold"
                 >
                   Commit Reflection
                 </button>

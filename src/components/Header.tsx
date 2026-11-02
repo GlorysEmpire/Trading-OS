@@ -2,9 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTrading, NavSection } from '../context/TradingContext';
 import { useAuth } from '../context/AuthContext';
 import {
-  ShieldAlert,
-  Clock,
-  PlusCircle,
+  Plus,
   Download,
   Upload,
   LogOut,
@@ -14,16 +12,20 @@ import {
   ClipboardCheck,
   CalendarRange,
   Calendar,
-  AlertTriangle,
+  Bell,
   Brain,
-  Search,
-  Activity,
+  FlaskConical,
+  LayoutDashboard,
+  Globe,
   Radar,
   Sliders,
-  CheckCircle2,
   Sun,
   Moon,
+  HelpCircle,
+  History,
 } from 'lucide-react';
+import { GlossaryDrawer } from './GlossaryDrawer';
+import { getActiveSession, deviceTimeZone } from '../utils/traderTime';
 
 export const Header: React.FC = () => {
   const {
@@ -41,6 +43,9 @@ export const Header: React.FC = () => {
 
   const [nyTime, setNyTime] = useState('');
   const [lagosTime, setLagosTime] = useState('');
+  const [glossaryOpen, setGlossaryOpen] = useState(false);
+  const localTz = deviceTimeZone();
+  const localLabel = localTz.split('/').pop()?.replace(/_/g, ' ') ?? 'Local';
 
   useEffect(() => {
     const updateClocks = () => {
@@ -50,16 +55,14 @@ export const Header: React.FC = () => {
           timeZone: 'America/New_York',
           hour: '2-digit',
           minute: '2-digit',
-          second: '2-digit',
           hour12: false,
         })
       );
       setLagosTime(
         now.toLocaleTimeString('en-US', {
-          timeZone: 'Africa/Lagos',
+          timeZone: localTz,
           hour: '2-digit',
           minute: '2-digit',
-          second: '2-digit',
           hour12: false,
         })
       );
@@ -89,150 +92,130 @@ export const Header: React.FC = () => {
     e.target.value = '';
   };
 
-  // Ordered by how often each screen is used: the daily trading loop first
-  // (analyse → trade → debrief → backtest), then the weekly and planning
-  // screens, then setup screens that change rarely, with the not-yet-connected
-  // intelligence screens last.
-  const navItems: Array<{ id: NavSection; label: string; icon: any; category: string }> = [
-    { id: 'dashboard', label: 'Dashboard', icon: Activity, category: 'DAILY' },
-    { id: 'asset-desks', label: 'Asset Desks', icon: TrendingUp, category: 'DAILY' },
-    { id: 'journal', label: 'Journal', icon: BookOpen, category: 'DAILY' },
-    { id: 'debrief', label: 'Debrief', icon: ClipboardCheck, category: 'DAILY' },
-    { id: 'backtesting', label: 'Backtesting', icon: Search, category: 'DAILY' },
-    { id: 'research', label: 'Research Engine', icon: Radar, category: 'DAILY' },
-    { id: 'weekly-review', label: 'Weekly Review', icon: CalendarRange, category: 'WEEKLY' },
-    { id: 'calendar', label: 'Calendar', icon: Calendar, category: 'WEEKLY' },
-    { id: 'psychology', label: 'Psychology', icon: Brain, category: 'AS NEEDED' },
-    { id: 'trading-hq', label: 'Trading HQ', icon: Sliders, category: 'SETUP' },
-    { id: 'ai-assistant', label: 'AI Assistant', icon: Sparkles, category: 'AI' },
-    { id: 'alerts', label: 'Alerts', icon: AlertTriangle, category: 'SETUP' },
-    { id: 'market-intelligence', label: 'Market Intel', icon: Activity, category: 'INTELLIGENCE' },
-    { id: 'scanner', label: 'Scanner', icon: Radar, category: 'INTELLIGENCE' },
+  // Ordered by how often each screen is used, in groups: the daily trading
+  // loop, then weekly/planning, then setup screens that change rarely, then
+  // the intelligence screens (no data source connected yet).
+  const navGroups: Array<Array<{ id: NavSection; label: string; icon: any; hint: string }>> = [
+    [
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, hint: "Today at a glance: risk status, today's focus, pending setups and performance" },
+      { id: 'asset-desks', label: 'Asset Desks', icon: TrendingUp, hint: 'One workspace per market: your analysis, charts, scenarios and pending setups' },
+      { id: 'journal', label: 'Journal', icon: BookOpen, hint: 'Every trade you took, with its result and how well the plan was followed' },
+      { id: 'debrief', label: 'Debrief', icon: ClipboardCheck, hint: 'End-of-day review: what happened today and one improvement for tomorrow' },
+      { id: 'backtesting', label: 'Backtesting', icon: History, hint: 'Test ideas on past charts and record each example' },
+      { id: 'research', label: 'Research', icon: FlaskConical, hint: "This month's research question and how many examples back it up" },
+    ],
+    [
+      { id: 'weekly-review', label: 'Weekly Review', icon: CalendarRange, hint: 'Saturday review of the week, plus next week\'s watchlist' },
+      { id: 'calendar', label: 'Calendar', icon: Calendar, hint: 'News events, sessions and your trading schedule' },
+      { id: 'psychology', label: 'Psychology', icon: Brain, hint: 'Notes on your mindset and decisions' },
+    ],
+    [
+      { id: 'trading-hq', label: 'Trading HQ', icon: Sliders, hint: 'Your rules: risk, grades, sessions, mistake codes, focus rotation' },
+      { id: 'ai-assistant', label: 'AI Assistant', icon: Sparkles, hint: 'Ask questions about your system and journal' },
+      { id: 'alerts', label: 'Alerts', icon: Bell, hint: 'Price and rule alerts' },
+    ],
+    [
+      { id: 'market-intelligence', label: 'Market Intel', icon: Globe, hint: 'Market data (no data source connected yet)' },
+      { id: 'scanner', label: 'Scanner', icon: Radar, hint: 'Automated setup scanning (not connected yet)' },
+    ],
   ];
 
+  const session = getActiveSession(tradingHQ.sessions);
+  const lossesToday = performanceStats.lossCountToday;
+  const maxLosses = tradingHQ.riskRules.maxDailyLosses;
+  const halted = lossesToday >= maxLosses;
+  const pill = 'flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-line bg-raised text-xs whitespace-nowrap';
+  const iconBtn = 'p-2 rounded-lg text-ink-3 hover:text-ink hover:bg-raised transition';
+
   return (
-    <header className="bg-[#0c1017] border-b border-[#1f2937] sticky top-0 z-40">
-      {/* Top Utility & Operational Awareness Strip */}
-      <div className="px-4 py-2 border-b border-[#1b2332] flex flex-wrap items-center justify-between text-xs text-slate-400 gap-3">
-        {/* Brand & Strategic Identity */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 font-mono font-bold tracking-wider text-slate-100 uppercase">
-            <span className="inline-block w-2.5 h-2.5 bg-emerald-500 rounded-sm animate-pulse" />
-            TRADING OS
+    <header className="bg-panel border-b border-line sticky top-0 z-40">
+      <div className="px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-4 min-w-0">
+          <div className="flex items-center gap-2 shrink-0" title={`Trading HQ ${tradingHQ.version}`}>
+            <span className="grid place-items-center w-7 h-7 rounded-lg bg-sky-600 text-white text-[13px] font-bold">T</span>
+            <span className="text-[15px] font-semibold text-ink tracking-tight">Trading OS</span>
           </div>
-          <span className="text-slate-600">|</span>
-          <span className="px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700 text-slate-300 font-mono text-[11px]">
-            {tradingHQ.version}
-          </span>
-          <span className="text-slate-600 hidden sm:inline">|</span>
-          <div className="hidden sm:flex items-center gap-2 text-[11px] font-mono text-slate-300">
-            <span className="text-slate-500">RISK:</span>
-            <span className="text-emerald-400 font-semibold">{tradingHQ.riskRules.riskPerSetupPct}% / setup</span>
-            <span className="text-slate-600">•</span>
-            <span className="text-slate-500">DAILY LIMIT:</span>
-            <span className={`font-semibold ${performanceStats.lossCountToday >= tradingHQ.riskRules.maxDailyLosses ? 'text-rose-400' : 'text-slate-300'}`}>
-              {performanceStats.lossCountToday} / {tradingHQ.riskRules.maxDailyLosses} Losses
+          <div className="hidden md:flex items-center gap-2 min-w-0 overflow-hidden">
+            <span className={pill} title="The trading session happening now (defined in New York time)">
+              <span className={`w-1.5 h-1.5 rounded-full ${session ? 'bg-emerald-500' : 'bg-slate-500'}`} />
+              <span className="text-ink-2">{session ? `${session.name} session` : 'No session'}</span>
             </span>
-            <span className="text-slate-600">•</span>
-            <span className="text-amber-400/90">NO RE-ENTRY</span>
+            <span className={pill} title="Risk per trade, from Trading HQ">
+              <span className="text-ink-3">Risk</span>
+              <span className="font-semibold text-ink">{tradingHQ.riskRules.riskPerSetupPct}%</span>
+            </span>
+            <span className={`${pill} ${halted ? 'border-rose-700 bg-rose-950/40' : ''}`} title="Losses today against the daily limit. At the limit, trading stops for the day.">
+              <span className="text-ink-3">Losses today</span>
+              <span className={`font-semibold ${halted ? 'text-rose-400' : 'text-ink'}`}>{lossesToday}/{maxLosses}</span>
+            </span>
+            <span className={`${pill} hidden lg:flex`} title="Sessions are defined in New York time">
+              <span className="text-ink-3">New York</span>
+              <span className="font-semibold text-ink font-mono">{nyTime || '--:--'}</span>
+              <span className="text-ink-3 ml-1">{localLabel}</span>
+              <span className="font-semibold text-ink font-mono">{lagosTime || '--:--'}</span>
+            </span>
           </div>
         </div>
 
-        {/* Global Operational Clocks & Quick Action */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3 font-mono text-[11px] bg-slate-900/90 px-2.5 py-1 rounded border border-slate-800">
-            <div className="flex items-center gap-1.5">
-              <Clock className="w-3 h-3 text-cyan-400" />
-              <span className="text-slate-400">NY:</span>
-              <span className="text-cyan-300 font-medium">{nyTime || '--:--:--'}</span>
-            </div>
-            <span className="text-slate-700">/</span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-slate-400">LAGOS:</span>
-              <span className="text-emerald-300 font-medium">{lagosTime || '--:--:--'}</span>
-            </div>
-          </div>
-
+        <div className="flex items-center gap-1 shrink-0">
           <button
             id="btn-log-trade"
             onClick={() => setQuickTradeModalOpen(true)}
-            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-semibold px-3 py-1.5 rounded transition cursor-pointer shadow-sm"
+            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-3.5 py-2 rounded-lg transition shadow-sm mr-1"
           >
-            <PlusCircle className="w-3.5 h-3.5" />
-            <span>LOG TRADE</span>
+            <Plus className="w-4 h-4" />
+            <span>Log trade</span>
           </button>
-
-          {/* Theme Switcher */}
+          <button onClick={() => setGlossaryOpen(true)} title="What does this mean? Plain-English glossary" className={iconBtn}>
+            <HelpCircle className="w-[18px] h-[18px]" />
+          </button>
           <button
             onClick={() => setTheme(theme === 'ash' ? 'dark' : 'ash')}
-            title={theme === 'ash' ? 'Switch to Dark Mode' : 'Switch to Eye-Friendly Ash Light Mode'}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-200/80 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-mono transition border border-slate-300 dark:border-slate-700"
+            title={theme === 'ash' ? 'Switch to dark mode' : 'Switch to light mode'}
+            className={iconBtn}
           >
-            {theme === 'ash' ? (
-              <>
-                <Sun className="w-3.5 h-3.5 text-amber-500" />
-                <span className="text-[11px] font-semibold">Ash Mode</span>
-              </>
-            ) : (
-              <>
-                <Moon className="w-3.5 h-3.5 text-sky-400" />
-                <span className="text-[11px] font-semibold">Dark Mode</span>
-              </>
-            )}
+            {theme === 'ash' ? <Moon className="w-[18px] h-[18px]" /> : <Sun className="w-[18px] h-[18px]" />}
           </button>
-
-          {/* Backup / Export / Reset */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={exportDataJSON}
-              title="Export Full Trading OS Backup (JSON)"
-              className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded transition"
-            >
-              <Download className="w-3.5 h-3.5" />
-            </button>
-            <label
-              title="Import Trading OS Backup (JSON)"
-              className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded transition cursor-pointer"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              <input type="file" accept=".json" onChange={handleFileUpload} className="hidden" />
-            </label>
-            <button
-              onClick={signOut}
-              title={user?.email ? `Sign out (${user.email})` : 'Sign out'}
-              className="p-1.5 text-slate-400 hover:text-rose-300 hover:bg-slate-800 rounded transition"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <button onClick={exportDataJSON} title="Download a full backup (JSON)" className={`${iconBtn} hidden sm:block`}>
+            <Download className="w-[18px] h-[18px]" />
+          </button>
+          <label title="Restore from a backup (JSON)" className={`${iconBtn} cursor-pointer hidden sm:block`}>
+            <Upload className="w-[18px] h-[18px]" />
+            <input type="file" accept=".json" onChange={handleFileUpload} className="hidden" />
+          </label>
+          <button onClick={signOut} title={user?.email ? `Sign out (${user.email})` : 'Sign out'} className={`${iconBtn} hover:text-rose-400`}>
+            <LogOut className="w-[18px] h-[18px]" />
+          </button>
         </div>
       </div>
 
-      {/* Primary Navigation Bar */}
-      <nav className="px-4 flex items-center overflow-x-auto scrollbar-none gap-1 py-1 text-xs">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
-          return (
-            <button
-              key={item.id}
-              id={`nav-${item.id}`}
-              onClick={() => setActiveTab(item.id)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-md whitespace-nowrap transition-colors font-medium ${
-                isActive
-                  ? 'bg-[#182335] text-cyan-300 border border-cyan-500/30 font-semibold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-              }`}
-            >
-              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-cyan-400' : 'text-slate-500'}`} />
-              <span>{item.label}</span>
-              {item.id === 'alerts' && (
-                <span className="w-1.5 h-1.5 bg-amber-400 rounded-full" />
-              )}
-            </button>
-          );
-        })}
+      <nav className="px-2 sm:px-4 flex items-center overflow-x-auto scrollbar-none border-t border-line">
+        {navGroups.map((group, gi) => (
+          <React.Fragment key={gi}>
+            {gi > 0 && <span className="w-px h-5 bg-line mx-1.5 shrink-0" aria-hidden />}
+            {group.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  id={`nav-${item.id}`}
+                  onClick={() => setActiveTab(item.id)}
+                  title={item.hint}
+                  className={`relative flex items-center gap-1.5 px-3 h-11 text-sm whitespace-nowrap transition-colors ${
+                    isActive ? 'text-ink font-semibold' : 'text-ink-3 hover:text-ink'
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-sky-400' : ''}`} />
+                  <span>{item.label}</span>
+                  {isActive && <span className="absolute left-2 right-2 -bottom-px h-0.5 rounded-full bg-sky-500" />}
+                </button>
+              );
+            })}
+          </React.Fragment>
+        ))}
       </nav>
+      <GlossaryDrawer open={glossaryOpen} onClose={() => setGlossaryOpen(false)} />
     </header>
   );
 };

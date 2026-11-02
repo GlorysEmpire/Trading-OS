@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PageTitle } from './PageTitle';
 import { useTrading } from '../context/TradingContext';
 import {
   Calendar as CalendarIcon,
@@ -57,23 +58,14 @@ export const CalendarView: React.FC = () => {
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <div className="flex items-center gap-2 font-mono text-xs font-bold text-cyan-400 uppercase tracking-wider">
-            <CalendarIcon className="w-4 h-4" />
-            DISCRETIONARY OPERATIONAL SCHEDULE
-          </div>
-          <h2 className="text-xl font-mono font-bold text-slate-100 mt-1">OPERATIONAL CALENDAR</h2>
-          <p className="text-xs text-slate-400 font-sans mt-0.5">
-            Synchronizing trading sessions, high-impact economic releases, backtesting blocks, and review rituals.
-          </p>
-        </div>
+        <PageTitle icon={CalendarIcon} title="Calendar" description="Economic news, trading sessions and your own schedule in one place." />
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-1.5 px-4 py-2 rounded bg-cyan-600 hover:bg-cyan-500 text-white font-mono text-xs font-bold transition shadow-sm cursor-pointer"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold transition shadow-sm cursor-pointer"
         >
           <Plus className="w-4 h-4" />
-          <span>+ SCHEDULE EVENT</span>
+          <span>Add event</span>
         </button>
       </div>
 
@@ -91,7 +83,7 @@ export const CalendarView: React.FC = () => {
             onClick={() => setFilterType(f.id)}
             className={`px-3 py-1.5 rounded transition ${
               filterType === f.id
-                ? 'bg-[#182335] text-cyan-300 border border-cyan-500/40 font-bold'
+                ? 'bg-raised text-cyan-300 border border-cyan-500/40 font-bold'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -108,8 +100,8 @@ export const CalendarView: React.FC = () => {
               key={ev.id}
               className={`p-4 rounded-lg border transition space-y-2 ${
                 ev.completed
-                  ? 'bg-[#0e131d]/60 border-slate-800/60 opacity-60'
-                  : 'bg-[#101722] border-slate-800 hover:border-slate-700'
+                  ? 'bg-panel/60 border-slate-800/60 opacity-60'
+                  : 'bg-panel border-slate-800 hover:border-slate-700'
               }`}
             >
               <div className="flex items-center justify-between">
@@ -179,9 +171,9 @@ export const CalendarView: React.FC = () => {
       {/* Add Event Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-[#0f141d] border border-slate-700 rounded-lg max-w-lg w-full text-slate-200 p-6 space-y-4">
+          <div className="bg-panel border border-slate-700 rounded-lg max-w-lg w-full text-slate-200 p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="font-mono text-sm font-bold text-slate-100 uppercase">SCHEDULE OPERATIONAL EVENT</h3>
+              <h3 className="font-mono text-sm font-bold text-slate-100 uppercase">Schedule operational event</h3>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-200">
                 ✕
               </button>
@@ -189,48 +181,48 @@ export const CalendarView: React.FC = () => {
 
             <form onSubmit={handleAddSubmit} className="space-y-3 text-xs font-mono">
               <div>
-                <label className="block text-slate-400 mb-1">TITLE</label>
+                <label className="block text-slate-400 mb-1">Title</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. US Core CPI MoM / YoY Release"
                   value={eventTitle}
                   onChange={(e) => setEventTitle(e.target.value)}
-                  className="w-full bg-[#162130] border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none"
+                  className="w-full bg-raised border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1">DATE</label>
+                  <label className="block text-slate-400 mb-1">Date</label>
                   <input
                     type="date"
                     required
                     value={eventDate}
                     onChange={(e) => setEventDate(e.target.value)}
-                    className="w-full bg-[#162130] border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none"
+                    className="w-full bg-raised border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1">TIME (EST)</label>
+                  <label className="block text-slate-400 mb-1">Time (EST)</label>
                   <input
                     type="text"
                     required
                     placeholder="08:30 EST"
                     value={eventTime}
                     onChange={(e) => setEventTime(e.target.value)}
-                    className="w-full bg-[#162130] border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none"
+                    className="w-full bg-raised border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1">EVENT TYPE</label>
+                  <label className="block text-slate-400 mb-1">Event type</label>
                   <select
                     value={eventType}
                     onChange={(e) => setEventType(e.target.value as any)}
-                    className="w-full bg-[#162130] border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none"
+                    className="w-full bg-raised border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none"
                   >
                     <option value="NEWS">High-Impact News</option>
                     <option value="BACKTEST">Backtesting Block</option>
@@ -241,27 +233,27 @@ export const CalendarView: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 mb-1">VOLATILITY IMPACT</label>
+                  <label className="block text-slate-400 mb-1">Volatility impact</label>
                   <select
                     value={eventImpact}
                     onChange={(e) => setEventImpact(e.target.value as any)}
-                    className="w-full bg-[#162130] border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none"
+                    className="w-full bg-raised border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none"
                   >
-                    <option value="HIGH">HIGH IMPACT</option>
-                    <option value="MEDIUM">MEDIUM IMPACT</option>
-                    <option value="LOW">LOW IMPACT</option>
+                    <option value="HIGH">High impact</option>
+                    <option value="MEDIUM">Medium impact</option>
+                    <option value="LOW">Low impact</option>
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">NOTES</label>
+                <label className="block text-slate-400 mb-1">Notes</label>
                 <textarea
                   rows={2}
                   value={eventNotes}
                   onChange={(e) => setEventNotes(e.target.value)}
                   placeholder="Context, expected volatility, trading posture..."
-                  className="w-full bg-[#162130] border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none font-sans"
+                  className="w-full bg-raised border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none font-sans"
                 />
               </div>
 
@@ -275,7 +267,7 @@ export const CalendarView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded text-white font-bold"
+                  className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-white font-bold"
                 >
                   Save Event
                 </button>

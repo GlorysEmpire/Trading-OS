@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PageTitle } from './PageTitle';
 import { Activity, AlertTriangle } from 'lucide-react';
 
 /**
@@ -26,20 +27,10 @@ export const MarketIntelligenceView: React.FC = () => {
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <div className="flex items-center gap-2 font-mono text-xs font-bold text-cyan-400 uppercase tracking-wider">
-            <Activity className="w-4 h-4" />
-            INSTITUTIONAL FLOW & MACRO CONTEXT FEED
-          </div>
-          <h2 className="text-xl font-mono font-bold text-slate-100 mt-1">MARKET INTELLIGENCE</h2>
-          <p className="text-xs text-slate-400 font-sans mt-0.5">
-            Normalized data architecture for ETF institutional flows, open interest, funding, yields, and macro catalysts —
-            once a live data source is connected.
-          </p>
-        </div>
+        <PageTitle icon={Activity} title="Market Intel" description="Market data such as ETF flows, funding and macro events, once a data source is connected." />
 
         {/* Category switcher */}
-        <div className="flex items-center gap-1 bg-[#101722] p-1 border border-slate-800 rounded-lg text-xs font-mono">
+        <div className="flex items-center gap-1 bg-panel p-1 border border-line rounded-xl text-xs font-mono">
           {CATEGORIES.map((c) => (
             <button
               key={c.id}
@@ -55,9 +46,9 @@ export const MarketIntelligenceView: React.FC = () => {
       </div>
 
       {/* Warning Principle Banner */}
-      <div className="p-3.5 bg-[#121927] border-l-4 border-amber-400 rounded-r text-xs font-sans text-slate-300">
+      <div className="p-3.5 bg-panel border-l-4 border-amber-400 rounded-r text-xs font-sans text-slate-300">
         <strong className="text-amber-300 font-mono text-[11px] uppercase block mb-0.5">
-          CONTEXTUAL INTELLIGENCE DOCTRINE:
+          Contextual intelligence doctrine:
         </strong>
         External market intelligence provides backdrop context for asset desks. It is <strong>NOT</strong> an automatic
         trading signal. A positive ETF net inflow or drop in DXY would not justify buying without technical setup
@@ -65,7 +56,7 @@ export const MarketIntelligenceView: React.FC = () => {
       </div>
 
       {/* Honest "not connected" state */}
-      <div className="bg-[#101722] border border-dashed border-slate-800 rounded-lg p-8 text-center space-y-3">
+      <div className="bg-panel border border-dashed border-slate-800 rounded-lg p-8 text-center space-y-3">
         <AlertTriangle className="w-6 h-6 text-amber-400 mx-auto" />
         <h3 className="font-mono text-sm font-bold text-slate-200 uppercase">No live data source connected</h3>
         <p className="text-xs text-slate-400 font-sans max-w-md mx-auto">

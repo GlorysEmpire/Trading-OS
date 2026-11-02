@@ -123,7 +123,7 @@ export const AIAssistantView: React.FC = () => {
           </div>
           <div>
             <h2 className="font-mono text-base font-bold text-slate-100 flex items-center gap-2">
-              <span>TRADING OS COGNITIVE ASSISTANT</span>
+              <span>Trading os cognitive assistant</span>
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             </h2>
             <p className="text-xs text-slate-400 font-sans">
@@ -147,7 +147,7 @@ export const AIAssistantView: React.FC = () => {
           <button
             key={idx}
             onClick={() => handleSend(chip)}
-            className="px-2.5 py-1 rounded bg-[#131a26] border border-slate-800 hover:border-cyan-500/50 text-slate-300 hover:text-cyan-300 whitespace-nowrap transition cursor-pointer"
+            className="px-2.5 py-1 rounded bg-panel border border-slate-800 hover:border-cyan-500/50 text-slate-300 hover:text-cyan-300 whitespace-nowrap transition cursor-pointer"
           >
             {chip}
           </button>
@@ -155,7 +155,7 @@ export const AIAssistantView: React.FC = () => {
       </div>
 
       {/* Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto space-y-4 p-4 rounded-lg bg-[#0e141e] border border-slate-800">
+      <div className="flex-1 overflow-y-auto space-y-4 p-4 rounded-lg bg-panel border border-slate-800">
         {messages.map((msg) => {
           const isUser = msg.sender === 'user';
           return (
@@ -170,11 +170,11 @@ export const AIAssistantView: React.FC = () => {
                 className={`p-3.5 rounded-lg max-w-2xl text-xs leading-relaxed space-y-1 ${
                   isUser
                     ? 'bg-cyan-700 text-white font-sans'
-                    : 'bg-[#141d2b] border border-slate-800 text-slate-200 font-sans shadow-sm'
+                    : 'bg-raised border border-slate-800 text-slate-200 font-sans shadow-sm'
                 }`}
               >
                 <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 mb-1">
-                  <span>{isUser ? 'TRADER' : 'TRADING OS ASSISTANT'}</span>
+                  <span>{isUser ? 'TRADER' : 'Trading os assistant'}</span>
                   <span>{msg.timestamp}</span>
                 </div>
                 <div className="whitespace-pre-line">{msg.text}</div>
@@ -194,7 +194,7 @@ export const AIAssistantView: React.FC = () => {
             <div className="w-7 h-7 rounded bg-cyan-950/80 border border-cyan-800 flex items-center justify-center">
               <Bot className="w-4 h-4" />
             </div>
-            <div className="flex items-center gap-1.5 p-3 rounded-lg bg-[#141d2b] border border-slate-800">
+            <div className="flex items-center gap-1.5 p-3 rounded-lg bg-raised border border-slate-800">
               <span className="inline-block w-2 h-2 bg-cyan-400 rounded-full animate-bounce" />
               <span className="inline-block w-2 h-2 bg-cyan-400 rounded-full animate-bounce [animation-delay:0.2s]" />
               <span className="inline-block w-2 h-2 bg-cyan-400 rounded-full animate-bounce [animation-delay:0.4s]" />
@@ -219,15 +219,15 @@ export const AIAssistantView: React.FC = () => {
           value={inputPrompt}
           onChange={(e) => setInputPrompt(e.target.value)}
           placeholder="Ask Trading OS about active rules, ETH narrative, backtesting assignments, or trade audits..."
-          className="flex-1 bg-[#101722] border border-slate-700 rounded-lg px-4 py-3 text-xs text-slate-100 placeholder-slate-500 font-sans outline-none focus:border-cyan-500 transition"
+          className="flex-1 bg-panel border border-slate-700 rounded-lg px-4 py-3 text-xs text-slate-100 placeholder-slate-500 font-sans outline-none focus:border-cyan-500 transition"
         />
         <button
           type="submit"
           disabled={!inputPrompt.trim() || loading}
-          className="px-5 py-3 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-mono text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+          className="px-5 py-3 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-sm font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
         >
           <Send className="w-4 h-4" />
-          <span>SEND</span>
+          <span>Send</span>
         </button>
       </form>
     </div>

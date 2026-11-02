@@ -9,7 +9,7 @@ import { isPastValidity, setupStats } from '../utils/pendingSetups';
 import { MultiImageDropzone, ImageThumbGrid } from './ImageUploadDropzone';
 import { ImageViewerModal, type LightboxImage } from './ImageViewerModal';
 
-const field = 'w-full bg-[#162130] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 text-xs font-mono outline-none focus:border-cyan-600';
+const field = 'w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 text-xs font-mono outline-none focus:border-cyan-600';
 const TIMEFRAMES = ['1M', '3M', '5M', '15M', '30M', '1H', '4H', 'Daily'];
 const CHECKS: Array<{ key: keyof Omit<ProcessScore, 'score'>; fallback: string }> = [
   { key: 'session', fallback: 'Session' },
@@ -75,13 +75,13 @@ function SetupForm({ desk, initial, onDone }: { desk: AssetDeskData; initial?: P
   };
 
   return (
-    <div className="p-4 rounded-lg bg-[#131b26] border border-cyan-900/60 space-y-3 text-xs">
+    <div className="p-4 rounded-lg bg-raised border border-cyan-900/60 space-y-3 text-xs">
       <div className="flex items-center justify-between">
         <span className="font-mono font-bold text-cyan-300 uppercase">{initial ? 'Edit setup' : `New ${desk.symbol} setup`}</span>
         <button onClick={onDone} className="text-slate-500 hover:text-slate-200"><X className="w-4 h-4" /></button>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono">
-        <div className="grid grid-cols-2 gap-1 bg-[#162130] p-0.5 border border-slate-700 rounded col-span-2 sm:col-span-1">
+        <div className="grid grid-cols-2 gap-1 bg-raised p-0.5 border border-slate-700 rounded col-span-2 sm:col-span-1">
           {(['LONG', 'SHORT'] as const).map((dir) => (
             <button key={dir} type="button" onClick={() => set({ direction: dir })} className={`py-1 rounded font-bold ${d.direction === dir ? (dir === 'LONG' ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white') : 'text-slate-400'}`}>{dir}</button>
           ))}
@@ -97,10 +97,10 @@ function SetupForm({ desk, initial, onDone }: { desk: AssetDeskData; initial?: P
         </select>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono">
-        <label className="space-y-1"><span className="text-[10px] text-slate-400 block">ENTRY</span><input type="number" step="any" value={d.entry} onChange={(e) => set({ entry: e.target.value })} className={field} /></label>
-        <label className="space-y-1"><span className="text-[10px] text-slate-400 block">STOP</span><input type="number" step="any" value={d.stop} onChange={(e) => set({ stop: e.target.value })} className={field} /></label>
-        <label className="space-y-1"><span className="text-[10px] text-slate-400 block">TARGET</span><input type="number" step="any" value={d.target} onChange={(e) => set({ target: e.target.value })} className={field} /></label>
-        <div className="space-y-1"><span className="text-[10px] text-slate-400 block">PLANNED R</span><div className={`px-2.5 py-1.5 rounded border border-slate-700 font-bold ${plannedR >= 3 ? 'text-emerald-400' : plannedR > 0 ? 'text-amber-400' : 'text-slate-500'}`}>{plannedR > 0 ? `${plannedR}R` : '—'}</div></div>
+        <label className="space-y-1"><span className="text-[10px] text-slate-400 block">Entry</span><input type="number" step="any" value={d.entry} onChange={(e) => set({ entry: e.target.value })} className={field} /></label>
+        <label className="space-y-1"><span className="text-[10px] text-slate-400 block">Stop</span><input type="number" step="any" value={d.stop} onChange={(e) => set({ stop: e.target.value })} className={field} /></label>
+        <label className="space-y-1"><span className="text-[10px] text-slate-400 block">Target</span><input type="number" step="any" value={d.target} onChange={(e) => set({ target: e.target.value })} className={field} /></label>
+        <div className="space-y-1"><span className="text-[10px] text-slate-400 block">Planned R</span><div className={`px-2.5 py-1.5 rounded border border-slate-700 font-bold ${plannedR >= 3 ? 'text-emerald-400' : plannedR > 0 ? 'text-amber-400' : 'text-slate-500'}`}>{plannedR > 0 ? `${plannedR}R` : '—'}</div></div>
       </div>
       {checks.length > 0 && (
         <div className="space-y-1">
@@ -119,8 +119,8 @@ function SetupForm({ desk, initial, onDone }: { desk: AssetDeskData; initial?: P
       </div>
       {error && <p className="text-[11px] font-mono text-rose-400">{error}</p>}
       <div className="flex justify-end">
-        <button onClick={submit} disabled={saving} className="px-3 py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white font-mono font-bold">
-          {saving ? 'SAVING…' : initial ? 'SAVE CHANGES' : 'ADD PENDING SETUP'}
+        <button onClick={submit} disabled={saving} className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white font-mono font-bold">
+          {saving ? 'SAVING…' : initial ? 'Save changes' : 'Add pending setup'}
         </button>
       </div>
     </div>
@@ -157,8 +157,8 @@ function TriggerModal({ setup, onClose }: { setup: PendingSetup; onClose: () => 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto" onClick={onClose}>
-      <div className="bg-[#0f141d] border border-slate-700 rounded-lg max-w-lg w-full my-8 text-xs" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800 bg-[#131a26]">
+      <div className="bg-panel border border-slate-700 rounded-lg max-w-lg w-full my-8 text-xs" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800 bg-panel">
           <span className="font-mono text-sm font-bold text-slate-100 uppercase flex items-center gap-2"><Zap className="w-4 h-4 text-emerald-400" /> Entry triggered · {setup.asset} {setup.direction}</span>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-200"><X className="w-4 h-4" /></button>
         </div>
@@ -166,15 +166,15 @@ function TriggerModal({ setup, onClose }: { setup: PendingSetup; onClose: () => 
           <div className="p-5 space-y-3">
             <p className="text-emerald-300 font-mono">Moved to the Journal as an open trade, with all the setup's details and charts.</p>
             <div className="flex justify-end gap-2">
-              <button onClick={onClose} className="px-3 py-1.5 rounded border border-slate-700 text-slate-300 font-mono">CLOSE</button>
-              <button onClick={() => { onClose(); setActiveTab('journal'); }} className="flex items-center gap-1 px-3 py-1.5 rounded bg-cyan-600 text-white font-mono font-bold">OPEN JOURNAL <ArrowUpRight className="w-3 h-3" /></button>
+              <button onClick={onClose} className="px-3 py-1.5 rounded border border-slate-700 text-slate-300 font-mono">Close</button>
+              <button onClick={() => { onClose(); setActiveTab('journal'); }} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-mono font-bold">Open journal <ArrowUpRight className="w-3 h-3" /></button>
             </div>
           </div>
         ) : (
           <div className="p-5 space-y-4">
             <div className="grid grid-cols-2 gap-3 font-mono">
-              <label className="space-y-1"><span className="text-[10px] text-slate-400 block">ENTRY TIME (YOUR LOCAL TIME)</span><input type="datetime-local" value={entryLocal} onChange={(e) => setEntryLocal(e.target.value)} className={field} /></label>
-              <label className="space-y-1"><span className="text-[10px] text-slate-400 block">FILL PRICE</span><input type="number" step="any" value={fill} onChange={(e) => setFill(e.target.value)} className={field} /></label>
+              <label className="space-y-1"><span className="text-[10px] text-slate-400 block">Entry time (your local time)</span><input type="datetime-local" value={entryLocal} onChange={(e) => setEntryLocal(e.target.value)} className={field} /></label>
+              <label className="space-y-1"><span className="text-[10px] text-slate-400 block">Fill price</span><input type="number" step="any" value={fill} onChange={(e) => setFill(e.target.value)} className={field} /></label>
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-[11px]">
               <span className={session.outWindow ? 'text-rose-300' : 'text-cyan-300'}>
@@ -190,7 +190,7 @@ function TriggerModal({ setup, onClose }: { setup: PendingSetup; onClose: () => 
               </p>
             )}
             <div className="space-y-1.5">
-              <span className="text-[10px] font-mono text-slate-400 block">PROCESS CHECKS AT ENTRY</span>
+              <span className="text-[10px] font-mono text-slate-400 block">Process checks at entry</span>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 font-mono text-[11px]">
                 {CHECKS.map((c, i) => {
                   const on = c.key === 'session' ? session.pass : checks[c.key];
@@ -211,9 +211,9 @@ function TriggerModal({ setup, onClose }: { setup: PendingSetup; onClose: () => 
             </div>
             {error && <p className="text-[11px] font-mono text-rose-400">{error}</p>}
             <div className="flex justify-end gap-2">
-              <button onClick={onClose} className="px-3 py-1.5 rounded border border-slate-700 text-slate-300 font-mono">CANCEL</button>
-              <button onClick={confirm} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-mono font-bold">
-                <Zap className="w-3.5 h-3.5" /> {saving ? 'MOVING…' : 'MOVE TO JOURNAL'}
+              <button onClick={onClose} className="px-3 py-1.5 rounded border border-slate-700 text-slate-300 font-mono">Cancel</button>
+              <button onClick={confirm} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-mono font-bold">
+                <Zap className="w-3.5 h-3.5" /> {saving ? 'MOVING…' : 'Move to journal'}
               </button>
             </div>
           </div>
@@ -248,13 +248,13 @@ export const PendingSetupsPanel: React.FC<{ desk: AssetDeskData }> = ({ desk }) 
   };
 
   return (
-    <div className="bg-[#101722] border border-slate-800 rounded-lg p-5 space-y-4">
+    <div className="bg-panel border border-slate-800 rounded-xl p-5 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
         <span className="font-mono text-xs font-bold text-slate-200 uppercase flex items-center gap-2"><Crosshair className="w-4 h-4 text-cyan-400" /> Pending setups · {desk.symbol}</span>
         <div className="flex items-center gap-3 text-[10px] font-mono text-slate-500">
           <span>{stats.triggered} triggered · {stats.invalidated} invalidated · {stats.expired} expired{stats.triggerRate !== null ? ` · ${stats.triggerRate}% trigger rate` : ''}</span>
           {!formOpen && !editing && (
-            <button onClick={() => setFormOpen(true)} className="flex items-center gap-1 px-2 py-1 rounded border border-slate-700 text-cyan-300 hover:text-cyan-200"><Plus className="w-3 h-3" /> NEW SETUP</button>
+            <button onClick={() => setFormOpen(true)} className="flex items-center gap-1 px-2 py-1 rounded border border-slate-700 text-cyan-300 hover:text-cyan-200"><Plus className="w-3 h-3" /> New setup</button>
           )}
         </div>
       </div>
@@ -268,7 +268,7 @@ export const PendingSetupsPanel: React.FC<{ desk: AssetDeskData }> = ({ desk }) 
       ) : (
         <div className="space-y-3">
           {pending.map((p) => (
-            <div key={p.id} className="p-3 rounded-lg bg-[#162130] border border-slate-800 space-y-2">
+            <div key={p.id} className="p-3 rounded-lg bg-raised border border-slate-800 space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-xs">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`px-2 py-0.5 rounded font-bold ${p.direction === 'LONG' ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-800' : 'bg-rose-950/60 text-rose-300 border border-rose-800'}`}>{p.direction}</span>
@@ -285,7 +285,7 @@ export const PendingSetupsPanel: React.FC<{ desk: AssetDeskData }> = ({ desk }) 
                 <p className="flex items-center gap-1.5 text-[11px] font-mono text-amber-300"><Clock3 className="w-3 h-3" /> Past its valid-until date. Mark it expired if it no longer applies.</p>
               )}
               {p.narrative && <p className="text-xs text-slate-200 font-sans">{p.narrative}</p>}
-              {p.setupReasoning && <p className="text-[11px] text-slate-400 font-sans"><span className="font-mono text-slate-500">TRIGGER: </span>{p.setupReasoning}</p>}
+              {p.setupReasoning && <p className="text-[11px] text-slate-400 font-sans"><span className="font-mono text-slate-500">Trigger: </span>{p.setupReasoning}</p>}
               <ImageThumbGrid
                 images={p.screenshots}
                 onView={(i) => setLightbox({ images: p.screenshots.map((url, k) => ({ url, title: `${p.asset} ${p.direction} setup · ${k + 1}/${p.screenshots.length}`, timeframe: p.timeframe })), index: i })}
@@ -299,10 +299,10 @@ export const PendingSetupsPanel: React.FC<{ desk: AssetDeskData }> = ({ desk }) 
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center justify-end gap-2 pt-1 font-mono text-[11px]">
-                  <button onClick={() => setEditing(p)} className="flex items-center gap-1 px-2 py-1 rounded border border-slate-700 text-slate-300 hover:text-white"><Pencil className="w-3 h-3" /> EDIT</button>
-                  <button onClick={() => setResolving({ setup: p, status: 'EXPIRED' })} className="flex items-center gap-1 px-2 py-1 rounded border border-slate-700 text-slate-400 hover:text-amber-300"><Clock3 className="w-3 h-3" /> EXPIRED</button>
-                  <button onClick={() => setResolving({ setup: p, status: 'INVALIDATED' })} className="flex items-center gap-1 px-2 py-1 rounded border border-slate-700 text-slate-400 hover:text-rose-300"><Ban className="w-3 h-3" /> INVALIDATED</button>
-                  <button onClick={() => setTriggering(p)} className="flex items-center gap-1 px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold"><Zap className="w-3 h-3" /> ENTRY TRIGGERED</button>
+                  <button onClick={() => setEditing(p)} className="flex items-center gap-1 px-2 py-1 rounded border border-slate-700 text-slate-300 hover:text-ink"><Pencil className="w-3 h-3" /> Edit</button>
+                  <button onClick={() => setResolving({ setup: p, status: 'EXPIRED' })} className="flex items-center gap-1 px-2 py-1 rounded border border-slate-700 text-slate-400 hover:text-amber-300"><Clock3 className="w-3 h-3" /> Expired</button>
+                  <button onClick={() => setResolving({ setup: p, status: 'INVALIDATED' })} className="flex items-center gap-1 px-2 py-1 rounded border border-slate-700 text-slate-400 hover:text-rose-300"><Ban className="w-3 h-3" /> Invalidated</button>
+                  <button onClick={() => setTriggering(p)} className="flex items-center gap-1 px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold"><Zap className="w-3 h-3" /> Entry triggered</button>
                 </div>
               )}
             </div>

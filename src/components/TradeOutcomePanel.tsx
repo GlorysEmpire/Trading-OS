@@ -9,7 +9,7 @@ type Outcome = 'WIN' | 'LOSS' | 'SCRATCH';
 const CHECK_KEYS = ['session', 'grade', 'risk', 'management', 'structure'] as const;
 const DEFAULT_CHECK_LABELS = ['Session', 'Grade', 'Risk', 'Management', 'Structure'];
 
-const field = 'w-full bg-[#162130] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 text-xs font-mono outline-none focus:border-cyan-600';
+const field = 'w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 text-xs font-mono outline-none focus:border-cyan-600';
 
 function fmt(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
@@ -102,7 +102,7 @@ function BreakevenFields({ draft, onChange, verdict }: { draft: BeDraft; onChang
       </label>
       {draft.moved && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pl-5">
-          <label className="space-y-1"><span className="text-[10px] font-mono text-slate-400 block">MOVED AT (R)</span>
+          <label className="space-y-1"><span className="text-[10px] font-mono text-slate-400 block">Moved at (R)</span>
             <input type="number" step="0.1" value={draft.atR} onChange={(e) => onChange({ ...draft, atR: e.target.value })} className={field} placeholder="e.g. 3" />
           </label>
           <label className="flex items-center gap-2 font-mono text-[11px] text-slate-300 cursor-pointer sm:pt-4" title="New structure formed a new invalidation zone beyond the entry">
@@ -136,8 +136,8 @@ function ChangeList({ changes }: { changes: TradeAmendmentChange[] }) {
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto" onClick={onClose}>
-      <div className="bg-[#0f141d] border border-slate-700 rounded-lg max-w-xl w-full my-8 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800 bg-[#131a26]">
+      <div className="bg-panel border border-slate-700 rounded-lg max-w-xl w-full my-8 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800 bg-panel">
           <h3 className="font-mono text-sm font-bold text-slate-100 uppercase tracking-wide">{title}</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-200"><X className="w-4 h-4" /></button>
         </div>
@@ -197,44 +197,44 @@ function AmendModal({ trade, onClose }: { trade: Trade; onClose: () => void }) {
         The pre-trade narrative can't be amended; it was your commitment.
       </p>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono">
-        <label className="space-y-1"><span className="text-[10px] text-slate-400 block">ENTRY</span><input type="number" step="any" value={entryPrice} onChange={(e) => setEntryPrice(e.target.value)} className={field} /></label>
-        <label className="space-y-1"><span className="text-[10px] text-slate-400 block">STOP</span><input type="number" step="any" value={stopPrice} onChange={(e) => setStopPrice(e.target.value)} className={field} /></label>
-        <label className="space-y-1"><span className="text-[10px] text-slate-400 block">TARGET</span><input type="number" step="any" value={targetPrice} onChange={(e) => setTargetPrice(e.target.value)} className={field} /></label>
-        <label className="space-y-1"><span className="text-[10px] text-slate-400 block">EXIT</span><input type="number" step="any" value={exitPrice} onChange={(e) => setExitPrice(e.target.value)} className={field} /></label>
-        <label className="space-y-1"><span className="text-[10px] text-slate-400 block">DATE</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={field} /></label>
-        <label className="space-y-1"><span className="text-[10px] text-slate-400 block">GRADE</span>
+        <label className="space-y-1"><span className="text-[10px] text-slate-400 block">Entry</span><input type="number" step="any" value={entryPrice} onChange={(e) => setEntryPrice(e.target.value)} className={field} /></label>
+        <label className="space-y-1"><span className="text-[10px] text-slate-400 block">Stop</span><input type="number" step="any" value={stopPrice} onChange={(e) => setStopPrice(e.target.value)} className={field} /></label>
+        <label className="space-y-1"><span className="text-[10px] text-slate-400 block">Target</span><input type="number" step="any" value={targetPrice} onChange={(e) => setTargetPrice(e.target.value)} className={field} /></label>
+        <label className="space-y-1"><span className="text-[10px] text-slate-400 block">Exit</span><input type="number" step="any" value={exitPrice} onChange={(e) => setExitPrice(e.target.value)} className={field} /></label>
+        <label className="space-y-1"><span className="text-[10px] text-slate-400 block">Date</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={field} /></label>
+        <label className="space-y-1"><span className="text-[10px] text-slate-400 block">Grade</span>
           <select value={setupGrade} onChange={(e) => setSetupGrade(e.target.value)} className={field}>
             {[...new Set([trade.setupGrade, ...tradingHQ.setupGrades.map((g) => g.grade)])].map((g) => <option key={g} value={g}>{g}</option>)}
           </select>
         </label>
-        <label className="space-y-1 col-span-2"><span className="text-[10px] text-slate-400 block">OUTCOME</span>
+        <label className="space-y-1 col-span-2"><span className="text-[10px] text-slate-400 block">Outcome</span>
           <select value={outcome} onChange={(e) => setOutcome(e.target.value as 'AUTO' | Outcome)} className={field}>
             <option value="AUTO">Keep / derive from R (currently {trade.outcome ?? '—'})</option>
-            <option value="WIN">WIN</option><option value="LOSS">LOSS</option><option value="SCRATCH">SCRATCH / BREAKEVEN</option>
+            <option value="WIN">WIN</option><option value="LOSS">Loss</option><option value="SCRATCH">Scratch / breakeven</option>
           </select>
         </label>
       </div>
-      <div className="space-y-1.5"><span className="text-[10px] font-mono text-slate-400 block">PROCESS CHECKS</span>
+      <div className="space-y-1.5"><span className="text-[10px] font-mono text-slate-400 block">Process checks</span>
         <ProcessChecks score={checks} onToggle={(k) => setChecks((prev) => ({ ...prev, [k]: !prev[k] }))} />
       </div>
-      <div className="space-y-1.5"><span className="text-[10px] font-mono text-slate-400 block">BREAKEVEN</span>
+      <div className="space-y-1.5"><span className="text-[10px] font-mono text-slate-400 block">Breakeven</span>
         <BreakevenFields draft={be} onChange={setBe} verdict={beState.verdict} />
       </div>
-      <div className="space-y-1.5"><span className="text-[10px] font-mono text-slate-400 block">MISTAKE CODES</span>
+      <div className="space-y-1.5"><span className="text-[10px] font-mono text-slate-400 block">Mistake codes</span>
         <MistakeCodePicker value={codes} onChange={setCodes} forced={beState.forced} />
       </div>
-      <label className="space-y-1 block"><span className="text-[10px] font-mono text-slate-400 block">REASON (REQUIRED)</span>
+      <label className="space-y-1 block"><span className="text-[10px] font-mono text-slate-400 block">Reason (required)</span>
         <textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Typed the exit wrong; MT5 history shows 2391.4" className={`${field} font-sans resize-none`} />
       </label>
-      <div className="p-3 rounded bg-[#131b26] border border-slate-800 space-y-1">
-        <span className="text-[10px] font-mono text-slate-400 block">WILL BE LOGGED</span>
+      <div className="p-3 rounded bg-raised border border-slate-800 space-y-1">
+        <span className="text-[10px] font-mono text-slate-400 block">Will be logged</span>
         {preview.length ? <ChangeList changes={preview} /> : <p className="text-slate-500 font-mono text-[11px]">No changes yet.</p>}
       </div>
       {error && <p className="text-rose-400 font-mono text-[11px]">{error}</p>}
       <div className="flex justify-end gap-2">
-        <button onClick={onClose} className="px-3 py-1.5 rounded border border-slate-700 text-slate-300 font-mono">CANCEL</button>
-        <button onClick={submit} disabled={saving || !preview.length || !reason.trim()} className="px-3 py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white font-mono font-bold">
-          {saving ? 'LOGGING…' : 'LOG AMENDMENT'}
+        <button onClick={onClose} className="px-3 py-1.5 rounded border border-slate-700 text-slate-300 font-mono">Cancel</button>
+        <button onClick={submit} disabled={saving || !preview.length || !reason.trim()} className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white font-mono font-bold">
+          {saving ? 'LOGGING…' : 'Log amendment'}
         </button>
       </div>
     </Modal>
@@ -258,14 +258,14 @@ function VoidModal({ trade, onClose }: { trade: Trade; onClose: () => void }) {
         Use this only for an entry that shouldn't exist, like a duplicate or a trade logged by mistake. A voided trade stays in your Journal
         with its reason, but it's left out of your stats. This can't be undone. A real trade you regret is a loss, not a void.
       </p>
-      <label className="space-y-1 block"><span className="text-[10px] font-mono text-slate-400 block">REASON (REQUIRED)</span>
+      <label className="space-y-1 block"><span className="text-[10px] font-mono text-slate-400 block">Reason (required)</span>
         <textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Duplicate of the 09:42 XAUUSD entry" className={`${field} font-sans resize-none`} />
       </label>
       {error && <p className="text-rose-400 font-mono text-[11px]">{error}</p>}
       <div className="flex justify-end gap-2">
-        <button onClick={onClose} className="px-3 py-1.5 rounded border border-slate-700 text-slate-300 font-mono">CANCEL</button>
-        <button onClick={submit} disabled={saving || !reason.trim()} className="px-3 py-1.5 rounded bg-rose-700 hover:bg-rose-600 disabled:opacity-40 text-white font-mono font-bold">
-          {saving ? 'VOIDING…' : 'VOID ENTRY'}
+        <button onClick={onClose} className="px-3 py-1.5 rounded border border-slate-700 text-slate-300 font-mono">Cancel</button>
+        <button onClick={submit} disabled={saving || !reason.trim()} className="px-3 py-1.5 rounded-lg bg-rose-700 hover:bg-rose-600 disabled:opacity-40 text-white font-mono font-bold">
+          {saving ? 'VOIDING…' : 'Void entry'}
         </button>
       </div>
     </Modal>
@@ -300,16 +300,16 @@ function CloseForm({ trade }: { trade: Trade }) {
 
   return (
     <div className="space-y-3">
-      <div className="p-3 bg-[#131b26] border border-slate-800 rounded space-y-2">
+      <div className="p-3 bg-raised border border-slate-800 rounded space-y-2">
         <span className="text-[11px] font-mono text-slate-300 font-bold uppercase block">Process checks ({trade.processScore.score}/5 passed)</span>
         <ProcessChecks score={trade.processScore} onToggle={toggleCheck} />
       </div>
-      <div className="p-3 bg-[#131b26] border border-cyan-900/60 rounded space-y-3">
+      <div className="p-3 bg-raised border border-cyan-900/60 rounded space-y-3">
         <span className="text-[11px] font-mono text-cyan-300 font-bold uppercase block">Close trade</span>
         <div className="flex flex-wrap gap-2 font-mono text-[11px]">
           {([
-            { label: 'HIT TP', price: trade.targetPrice, tone: 'border-emerald-800 text-emerald-300 hover:bg-emerald-950/40', be: false },
-            { label: 'HIT SL', price: trade.stopPrice, tone: 'border-rose-800 text-rose-300 hover:bg-rose-950/40', be: false },
+            { label: 'Hit TP', price: trade.targetPrice, tone: 'border-emerald-800 text-emerald-300 hover:bg-emerald-950/40', be: false },
+            { label: 'Hit SL', price: trade.stopPrice, tone: 'border-rose-800 text-rose-300 hover:bg-rose-950/40', be: false },
             { label: 'BREAKEVEN', price: trade.entryPrice, tone: 'border-slate-600 text-slate-200 hover:bg-slate-800/60', be: true },
           ] as const).map((b) => (
             <button
@@ -327,23 +327,23 @@ function CloseForm({ trade }: { trade: Trade }) {
             </button>
           ))}
           <button type="button" onClick={() => { setExit(''); setOutcome('AUTO'); }} className="px-3 py-1 rounded border border-slate-700 text-slate-400 hover:text-slate-200">
-            MANUAL EXIT
+            Manual exit
           </button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono">
-          <label className="space-y-1"><span className="text-[10px] text-slate-400 block">EXIT PRICE</span>
+          <label className="space-y-1"><span className="text-[10px] text-slate-400 block">Exit price</span>
             <input type="number" step="any" value={exit} onChange={(e) => setExit(e.target.value)} placeholder="Actual fill" className={field} />
           </label>
-          <div className="space-y-1"><span className="text-[10px] text-slate-400 block">REALIZED R</span>
-            <div className="px-2.5 py-1.5 bg-[#162130] border border-slate-700 rounded text-slate-100 font-bold">{previewR !== undefined ? `${previewR}R → ${outcomeFromR(previewR)}` : '—'}</div>
+          <div className="space-y-1"><span className="text-[10px] text-slate-400 block">Realized R</span>
+            <div className="px-2.5 py-1.5 bg-raised border border-slate-700 rounded text-slate-100 font-bold">{previewR !== undefined ? `${previewR}R → ${outcomeFromR(previewR)}` : '—'}</div>
           </div>
-          <label className="space-y-1"><span className="text-[10px] text-slate-400 block">OUTCOME</span>
+          <label className="space-y-1"><span className="text-[10px] text-slate-400 block">Outcome</span>
             <select value={outcome} onChange={(e) => setOutcome(e.target.value as 'AUTO' | Outcome)} className={field}>
-              <option value="AUTO">From R</option><option value="WIN">WIN</option><option value="LOSS">LOSS</option><option value="SCRATCH">SCRATCH / BREAKEVEN</option>
+              <option value="AUTO">From R</option><option value="WIN">WIN</option><option value="LOSS">Loss</option><option value="SCRATCH">Scratch / breakeven</option>
             </select>
           </label>
         </div>
-        <div className="space-y-1.5"><span className="text-[10px] font-mono text-slate-400 block">BREAKEVEN</span>
+        <div className="space-y-1.5"><span className="text-[10px] font-mono text-slate-400 block">Breakeven</span>
           <BreakevenFields draft={be} onChange={setBe} verdict={beState.verdict} />
         </div>
         <div className="space-y-1.5"><span className="text-[10px] font-mono text-slate-400 block">MISTAKE CODES (if any)</span>
@@ -351,8 +351,8 @@ function CloseForm({ trade }: { trade: Trade }) {
         </div>
         {error && <p className="text-rose-400 font-mono text-[11px]">{error}</p>}
         <div className="flex justify-end">
-          <button onClick={submit} disabled={saving || !Number.isFinite(exitNum)} className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white font-mono text-xs font-bold">
-            <Lock className="w-3.5 h-3.5" />{saving ? 'CLOSING…' : 'CLOSE & LOCK'}
+          <button onClick={submit} disabled={saving || !Number.isFinite(exitNum)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white text-sm font-semibold">
+            <Lock className="w-3.5 h-3.5" />{saving ? 'CLOSING…' : 'Close & lock'}
           </button>
         </div>
       </div>
@@ -364,21 +364,21 @@ function LockedView({ trade }: { trade: Trade }) {
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono">
-        <div className="p-3 rounded bg-[#131b26] border border-slate-800"><span className="text-[10px] text-slate-400 block">EXIT PRICE</span><span className="text-slate-100 font-bold">{fmt(trade.exitPrice)}</span></div>
-        <div className="p-3 rounded bg-[#131b26] border border-slate-800"><span className="text-[10px] text-slate-400 block">REALIZED R</span><span className={`font-bold ${(trade.realizedR ?? 0) > 0 ? 'text-emerald-400' : (trade.realizedR ?? 0) < 0 ? 'text-rose-400' : 'text-slate-100'}`}>{trade.realizedR !== undefined ? `${trade.realizedR}R` : '—'}</span></div>
-        <div className="p-3 rounded bg-[#131b26] border border-slate-800"><span className="text-[10px] text-slate-400 block">OUTCOME</span><span className="text-slate-100 font-bold">{fmt(trade.outcome)}</span></div>
+        <div className="p-3 rounded bg-raised border border-slate-800"><span className="text-[10px] text-slate-400 block">Exit price</span><span className="text-slate-100 font-bold">{fmt(trade.exitPrice)}</span></div>
+        <div className="p-3 rounded bg-raised border border-slate-800"><span className="text-[10px] text-slate-400 block">Realized R</span><span className={`font-bold ${(trade.realizedR ?? 0) > 0 ? 'text-emerald-400' : (trade.realizedR ?? 0) < 0 ? 'text-rose-400' : 'text-slate-100'}`}>{trade.realizedR !== undefined ? `${trade.realizedR}R` : '—'}</span></div>
+        <div className="p-3 rounded bg-raised border border-slate-800"><span className="text-[10px] text-slate-400 block">Outcome</span><span className="text-slate-100 font-bold">{fmt(trade.outcome)}</span></div>
       </div>
-      <div className="p-3 bg-[#131b26] border border-slate-800 rounded space-y-2">
+      <div className="p-3 bg-raised border border-slate-800 rounded space-y-2">
         <span className="text-[11px] font-mono text-slate-300 font-bold uppercase block">Process checks ({trade.processScore.score}/5 passed)</span>
         <ProcessChecks score={trade.processScore} />
       </div>
       {trade.breakeven && (
         <p className="font-mono text-[11px] text-slate-300">
-          <span className="text-slate-400">BREAKEVEN:</span> moved at {trade.breakeven.movedAtR}R{trade.breakeven.structural ? ' · structural' : ''}{trade.breakeven.note ? ` · ${trade.breakeven.note}` : ''}
+          <span className="text-slate-400">Breakeven:</span> moved at {trade.breakeven.movedAtR}R{trade.breakeven.structural ? ' · structural' : ''}{trade.breakeven.note ? ` · ${trade.breakeven.note}` : ''}
         </p>
       )}
       <div className="flex flex-wrap items-center gap-1.5 font-mono text-[10px]">
-        <span className="text-slate-400">MISTAKE CODES:</span>
+        <span className="text-slate-400">Mistake codes:</span>
         {trade.mistakeCodes.length ? trade.mistakeCodes.map((c) => <span key={c} className="px-2 py-0.5 rounded border bg-amber-950/60 border-amber-700 text-amber-300">{c}</span>) : <span className="text-slate-500">none</span>}
       </div>
     </div>
@@ -412,12 +412,12 @@ export const TradeOutcomePanel: React.FC<{ trade: Trade }> = ({ trade }) => {
       <div className="flex flex-wrap items-center justify-end gap-2">
         {locked && !trade.voided && (
           <button onClick={() => setModal('amend')} className="flex items-center gap-1 px-2.5 py-1 rounded border border-slate-700 text-cyan-300 hover:text-cyan-200 font-mono text-[11px]">
-            <PenLine className="w-3 h-3" /> AMEND
+            <PenLine className="w-3 h-3" /> Amend
           </button>
         )}
         {!trade.voided && (
           <button onClick={() => setModal('void')} className="flex items-center gap-1 px-2.5 py-1 rounded border border-slate-700 text-slate-400 hover:text-rose-300 font-mono text-[11px]">
-            <Ban className="w-3 h-3" /> VOID ENTRY
+            <Ban className="w-3 h-3" /> Void entry
           </button>
         )}
       </div>
@@ -427,7 +427,7 @@ export const TradeOutcomePanel: React.FC<{ trade: Trade }> = ({ trade }) => {
       )}
 
       {history.length > 0 && (
-        <div className="p-3 rounded bg-[#0b1018] border border-slate-800 space-y-2">
+        <div className="p-3 rounded bg-well border border-slate-800 space-y-2">
           <span className="flex items-center gap-1.5 text-[11px] font-mono font-bold text-slate-300 uppercase"><History className="w-3.5 h-3.5" /> Amendment history ({history.length})</span>
           {history.map((a) => (
             <div key={a.id} className="border-l-2 border-slate-700 pl-2.5 space-y-1">

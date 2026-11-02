@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { PageTitle } from './PageTitle';
 import { CalendarRange, ChevronLeft, ChevronRight, Save, RotateCcw, ArrowUpRight, AlertTriangle } from 'lucide-react';
 import { useTrading } from '../context/TradingContext';
 import type { WatchlistEntry, WeeklyReview } from '../types';
 import { traderDateString } from '../utils/traderTime';
 import { addDays, computeWeeklyEvidence, findPreviousWeeklyReview, matchDesk, weekDates, weekStartOf } from '../utils/weekly';
 
-const field = 'w-full bg-[#162130] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 text-xs outline-none focus:border-cyan-600';
+const field = 'w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 text-xs outline-none focus:border-cyan-600';
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 function fmtDay(date: string, opts: Intl.DateTimeFormatOptions = { weekday: 'short', day: 'numeric', month: 'short' }) {
@@ -120,18 +121,12 @@ export const WeeklyReviewView: React.FC = () => {
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <div className="flex items-center gap-2 font-mono text-xs font-bold text-cyan-400 uppercase tracking-wider">
-            <CalendarRange className="w-4 h-4" /> Evidence → Pattern → One upgrade → Recommit
-          </div>
-          <h2 className="text-xl font-mono font-bold text-slate-100 mt-1">WEEKLY REVIEW</h2>
-          <p className="text-[11px] font-mono text-slate-400 mt-0.5">{weekLabel(weekStart)}</p>
-        </div>
+        <PageTitle icon={CalendarRange} title="Weekly Review" description="Review the week, choose one improvement, and set next week's watchlist." meta={weekLabel(weekStart)} />
         <div className="flex items-center gap-1.5 font-mono text-xs">
-          <button onClick={() => setWeekStart(addDays(weekStart, -7))} className="p-1.5 rounded border border-slate-700 text-slate-300 hover:text-white" title="Previous week"><ChevronLeft className="w-4 h-4" /></button>
-          <button onClick={() => setWeekStart(addDays(weekStart, 7))} disabled={weekStart >= thisWeek} className="p-1.5 rounded border border-slate-700 text-slate-300 hover:text-white disabled:opacity-30" title="Next week"><ChevronRight className="w-4 h-4" /></button>
+          <button onClick={() => setWeekStart(addDays(weekStart, -7))} className="p-1.5 rounded border border-slate-700 text-slate-300 hover:text-ink" title="Previous week"><ChevronLeft className="w-4 h-4" /></button>
+          <button onClick={() => setWeekStart(addDays(weekStart, 7))} disabled={weekStart >= thisWeek} className="p-1.5 rounded border border-slate-700 text-slate-300 hover:text-ink disabled:opacity-30" title="Next week"><ChevronRight className="w-4 h-4" /></button>
           {weekStart !== thisWeek && (
-            <button onClick={() => setWeekStart(thisWeek)} className="flex items-center gap-1 px-2 py-1.5 rounded border border-slate-700 text-cyan-300"><RotateCcw className="w-3 h-3" /> THIS WEEK</button>
+            <button onClick={() => setWeekStart(thisWeek)} className="flex items-center gap-1 px-2 py-1.5 rounded border border-slate-700 text-cyan-300"><RotateCcw className="w-3 h-3" /> This week</button>
           )}
         </div>
       </div>
@@ -140,7 +135,7 @@ export const WeeklyReviewView: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
         {/* Evidence */}
-        <section className="lg:col-span-2 bg-[#101722] border border-slate-800 rounded-lg p-4 space-y-3">
+        <section className="lg:col-span-2 bg-panel border border-slate-800 rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">The week's evidence</h3>
             <span className="text-[10px] font-mono text-slate-500">Journal + debriefs</span>
@@ -167,7 +162,7 @@ export const WeeklyReviewView: React.FC = () => {
           )}
 
           <table className="w-full font-mono text-[11px]">
-            <thead><tr className="text-slate-500 text-left"><th className="font-normal py-1">DAY</th><th className="font-normal">TRADES</th><th className="font-normal">PROCESS</th><th className="font-normal text-right">R</th></tr></thead>
+            <thead><tr className="text-slate-500 text-left"><th className="font-normal py-1">DAY</th><th className="font-normal">Trades</th><th className="font-normal">Process</th><th className="font-normal text-right">R</th></tr></thead>
             <tbody>
               {live.processByDay.map((d) => (
                 <tr key={d.date} className="border-t border-slate-800/60">
@@ -188,7 +183,7 @@ export const WeeklyReviewView: React.FC = () => {
         </section>
 
         {/* Reflection */}
-        <section className="lg:col-span-3 bg-[#101722] border border-slate-800 rounded-lg p-4 space-y-4">
+        <section className="lg:col-span-3 bg-panel border border-slate-800 rounded-xl p-4 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">Pattern & upgrade</h3>
             {saved && <span className="text-[10px] font-mono text-emerald-400">saved {new Date(saved.updatedAt).toLocaleString()}</span>}
@@ -200,7 +195,7 @@ export const WeeklyReviewView: React.FC = () => {
             </p>
           )}
 
-          <div className="space-y-1.5 p-3 rounded bg-[#131b26] border border-slate-800">
+          <div className="space-y-1.5 p-3 rounded bg-raised border border-slate-800">
             <span className="text-[11px] font-mono text-slate-300 block">Last week's upgrade held?</span>
             {previousUpgrade ? (
               <>
@@ -249,7 +244,7 @@ export const WeeklyReviewView: React.FC = () => {
       </div>
 
       {/* Watchlist for next week */}
-      <section className="bg-[#101722] border border-slate-800 rounded-lg p-4 space-y-3">
+      <section className="bg-panel border border-slate-800 rounded-xl p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">Watchlist · {weekLabel(nextWeek)}</h3>
           <span className="text-[10px] font-mono text-slate-500">From the focus rotation in Trading HQ. Desk bias shown for reference.</span>
@@ -262,10 +257,10 @@ export const WeeklyReviewView: React.FC = () => {
               <thead>
                 <tr className="text-slate-500 text-left border-b border-slate-800">
                   <th className="py-1.5 font-normal w-24">DAY</th>
-                  <th className="font-normal w-20">ASSET</th>
-                  <th className="font-normal w-40">DESK NOW</th>
-                  <th className="font-normal">ONE-SENTENCE BIAS</th>
-                  <th className="font-normal w-56">KEY LEVELS</th>
+                  <th className="font-normal w-20">Asset</th>
+                  <th className="font-normal w-40">Desk now</th>
+                  <th className="font-normal">One-sentence bias</th>
+                  <th className="font-normal w-56">Key levels</th>
                 </tr>
               </thead>
               <tbody>
@@ -300,20 +295,20 @@ export const WeeklyReviewView: React.FC = () => {
         {error && <span className="text-[11px] font-mono text-rose-400">{error}</span>}
         {!canSave && <span className="text-[10px] font-mono text-slate-500">The leak, the upgrade{previousUpgrade ? ' and Y/N' : ''} are needed to save.</span>}
         {justSaved && <span className="text-[11px] font-mono text-emerald-400">Weekly review saved.</span>}
-        <button onClick={handleSave} disabled={!canSave || saving || weeklyReviewsLoading} className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white font-mono text-xs font-bold">
-          <Save className="w-3.5 h-3.5" /> {saving ? 'SAVING…' : saved ? 'UPDATE REVIEW' : 'SAVE REVIEW'}
+        <button onClick={handleSave} disabled={!canSave || saving || weeklyReviewsLoading} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white text-sm font-semibold">
+          <Save className="w-3.5 h-3.5" /> {saving ? 'SAVING…' : saved ? 'Update review' : 'Save review'}
         </button>
       </div>
 
       {/* History */}
-      <section className="bg-[#101722] border border-slate-800 rounded-lg p-4 space-y-2">
+      <section className="bg-panel border border-slate-800 rounded-xl p-4 space-y-2">
         <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">Review history</h3>
         {weeklyReviews.length === 0 ? (
           <p className="text-[11px] text-slate-500 font-sans">No weekly reviews yet.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full font-mono text-[11px] min-w-[640px]">
-              <thead><tr className="text-slate-500 text-left border-b border-slate-800"><th className="py-1.5 font-normal">WEEK</th><th className="font-normal">PROCESS</th><th className="font-normal">TRADES</th><th className="font-normal">R</th><th className="font-normal">TOP MISTAKE</th><th className="font-normal">UPGRADE</th></tr></thead>
+              <thead><tr className="text-slate-500 text-left border-b border-slate-800"><th className="py-1.5 font-normal">Week</th><th className="font-normal">Process</th><th className="font-normal">Trades</th><th className="font-normal">R</th><th className="font-normal">Top mistake</th><th className="font-normal">Upgrade</th></tr></thead>
               <tbody>
                 {weeklyReviews.slice(0, 12).map((r) => (
                   <tr key={r.weekStart} onClick={() => setWeekStart(r.weekStart)} className={`border-b border-slate-800/60 cursor-pointer hover:bg-slate-800/30 ${r.weekStart === weekStart ? 'bg-cyan-950/20' : ''}`}>

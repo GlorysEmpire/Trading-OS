@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { PageTitle } from './PageTitle';
 import { ClipboardCheck, ChevronLeft, ChevronRight, Save, AlertTriangle, ShieldAlert, ArrowUpRight, RotateCcw } from 'lucide-react';
 import { useTrading } from '../context/TradingContext';
 import type { DailyDebrief } from '../types';
 import { traderDateString } from '../utils/traderTime';
 import { computeDailyEvidence, evidenceChangedSince, findPreviousDebrief, tradingDatesWithoutDebrief } from '../utils/debrief';
 
-const field = 'w-full bg-[#162130] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 text-xs outline-none focus:border-cyan-600';
+const field = 'w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 text-xs outline-none focus:border-cyan-600';
 
 function shiftDate(date: string, days: number): string {
   const d = new Date(`${date}T12:00:00Z`);
@@ -99,18 +100,13 @@ export const DebriefView: React.FC = () => {
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-5">
       {/* Header + day navigation */}
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <div className="flex items-center gap-2 font-mono text-xs font-bold text-cyan-400 uppercase tracking-wider">
-            <ClipboardCheck className="w-4 h-4" /> Evidence → Pattern → One upgrade → Recommit
-          </div>
-          <h2 className="text-xl font-mono font-bold text-slate-100 mt-1">DAILY DEBRIEF</h2>
-        </div>
+        <PageTitle icon={ClipboardCheck} title="Daily Debrief" description="Look at today's evidence, spot one pattern, and pick one small improvement for tomorrow." />
         <div className="flex items-center gap-1.5 font-mono text-xs">
-          <button onClick={() => setDate(shiftDate(date, -1))} className="p-1.5 rounded border border-slate-700 text-slate-300 hover:text-white" title="Previous day"><ChevronLeft className="w-4 h-4" /></button>
-          <input type="date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} className="bg-[#162130] border border-slate-700 rounded px-2 py-1.5 text-slate-100 outline-none" />
-          <button onClick={() => setDate(shiftDate(date, 1))} disabled={date >= today} className="p-1.5 rounded border border-slate-700 text-slate-300 hover:text-white disabled:opacity-30" title="Next day"><ChevronRight className="w-4 h-4" /></button>
+          <button onClick={() => setDate(shiftDate(date, -1))} className="p-1.5 rounded border border-slate-700 text-slate-300 hover:text-ink" title="Previous day"><ChevronLeft className="w-4 h-4" /></button>
+          <input type="date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} className="bg-raised border border-slate-700 rounded px-2 py-1.5 text-slate-100 outline-none" />
+          <button onClick={() => setDate(shiftDate(date, 1))} disabled={date >= today} className="p-1.5 rounded border border-slate-700 text-slate-300 hover:text-ink disabled:opacity-30" title="Next day"><ChevronRight className="w-4 h-4" /></button>
           {date !== today && (
-            <button onClick={() => setDate(today)} className="flex items-center gap-1 px-2 py-1.5 rounded border border-slate-700 text-cyan-300"><RotateCcw className="w-3 h-3" /> TODAY</button>
+            <button onClick={() => setDate(today)} className="flex items-center gap-1 px-2 py-1.5 rounded border border-slate-700 text-cyan-300"><RotateCcw className="w-3 h-3" /> Today</button>
           )}
         </div>
       </div>
@@ -119,7 +115,7 @@ export const DebriefView: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
         {/* Evidence (computed) */}
-        <section className="lg:col-span-2 bg-[#101722] border border-slate-800 rounded-lg p-4 space-y-3">
+        <section className="lg:col-span-2 bg-panel border border-slate-800 rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">Evidence · {prettyDate(date)}</h3>
             <span className="text-[10px] font-mono text-slate-500">from the Journal</span>
@@ -197,7 +193,7 @@ export const DebriefView: React.FC = () => {
         </section>
 
         {/* Reflection (written) */}
-        <section className="lg:col-span-3 bg-[#101722] border border-slate-800 rounded-lg p-4 space-y-4">
+        <section className="lg:col-span-3 bg-panel border border-slate-800 rounded-xl p-4 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">Reflection</h3>
             {saved && <span className="text-[10px] font-mono text-emerald-400">saved {new Date(saved.updatedAt).toLocaleString()}</span>}
@@ -214,7 +210,7 @@ export const DebriefView: React.FC = () => {
             <input value={presence} maxLength={240} onChange={(e) => setPresence(e.target.value)} placeholder="Where was my mind during the windows: in control or drifting?" className={field} />
           </label>
 
-          <div className="space-y-1.5 p-3 rounded bg-[#131b26] border border-slate-800">
+          <div className="space-y-1.5 p-3 rounded bg-raised border border-slate-800">
             <span className="text-[11px] font-mono text-slate-300 block">Last 1% upgrade executed?</span>
             {previousUpgrade ? (
               <>
@@ -252,15 +248,15 @@ export const DebriefView: React.FC = () => {
           <div className="flex items-center justify-end gap-3">
             {!canSave && <span className="text-[10px] font-mono text-slate-500">Presence, the upgrade{previousUpgrade ? ' and Y/N' : ''} are needed to save.</span>}
             {justSaved && <span className="text-[11px] font-mono text-emerald-400">Debrief saved.</span>}
-            <button onClick={handleSave} disabled={!canSave || saving || debriefsLoading} className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white font-mono text-xs font-bold">
-              <Save className="w-3.5 h-3.5" /> {saving ? 'SAVING…' : saved ? 'UPDATE DEBRIEF' : 'SAVE DEBRIEF'}
+            <button onClick={handleSave} disabled={!canSave || saving || debriefsLoading} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white text-sm font-semibold">
+              <Save className="w-3.5 h-3.5" /> {saving ? 'SAVING…' : saved ? 'Update debrief' : 'Save debrief'}
             </button>
           </div>
         </section>
       </div>
 
       {/* History */}
-      <section className="bg-[#101722] border border-slate-800 rounded-lg p-4 space-y-3">
+      <section className="bg-panel border border-slate-800 rounded-xl p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">Debrief history</h3>
           {missing.length > 0 && (
@@ -279,12 +275,12 @@ export const DebriefView: React.FC = () => {
             <table className="w-full font-mono text-[11px] min-w-[640px]">
               <thead>
                 <tr className="text-slate-500 text-left border-b border-slate-800">
-                  <th className="py-1.5 font-normal">DATE</th>
-                  <th className="font-normal">PROCESS</th>
-                  <th className="font-normal">TRADES</th>
+                  <th className="py-1.5 font-normal">Date</th>
+                  <th className="font-normal">Process</th>
+                  <th className="font-normal">Trades</th>
                   <th className="font-normal">R</th>
-                  <th className="font-normal">LAST UPGRADE</th>
-                  <th className="font-normal">UPGRADE FOR NEXT DAY</th>
+                  <th className="font-normal">Last upgrade</th>
+                  <th className="font-normal">Upgrade for next day</th>
                 </tr>
               </thead>
               <tbody>

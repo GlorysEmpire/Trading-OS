@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PageTitle } from './PageTitle';
 import { useTrading } from '../context/TradingContext';
 import { Sliders, ShieldCheck, Clock, AlertOctagon, Save, Tag, Info, Layers, History, Plus, Trash2, ListChecks, FlaskConical, CalendarDays } from 'lucide-react';
 import type { HQCategory } from '../lib/hqStore';
@@ -17,7 +18,7 @@ function CategoryVersionBadge({ label }: { label: string }) {
 /** Small shared input styling so every editable field in this view looks
  * consistent without repeating the class string everywhere. */
 const fieldClass =
-  'bg-[#162130] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 text-xs font-mono outline-none focus:border-cyan-600 w-full';
+  'bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 text-xs font-mono outline-none focus:border-cyan-600 w-full';
 const textareaClass = `${fieldClass} font-sans resize-none`;
 
 function SectionHeader({
@@ -45,7 +46,7 @@ function SectionHeader({
           <button
             onClick={onSave}
             disabled={saving}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-mono text-xs font-bold transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-sm font-semibold transition"
           >
             <Save className="w-3.5 h-3.5" />
             {saving ? 'SAVING…' : 'SAVE'}
@@ -199,30 +200,17 @@ export const TradingHQView: React.FC = () => {
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <div className="flex items-center gap-2 font-mono text-xs font-bold text-cyan-400 uppercase tracking-wider">
-            <Sliders className="w-4 h-4" />
-            STRATEGIC SOURCE OF TRUTH & METHODOLOGY LAYER
-          </div>
-          <h2 className="text-xl font-mono font-bold text-slate-100 mt-1">TRADING HQ</h2>
-          <p className="text-xs text-slate-400 font-sans mt-0.5 max-w-3xl">
-            The trader's strategy is never hardcoded. Every category below is versioned in Supabase — editing a
-            category deactivates the current version and writes the next one, so a past trade always knows which
-            rule it followed. Everything here — risk rules, setup grades, execution models, sessions, mistake
-            codes, the process checklist, and the research framework — is yours to edit, add to, or remove. What's
-            loaded by default is one trader's real methodology; it's a starting point, not a requirement.
-          </p>
-        </div>
+        <PageTitle icon={Sliders} title="Trading HQ" description="Your rulebook: risk, grades, sessions, mistake codes and focus rotation. Every change is saved as a new version, so past trades keep the rules they were taken under." />
         <CategoryVersionBadge label={tradingHQ.version.replace(/^v/, '')} />
       </div>
 
       {hqError && <p className="text-sm font-mono text-rose-400">{hqError}</p>}
       {saveError && <p className="text-sm font-mono text-rose-400">{saveError}</p>}
 
-      <div className="p-4 bg-[#141b27] border-l-4 border-cyan-400 rounded-r-lg shadow-sm space-y-1">
+      <div className="p-4 bg-panel border-l-4 border-cyan-400 rounded-r-lg shadow-sm space-y-1">
         <div className="flex items-center gap-2 text-cyan-300 font-mono text-xs font-bold uppercase tracking-wider">
           <Info className="w-4 h-4 text-cyan-400" />
-          MANDATORY WYCKOFF TERMINOLOGY GOVERNANCE: AR = AUTOMATIC REACTION
+          Mandatory Wyckoff terminology governance: AR = automatic reaction
         </div>
         <p className="text-xs text-slate-300 font-sans leading-relaxed">
           <strong>AR (Automatic Reaction)</strong> is an <em>analytical/event concept</em> that establishes the
@@ -233,7 +221,7 @@ export const TradingHQView: React.FC = () => {
       </div>
 
       {/* Section 1: Risk Rules */}
-      <div className="bg-[#101722] border border-slate-800 rounded-lg p-5 space-y-4">
+      <div className="bg-panel border border-slate-800 rounded-xl p-5 space-y-4">
         <SectionHeader
           icon={<ShieldCheck className="w-4 h-4 text-emerald-400" />}
           title="1. RISK RULES & DRAWDOWN CONTROLS"
@@ -243,23 +231,23 @@ export const TradingHQView: React.FC = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
           <div>
-            <label className="block text-slate-400 mb-1">RISK PER SETUP (%)</label>
-            <div className="flex items-center gap-2 bg-[#162130] border border-slate-700 rounded px-3 py-2">
+            <label className="block text-slate-400 mb-1">Risk per setup (%)</label>
+            <div className="flex items-center gap-2 bg-raised border border-slate-700 rounded px-3 py-2">
               <input type="number" step="0.1" min="0.1" max="5.0" value={riskPerSetup} onChange={e => setRiskPerSetup(parseFloat(e.target.value) || 1.0)} className="bg-transparent text-slate-100 font-bold w-full outline-none" />
               <span className="text-slate-400">%</span>
             </div>
           </div>
           <div>
-            <label className="block text-slate-400 mb-1">MAX DAILY LOSSES</label>
-            <div className="flex items-center gap-2 bg-[#162130] border border-slate-700 rounded px-3 py-2">
+            <label className="block text-slate-400 mb-1">Max daily losses</label>
+            <div className="flex items-center gap-2 bg-raised border border-slate-700 rounded px-3 py-2">
               <input type="number" min="1" max="5" value={maxDailyLosses} onChange={e => setMaxDailyLosses(parseInt(e.target.value) || 2)} className="bg-transparent text-slate-100 font-bold w-full outline-none" />
               <span className="text-slate-400">losses</span>
             </div>
             <span className="text-[10px] text-slate-500 mt-1 block">Triggers mandatory daily halt</span>
           </div>
           <div>
-            <label className="block text-slate-400 mb-1">MAX OPEN CONCURRENT TRADES</label>
-            <div className="flex items-center gap-2 bg-[#162130] border border-slate-700 rounded px-3 py-2">
+            <label className="block text-slate-400 mb-1">Max open concurrent trades</label>
+            <div className="flex items-center gap-2 bg-raised border border-slate-700 rounded px-3 py-2">
               <input
                 type="number"
                 min="1"
@@ -275,24 +263,24 @@ export const TradingHQView: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs font-mono">
-          <label className="flex items-center gap-2 p-3 rounded bg-[#162130] border border-slate-800 cursor-pointer">
+          <label className="flex items-center gap-2 p-3 rounded bg-raised border border-slate-800 cursor-pointer">
             <input type="checkbox" checked={noReEntry} onChange={e => setNoReEntry(e.target.checked)} className="accent-cyan-500 w-4 h-4 rounded" />
             <div>
-              <span className="text-slate-200 font-bold block">NO RE-ENTRY</span>
+              <span className="text-slate-200 font-bold block">No re-entry</span>
               <span className="text-[10px] text-slate-400">No re-entering same idea after stopped out</span>
             </div>
           </label>
-          <label className="flex items-center gap-2 p-3 rounded bg-[#162130] border border-slate-800 cursor-pointer">
+          <label className="flex items-center gap-2 p-3 rounded bg-raised border border-slate-800 cursor-pointer">
             <input type="checkbox" checked={noAdding} onChange={e => setNoAdding(e.target.checked)} className="accent-cyan-500 w-4 h-4 rounded" />
             <div>
-              <span className="text-slate-200 font-bold block">NO ADDING</span>
+              <span className="text-slate-200 font-bold block">No adding</span>
               <span className="text-[10px] text-slate-400">Never add to an existing position</span>
             </div>
           </label>
-          <label className="flex items-center gap-2 p-3 rounded bg-[#162130] border border-slate-800 cursor-pointer">
+          <label className="flex items-center gap-2 p-3 rounded bg-raised border border-slate-800 cursor-pointer">
             <input type="checkbox" checked={scratchCountsAsLoss} onChange={e => setScratchCountsAsLoss(e.target.checked)} className="accent-cyan-500 w-4 h-4 rounded" />
             <div>
-              <span className="text-slate-200 font-bold block">BE / SCRATCH COUNTS AS LOSS</span>
+              <span className="text-slate-200 font-bold block">BE / scratch counts as loss</span>
               <span className="text-[10px] text-slate-400">Consumes 1 daily loss ticket</span>
             </div>
           </label>
@@ -300,7 +288,7 @@ export const TradingHQView: React.FC = () => {
       </div>
 
       {/* Section 2: Setup Grades */}
-      <div className="bg-[#101722] border border-slate-800 rounded-lg p-5 space-y-4">
+      <div className="bg-panel border border-slate-800 rounded-xl p-5 space-y-4">
         <SectionHeader
           icon={<Tag className="w-4 h-4 text-purple-400" />}
           title="2. SETUP GRADES & MINIMUM THRESHOLDS"
@@ -308,13 +296,13 @@ export const TradingHQView: React.FC = () => {
           saving={savingCategory === 'setup_quality'}
           extra={
             <button onClick={addSetupGrade} className="flex items-center gap-1 text-[11px] font-mono text-cyan-300 hover:text-cyan-200 border border-slate-700 rounded px-2 py-1">
-              <Plus className="w-3 h-3" /> ADD GRADE
+              <Plus className="w-3 h-3" /> Add grade
             </button>
           }
         />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {setupGrades.map((g, idx) => (
-            <div key={idx} className="p-3 rounded bg-[#162130] border border-slate-800 space-y-2">
+            <div key={idx} className="p-3 rounded bg-raised border border-slate-800 space-y-2">
               <div className="flex items-center gap-2">
                 <input
                   value={g.grade}
@@ -363,7 +351,7 @@ export const TradingHQView: React.FC = () => {
       </div>
 
       {/* Section 3: Execution Models */}
-      <div className="bg-[#101722] border border-slate-800 rounded-lg p-5 space-y-4">
+      <div className="bg-panel border border-slate-800 rounded-xl p-5 space-y-4">
         <SectionHeader
           icon={<Layers className="w-4 h-4 text-cyan-400" />}
           title={`3. EXECUTION MODELS (${executionModels.length})`}
@@ -371,13 +359,13 @@ export const TradingHQView: React.FC = () => {
           saving={savingCategory === 'execution_model'}
           extra={
             <button onClick={addExecutionModel} className="flex items-center gap-1 text-[11px] font-mono text-cyan-300 hover:text-cyan-200 border border-slate-700 rounded px-2 py-1">
-              <Plus className="w-3 h-3" /> ADD MODEL
+              <Plus className="w-3 h-3" /> Add model
             </button>
           }
         />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {executionModels.map((model) => (
-            <div key={model.id} className="p-4 rounded bg-[#162130] border border-slate-800 space-y-2">
+            <div key={model.id} className="p-4 rounded bg-raised border border-slate-800 space-y-2">
               <div className="flex items-center gap-2">
                 <input
                   value={model.name}
@@ -420,7 +408,7 @@ export const TradingHQView: React.FC = () => {
       </div>
 
       {/* Section 4: Sessions */}
-      <div className="bg-[#101722] border border-slate-800 rounded-lg p-5 space-y-4">
+      <div className="bg-panel border border-slate-800 rounded-xl p-5 space-y-4">
         <SectionHeader
           icon={<Clock className="w-4 h-4 text-emerald-400" />}
           title="4. OPERATIONAL SESSION WINDOWS"
@@ -429,7 +417,7 @@ export const TradingHQView: React.FC = () => {
           extra={
             <>
               <button onClick={addSession} className="flex items-center gap-1 text-[11px] font-mono text-cyan-300 hover:text-cyan-200 border border-slate-700 rounded px-2 py-1">
-                <Plus className="w-3 h-3" /> ADD SESSION
+                <Plus className="w-3 h-3" /> Add session
               </button>
               <button
                 onClick={resetSessionsToStandard}
@@ -437,14 +425,14 @@ export const TradingHQView: React.FC = () => {
                 className="text-[10px] font-mono text-cyan-300 hover:text-cyan-200 border border-slate-700 rounded px-2 py-1"
                 title="Reset to the default 4-session day in NY time: London 00–05, New York 05–12, Afternoon 12–18, Tokyo 18–00"
               >
-                {savingCategory === 'session' ? 'SAVING…' : 'RESET TO DEFAULT SESSIONS'}
+                {savingCategory === 'session' ? 'SAVING…' : 'Reset to default sessions'}
               </button>
             </>
           }
         />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {sessions.map((sess) => (
-            <div key={sess.id} className="p-4 rounded bg-[#162130] border border-slate-800 space-y-2">
+            <div key={sess.id} className="p-4 rounded bg-raised border border-slate-800 space-y-2">
               <div className="flex items-center gap-2">
                 <input
                   value={sess.name}
@@ -458,7 +446,7 @@ export const TradingHQView: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
                 <div className="space-y-1">
-                  <span className="text-slate-400 text-[10px] block">NEW YORK TIME (SOURCE OF TRUTH):</span>
+                  <span className="text-slate-400 text-[10px] block">New York time (source of truth):</span>
                   <div className="flex items-center gap-1">
                     <input value={sess.nyStart} onChange={(e) => updateSession(sess.id, { nyStart: e.target.value })} className={`${fieldClass} text-cyan-300`} placeholder="HH:MM" />
                     <span className="text-slate-500">–</span>
@@ -467,7 +455,7 @@ export const TradingHQView: React.FC = () => {
                 </div>
                 <div className="space-y-1">
                   <span className="text-slate-400 text-[10px] block">{localTzLabel.toUpperCase()} TIME TODAY:</span>
-                  <div className="px-2.5 py-1.5 rounded border border-slate-800 bg-[#0d131d] text-emerald-300" title="Derived from NY time with today's daylight-saving offsets; changes automatically when US clocks change">
+                  <div className="px-2.5 py-1.5 rounded border border-slate-800 bg-well text-emerald-300" title="Derived from NY time with today's daylight-saving offsets; changes automatically when US clocks change">
                     {nyTimeIn(sess.nyStart, localTz)} – {nyTimeIn(sess.nyEnd, localTz)}
                   </div>
                 </div>
@@ -498,7 +486,7 @@ export const TradingHQView: React.FC = () => {
       </div>
 
       {/* Section 5: Mistake Codes */}
-      <div className="bg-[#101722] border border-slate-800 rounded-lg p-5 space-y-4">
+      <div className="bg-panel border border-slate-800 rounded-xl p-5 space-y-4">
         <SectionHeader
           icon={<AlertOctagon className="w-4 h-4 text-amber-400" />}
           title="5. MISTAKE CODE TAXONOMY"
@@ -506,7 +494,7 @@ export const TradingHQView: React.FC = () => {
           saving={savingCategory === 'mistake_code'}
           extra={
             <button onClick={addMistakeCode} className="flex items-center gap-1 text-[11px] font-mono text-cyan-300 hover:text-cyan-200 border border-slate-700 rounded px-2 py-1">
-              <Plus className="w-3 h-3" /> ADD CODE
+              <Plus className="w-3 h-3" /> Add code
             </button>
           }
         />
@@ -528,7 +516,7 @@ export const TradingHQView: React.FC = () => {
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {mistakeCodes.map((m, idx) => (
-            <div key={idx} className="p-3 rounded bg-[#162130] border border-slate-800 space-y-2">
+            <div key={idx} className="p-3 rounded bg-raised border border-slate-800 space-y-2">
               <div className="flex items-center gap-2">
                 <input
                   value={m.code}
@@ -545,10 +533,10 @@ export const TradingHQView: React.FC = () => {
                 onChange={(e) => updateMistakeCode(idx, { category: e.target.value as MistakeCode['category'] })}
                 className={fieldClass}
               >
-                <option value="MANAGEMENT">MANAGEMENT</option>
-                <option value="EXECUTION">EXECUTION</option>
-                <option value="PSYCHOLOGY">PSYCHOLOGY</option>
-                <option value="RISK">RISK</option>
+                <option value="MANAGEMENT">Management</option>
+                <option value="EXECUTION">Execution</option>
+                <option value="PSYCHOLOGY">Psychology</option>
+                <option value="RISK">Risk</option>
               </select>
               <input
                 value={m.label}
@@ -572,7 +560,7 @@ export const TradingHQView: React.FC = () => {
       </div>
 
       {/* Section 6: Process Checklist */}
-      <div className="bg-[#101722] border border-slate-800 rounded-lg p-5 space-y-4">
+      <div className="bg-panel border border-slate-800 rounded-xl p-5 space-y-4">
         <SectionHeader
           icon={<ListChecks className="w-4 h-4 text-cyan-400" />}
           title="6. PROCESS CHECKLIST"
@@ -594,7 +582,7 @@ export const TradingHQView: React.FC = () => {
       </div>
 
       {/* Section 7: Research Framework */}
-      <div className="bg-[#101722] border border-slate-800 rounded-lg p-5 space-y-4">
+      <div className="bg-panel border border-slate-800 rounded-xl p-5 space-y-4">
         <SectionHeader
           icon={<FlaskConical className="w-4 h-4 text-purple-400" />}
           title="7. RESEARCH FRAMEWORK"
@@ -603,7 +591,7 @@ export const TradingHQView: React.FC = () => {
         />
         <div className="flex flex-wrap gap-2 text-[11px] font-mono">
           {tradingHQ.researchFramework.workflow.map((stage, i) => (
-            <span key={stage} className="px-2 py-1 rounded bg-[#162130] border border-slate-800 text-slate-300">
+            <span key={stage} className="px-2 py-1 rounded bg-raised border border-slate-800 text-slate-300">
               {i + 1}. {stage}
             </span>
           ))}
@@ -614,7 +602,7 @@ export const TradingHQView: React.FC = () => {
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label className="block text-slate-400 mb-1 text-xs font-mono">MIN. SAMPLES FOR A FINDING</label>
+            <label className="block text-slate-400 mb-1 text-xs font-mono">Min. Samples for a finding</label>
             <input
               type="number"
               min="1"
@@ -624,14 +612,14 @@ export const TradingHQView: React.FC = () => {
             />
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-slate-400 mb-1 text-xs font-mono">NOTES</label>
+            <label className="block text-slate-400 mb-1 text-xs font-mono">Notes</label>
             <textarea value={researchNotes} onChange={(e) => setResearchNotes(e.target.value)} className={textareaClass} rows={2} />
           </div>
         </div>
       </div>
 
       {/* Section 8: Focus Rotation */}
-      <div className="bg-[#101722] border border-slate-800 rounded-lg p-5 space-y-4">
+      <div className="bg-panel border border-slate-800 rounded-xl p-5 space-y-4">
         <SectionHeader
           icon={<CalendarDays className="w-4 h-4 text-cyan-400" />}
           title="8. WEEKLY FOCUS ROTATION"
@@ -648,7 +636,7 @@ export const TradingHQView: React.FC = () => {
               <tr className="text-[10px] text-slate-500 text-left border-b border-slate-800">
                 <th className="py-1.5 font-normal w-28">DAY</th>
                 <th className="font-normal">FOCUS ASSETS (comma-separated)</th>
-                <th className="font-normal w-56">PRIMARY ACTIVITY</th>
+                <th className="font-normal w-56">Primary activity</th>
               </tr>
             </thead>
             <tbody>

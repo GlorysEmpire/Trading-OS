@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PageTitle } from './PageTitle';
 import { useTrading } from '../context/TradingContext';
 import { getAuthHeaders } from '../lib/supabaseClient';
 import {
@@ -43,7 +44,7 @@ export const JournalView: React.FC = () => {
         url: trade.screenshots.before,
         title: `${trade.asset} ${trade.direction} — Entry Setup Chart`,
         subtitle: `Timeframe: ${trade.timeframe} | Session: ${trade.session}`,
-        badge: 'PRE-TRADE SETUP',
+        badge: 'Pre-trade setup',
         timeframe: trade.timeframe,
         notes: trade.narrative,
       });
@@ -53,7 +54,7 @@ export const JournalView: React.FC = () => {
         url: trade.screenshots.during,
         title: `${trade.asset} ${trade.direction} — In-Trade Management`,
         subtitle: `Holding Position Notes`,
-        badge: 'IN-TRADE MANAGEMENT',
+        badge: 'In-trade management',
         timeframe: trade.timeframe,
         notes: trade.notesDuring || undefined,
       });
@@ -63,7 +64,7 @@ export const JournalView: React.FC = () => {
         url: trade.screenshots.after,
         title: `${trade.asset} ${trade.direction} — Exit & Outcome Chart`,
         subtitle: `Outcome: ${trade.outcome || 'Pending'} | Realized: ${trade.realizedR || 0}R`,
-        badge: 'TRADE OUTCOME',
+        badge: 'Trade outcome',
         timeframe: trade.timeframe,
         notes: trade.reflectionAfter || undefined,
       });
@@ -75,7 +76,7 @@ export const JournalView: React.FC = () => {
         list.push({
           url: itemUrl,
           title: `${trade.asset} ${trade.direction} — ${itemTitle}`,
-          badge: 'HTF CONTEXT',
+          badge: 'HTF context',
           timeframe: trade.timeframe,
         });
       });
@@ -169,35 +170,26 @@ Provide an objective assessment:
     <div className="p-4 sm:p-6 space-y-5 max-w-7xl mx-auto">
       {/* Header & Controls */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <div className="flex items-center gap-2 font-mono text-xs font-bold text-cyan-400 uppercase tracking-wider">
-            <BookOpen className="w-4 h-4" />
-            DISCRETIONARY EXECUTION JOURNAL
-          </div>
-          <h2 className="text-xl font-mono font-bold text-slate-100 mt-1">TRADE JOURNAL & AUDIT</h2>
-          <p className="text-xs text-slate-400 font-sans mt-0.5">
-            Narrative-driven trade logs documenting Before, During, and After states with mathematical process scoring.
-          </p>
-        </div>
+        <PageTitle icon={BookOpen} title="Journal" description="Every trade you've taken: the plan, how it played out, and how well you followed your rules." />
 
         <button
           onClick={() => setQuickTradeModalOpen(true)}
-          className="flex items-center gap-1.5 px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold transition shadow-sm cursor-pointer"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition shadow-sm cursor-pointer"
         >
-          <span>+ LOG NEW EXECUTION</span>
+          <span>+ Log trade</span>
         </button>
         {localTradeImportCount > 0 && <button onClick={() => importLocalTrades().catch(error => alert(error instanceof Error ? error.message : 'Import failed'))} className="px-4 py-2 rounded border border-amber-700 text-amber-300 font-mono text-xs font-bold">IMPORT {localTradeImportCount} LOCAL TRADE{localTradeImportCount === 1 ? '' : 'S'}</button>}
       </div>
 
       {/* Filters Bar */}
-      <div className="bg-[#101722] border border-slate-800 rounded-lg p-3 flex flex-wrap items-center gap-4 text-xs font-mono">
+      <div className="bg-panel border border-slate-800 rounded-xl p-3 flex flex-wrap items-center gap-4 text-xs font-mono">
         <div className="flex items-center gap-2">
           <Filter className="w-3.5 h-3.5 text-slate-400" />
-          <span className="text-slate-400">ASSET:</span>
+          <span className="text-slate-400">Asset:</span>
           <select
             value={filterAsset}
             onChange={(e) => setFilterAsset(e.target.value)}
-            className="bg-[#162130] border border-slate-700 rounded px-2.5 py-1 text-slate-200 outline-none"
+            className="bg-raised border border-slate-700 rounded px-2.5 py-1 text-slate-200 outline-none"
           >
             <option value="ALL">All Assets ({trades.length})</option>
             {assets.map(asset => <option key={asset.id} value={asset.symbol}>{asset.symbol}</option>)}
@@ -205,11 +197,11 @@ Provide an objective assessment:
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-slate-400">PROCESS CATEGORY:</span>
+          <span className="text-slate-400">Process category:</span>
           <select
             value={filterProcess}
             onChange={(e) => setFilterProcess(e.target.value)}
-            className="bg-[#162130] border border-slate-700 rounded px-2.5 py-1 text-slate-200 outline-none"
+            className="bg-raised border border-slate-700 rounded px-2.5 py-1 text-slate-200 outline-none"
           >
             <option value="ALL">All Categories</option>
             <option value="GOOD_PROCESS_WIN">Good Process + Win</option>
@@ -220,11 +212,11 @@ Provide an objective assessment:
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-slate-400">OUTCOME:</span>
+          <span className="text-slate-400">Outcome:</span>
           <select
             value={filterOutcome}
             onChange={(e) => setFilterOutcome(e.target.value)}
-            className="bg-[#162130] border border-slate-700 rounded px-2.5 py-1 text-slate-200 outline-none"
+            className="bg-raised border border-slate-700 rounded px-2.5 py-1 text-slate-200 outline-none"
           >
             <option value="ALL">All Outcomes</option>
             <option value="WIN">Win</option>
@@ -247,7 +239,7 @@ Provide an objective assessment:
           return (
             <div
               key={trade.id}
-              className={`bg-[#101722] border rounded-lg overflow-hidden transition ${
+              className={`bg-panel border rounded-lg overflow-hidden transition ${
                 isExpanded ? 'border-cyan-500/50 shadow-md' : 'border-slate-800 hover:border-slate-700'
               }`}
             >
@@ -293,7 +285,7 @@ Provide an objective assessment:
                 <div className="flex items-center gap-4">
                   {trade.voided && (
                     <span className="text-[10px] px-2 py-0.5 rounded bg-rose-950/60 border border-rose-800 text-rose-300 font-mono font-bold" title={trade.voided.reason}>
-                      VOIDED
+                      Voided
                     </span>
                   )}
                   {/* Process Score Badge */}
@@ -326,7 +318,7 @@ Provide an objective assessment:
                       </span>
                     ) : (
                       <span className="text-xs text-cyan-400 px-2 py-0.5 rounded bg-cyan-950/50 border border-cyan-800 font-bold">
-                        OPEN
+                        Open
                       </span>
                     )}
                   </div>
@@ -341,40 +333,40 @@ Provide an objective assessment:
 
               {/* Expanded Trade Story Details */}
               {isExpanded && (
-                <div className="px-5 pb-5 pt-2 border-t border-slate-800/80 bg-[#0d131d] space-y-5 text-xs">
+                <div className="px-5 pb-5 pt-2 border-t border-slate-800/80 bg-well space-y-5 text-xs">
                   {/* 1. Before The Trade */}
                   <div className="space-y-2">
                     <span className="font-mono text-[11px] font-bold text-cyan-400 uppercase tracking-wider block">
-                      1. BEFORE THE TRADE (NARRATIVE & SETUP CRITERIA)
+                      1. Before the trade (narrative & setup criteria)
                     </span>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 font-mono">
-                      <div className="p-3 rounded bg-[#131b26] border border-slate-800">
-                        <span className="text-[10px] text-slate-400 block">ENTRY PRICE:</span>
+                      <div className="p-3 rounded bg-raised border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block">Entry price:</span>
                         <span className="text-slate-100 font-bold">{trade.entryPrice}</span>
                       </div>
-                      <div className="p-3 rounded bg-[#131b26] border border-slate-800">
-                        <span className="text-[10px] text-slate-400 block">STOP LOSS:</span>
+                      <div className="p-3 rounded bg-raised border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block">Stop loss:</span>
                         <span className="text-rose-400 font-bold">{trade.stopPrice}</span>
                       </div>
-                      <div className="p-3 rounded bg-[#131b26] border border-slate-800">
-                        <span className="text-[10px] text-slate-400 block">TARGET:</span>
+                      <div className="p-3 rounded bg-raised border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block">Target:</span>
                         <span className="text-emerald-400 font-bold">{trade.targetPrice}</span>
                       </div>
                     </div>
-                    <div className="p-3 rounded bg-[#131b26] border border-slate-800 font-sans space-y-1">
-                      <strong className="text-slate-400 font-mono text-[11px] uppercase block">PRE-TRADE NARRATIVE:</strong>
+                    <div className="p-3 rounded bg-raised border border-slate-800 font-sans space-y-1">
+                      <strong className="text-slate-400 font-mono text-[11px] uppercase block">Pre-trade narrative:</strong>
                       <p className="text-slate-200 leading-relaxed">{trade.narrative}</p>
                     </div>
                     {trade.setupReasoning && (
                       <div className="text-slate-300 font-sans">
-                        <strong className="text-slate-400 font-mono text-[11px] uppercase">EVIDENCE: </strong>
+                        <strong className="text-slate-400 font-mono text-[11px] uppercase">Evidence: </strong>
                         {trade.setupReasoning}
                       </div>
                     )}
                   </div>
 
                   {/* Visual Trade Screenshots & Chart Position Setup */}
-                  <div className="p-3.5 rounded-lg bg-[#0b1018] border border-slate-800 space-y-3">
+                  <div className="p-3.5 rounded-lg bg-well border border-slate-800 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="font-mono text-[11px] font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
                         <ImageIcon className="w-3.5 h-3.5 text-sky-400" />
@@ -457,21 +449,21 @@ Provide an objective assessment:
                   {/* 2. During The Trade */}
                   <div className="space-y-2">
                     <span className="font-mono text-[11px] font-bold text-amber-400 uppercase tracking-wider block">
-                      2. DURING THE TRADE (MANAGEMENT & EXECUTION NOTES)
+                      2. During the trade (management & execution notes)
                     </span>
                     <textarea
                       rows={2}
                       value={trade.notesDuring || ''}
                       onChange={(e) => updateTrade(trade.id, { notesDuring: e.target.value })}
                       placeholder="Log management thoughts during the position (e.g. held through pullback, target scaled)..."
-                      className="w-full bg-[#162130] border border-slate-700 rounded p-2.5 text-slate-200 font-sans text-xs outline-none"
+                      className="w-full bg-raised border border-slate-700 rounded p-2.5 text-slate-200 font-sans text-xs outline-none"
                     />
                   </div>
 
                   {/* 3. After The Trade & Process Review */}
                   <div className="space-y-2">
                     <span className="font-mono text-[11px] font-bold text-purple-400 uppercase tracking-wider block">
-                      3. AFTER THE TRADE (OUTCOME, PROCESS SCORING & REFLECTION)
+                      3. After the trade (outcome, process scoring & reflection)
                     </span>
 
                     <TradeOutcomePanel trade={trade} />
@@ -479,14 +471,14 @@ Provide an objective assessment:
                     {/* Post-Trade Reflection */}
                     <div>
                       <label className="text-[10px] font-mono text-slate-400 block mb-1">
-                        POST-TRADE REFLECTION & LESSON:
+                        Post-trade reflection & lesson:
                       </label>
                       <textarea
                         rows={2}
                         value={trade.reflectionAfter || ''}
                         onChange={(e) => updateTrade(trade.id, { reflectionAfter: e.target.value })}
                         placeholder="What did this execution teach you about your psychology, market rhythm, or process adherence?"
-                        className="w-full bg-[#162130] border border-slate-700 rounded p-2.5 text-slate-200 font-sans text-xs outline-none"
+                        className="w-full bg-raised border border-slate-700 rounded p-2.5 text-slate-200 font-sans text-xs outline-none"
                       />
                     </div>
                   </div>
@@ -500,7 +492,7 @@ Provide an objective assessment:
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-700 font-mono text-xs font-bold transition cursor-pointer"
                       >
                         <Sparkles className="w-3.5 h-3.5 text-purple-300" />
-                        <span>{auditingTradeId === trade.id ? 'AUDITING EXECUTION...' : 'RUN AI PROCESS AUDIT'}</span>
+                        <span>{auditingTradeId === trade.id ? 'Auditing execution...' : 'Run AI process audit'}</span>
                       </button>
 
                       {trade.screenshots.before && (
@@ -517,9 +509,9 @@ Provide an objective assessment:
 
                   {/* Audit Result Display */}
                   {auditResult && auditResult.tradeId === trade.id && (
-                    <div className="p-3 bg-[#131525] border border-purple-800/80 rounded font-sans text-purple-200/90 leading-relaxed text-xs">
+                    <div className="p-3 bg-panel border border-purple-800/80 rounded font-sans text-purple-200/90 leading-relaxed text-xs">
                       <div className="flex items-center justify-between mb-1 font-mono font-bold text-purple-300 text-[11px]">
-                        <span>AI DISCRETIONARY PROCESS AUDIT</span>
+                        <span>AI discretionary process audit</span>
                         <button onClick={() => setAuditResult(null)} className="text-slate-400 hover:text-slate-200">
                           ✕
                         </button>

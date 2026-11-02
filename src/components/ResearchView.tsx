@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PageTitle } from './PageTitle';
 import { useTrading } from '../context/TradingContext';
 import {
   Radar,
@@ -15,7 +16,7 @@ import {
 import { ResearchQuestion } from '../types';
 
 export const ResearchView: React.FC = () => {
-  const { researchQuestions, addResearchQuestion, backtestSamples, setActiveTab, researchLoading, researchError, localResearchImportCount, importLocalResearchQuestions } = useTrading();
+  const { tradingHQ, researchQuestions, addResearchQuestion, backtestSamples, setActiveTab, researchLoading, researchError, localResearchImportCount, importLocalResearchQuestions } = useTrading();
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [code, setCode] = useState(`RQ-0${researchQuestions.length + 1}`);
@@ -55,23 +56,14 @@ export const ResearchView: React.FC = () => {
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <div className="flex items-center gap-2 font-mono text-xs font-bold text-purple-400 uppercase tracking-wider">
-            <Radar className="w-4 h-4" />
-            METHODOLOGY EVOLUTION & EMPIRICAL HYPOTHESIS TESTING
-          </div>
-          <h2 className="text-xl font-mono font-bold text-slate-100 mt-1">RESEARCH ENGINE</h2>
-          <p className="text-xs text-slate-400 font-sans mt-0.5">
-            Strict scientific workflow: Observation → Hypothesis → Backtest Sample Collection → Empirical Validation → Locked Rule.
-          </p>
-        </div>
+        <PageTitle icon={Radar} title="Research" description="Turn observations into rules step by step: observation, hypothesis, backtest, validation, locked rule." />
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-1.5 px-4 py-2 rounded bg-purple-600 hover:bg-purple-500 text-white font-mono text-xs font-bold transition shadow-sm cursor-pointer"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition shadow-sm cursor-pointer"
         >
           <Plus className="w-4 h-4" />
-          <span>+ REGISTER RESEARCH QUESTION</span>
+          <span>New research question</span>
         </button>
         {localResearchImportCount > 0 && (
           <button
@@ -84,17 +76,17 @@ export const ResearchView: React.FC = () => {
       </div>
 
       {/* Scientific Workflow Diagram */}
-      <div className="p-3 bg-[#111622] border border-slate-800 rounded-lg flex flex-wrap items-center justify-around gap-2 text-xs font-mono">
-        <span className="text-slate-400 font-semibold">1. OBSERVATION</span>
+      <div className="p-3 bg-panel border border-slate-800 rounded-xl flex flex-wrap items-center justify-around gap-2 text-xs font-mono">
+        <span className="text-slate-400 font-semibold">1. Observation</span>
         <ArrowRight className="w-3.5 h-3.5 text-slate-600" />
-        <span className="text-purple-300 font-semibold">2. HYPOTHESIS</span>
+        <span className="text-purple-300 font-semibold">2. Hypothesis</span>
         <ArrowRight className="w-3.5 h-3.5 text-slate-600" />
-        <span className="text-cyan-300 font-semibold">3. BACKTEST (50 SAMPLES)</span>
+        <span className="text-cyan-300 font-semibold">3. Backtest ({tradingHQ.researchFramework.minSamples}+ samples)</span>
         <ArrowRight className="w-3.5 h-3.5 text-slate-600" />
-        <span className="text-amber-300 font-semibold">4. VALIDATION</span>
+        <span className="text-amber-300 font-semibold">4. Validation</span>
         <ArrowRight className="w-3.5 h-3.5 text-slate-600" />
         <span className="text-emerald-400 font-bold flex items-center gap-1">
-          <Lock className="w-3 h-3" /> 5. LOCKED RULE (TRADING HQ)
+          <Lock className="w-3 h-3" /> 5. Locked rule (trading HQ)
         </span>
       </div>
 
@@ -106,7 +98,7 @@ export const ResearchView: React.FC = () => {
           const pct = Math.min(100, Math.round((rq.sampleCount / rq.targetSamples) * 100));
 
           return (
-            <div key={rq.id} className="bg-[#101722] border border-slate-800 rounded-lg p-5 space-y-4">
+            <div key={rq.id} className="bg-panel border border-slate-800 rounded-xl p-5 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
                 <div className="flex items-center gap-3">
                   <span className="px-2.5 py-1 rounded bg-purple-950/80 border border-purple-800 text-purple-300 font-mono text-xs font-bold">
@@ -117,7 +109,7 @@ export const ResearchView: React.FC = () => {
 
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">
-                    Assigned: {rq.initialAsset} ({rq.scheduledDay}s)
+                    Assigned: {rq.initialAsset}{rq.scheduledDay ? ` · ${rq.scheduledDay}` : ''}
                   </span>
                   <span
                     className={`text-xs font-mono px-2.5 py-0.5 rounded font-bold ${
@@ -136,8 +128,8 @@ export const ResearchView: React.FC = () => {
               </div>
 
               {/* Hypothesis */}
-              <div className="bg-[#0c1119] p-3 rounded border border-slate-800 space-y-1">
-                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">CORE HYPOTHESIS:</span>
+              <div className="bg-canvas p-3 rounded border border-slate-800 space-y-1">
+                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Core hypothesis:</span>
                 <p className="text-xs text-slate-200 font-sans leading-relaxed italic">"{rq.hypothesis}"</p>
               </div>
 
@@ -159,7 +151,7 @@ export const ResearchView: React.FC = () => {
 
               {/* Findings */}
               <div className="space-y-1 text-xs">
-                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">PRELIMINARY FINDINGS & EVIDENCE:</span>
+                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Preliminary findings & evidence:</span>
                 <p className="text-slate-300 font-sans leading-relaxed">{rq.findings}</p>
               </div>
 
@@ -182,9 +174,9 @@ export const ResearchView: React.FC = () => {
       {/* Add Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-[#0f141d] border border-slate-700 rounded-lg max-w-lg w-full text-slate-200 p-6 space-y-4">
+          <div className="bg-panel border border-slate-700 rounded-lg max-w-lg w-full text-slate-200 p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="font-mono text-sm font-bold text-slate-100 uppercase">REGISTER RESEARCH QUESTION</h3>
+              <h3 className="font-mono text-sm font-bold text-slate-100 uppercase">Register research question</h3>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-200">
                 ✕
               </button>
@@ -193,58 +185,58 @@ export const ResearchView: React.FC = () => {
             <form onSubmit={handleCreate} className="space-y-3 text-xs font-mono">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1">CODE</label>
+                  <label className="block text-slate-400 mb-1">Code</label>
                   <input
                     type="text"
                     required
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
-                    className="w-full bg-[#162130] border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none"
+                    className="w-full bg-raised border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1">TARGET SAMPLE COUNT</label>
+                  <label className="block text-slate-400 mb-1">Target sample count</label>
                   <input
                     type="number"
                     required
                     value={targetSamples}
                     onChange={(e) => setTargetSamples(parseInt(e.target.value) || 50)}
-                    className="w-full bg-[#162130] border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none"
+                    className="w-full bg-raised border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">TITLE</label>
+                <label className="block text-slate-400 mb-1">Title</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. SMT Divergence at Key Liquidity Pools"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full bg-[#162130] border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none"
+                  className="w-full bg-raised border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">TESTABLE HYPOTHESIS STATEMENT</label>
+                <label className="block text-slate-400 mb-1">Testable hypothesis statement</label>
                 <textarea
                   rows={3}
                   required
                   placeholder="If [Condition A] occurs in [Context B], then [Expectation C] will occur with ≥60% win rate..."
                   value={hypothesis}
                   onChange={(e) => setHypothesis(e.target.value)}
-                  className="w-full bg-[#162130] border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none font-sans"
+                  className="w-full bg-raised border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none font-sans"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1">INITIAL ASSET</label>
+                  <label className="block text-slate-400 mb-1">Initial asset</label>
                   <select
                     value={initialAsset}
                     onChange={(e) => setInitialAsset(e.target.value)}
-                    className="w-full bg-[#162130] border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none"
+                    className="w-full bg-raised border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none"
                   >
                     <option value="ETH">ETH</option>
                     <option value="BTC">BTC</option>
@@ -254,12 +246,12 @@ export const ResearchView: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1">SCHEDULED CALENDAR DAY</label>
+                  <label className="block text-slate-400 mb-1">Scheduled calendar day</label>
                   <input
                     type="text"
                     value={scheduledDay}
                     onChange={(e) => setScheduledDay(e.target.value)}
-                    className="w-full bg-[#162130] border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none"
+                    className="w-full bg-raised border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none"
                   />
                 </div>
               </div>
@@ -274,7 +266,7 @@ export const ResearchView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 rounded text-white font-bold"
+                  className="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold"
                 >
                   Register Hypothesis
                 </button>

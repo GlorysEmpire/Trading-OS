@@ -164,13 +164,13 @@ export const QuickTradeModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="bg-[#0f141d] border border-slate-700 rounded-lg max-w-2xl w-full text-slate-200 shadow-2xl overflow-hidden my-8">
+      <div className="bg-panel border border-slate-700 rounded-lg max-w-2xl w-full text-slate-200 shadow-2xl overflow-hidden my-8">
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-[#131a26]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-panel">
           <div className="flex items-center gap-2">
             <Calculator className="w-5 h-5 text-cyan-400" />
             <h2 className="font-mono text-base font-bold tracking-wide text-slate-100 uppercase">
-              NEW EXECUTION — DISCRETIONARY TRADE LOG
+              New execution — discretionary trade log
             </h2>
           </div>
           <button
@@ -183,7 +183,8 @@ export const QuickTradeModal: React.FC = () => {
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5 text-xs">
           {/* Violations Warning Banner */}
-          {violations.length > 0 && (
+          {/* Only warn once there are prices to check (an empty form isn't a rule break). */}
+          {violations.length > 0 && !(isNaN(numEntry) || isNaN(numStop) || isNaN(numTarget)) && (
             <div className="p-3 bg-rose-950/40 border border-rose-800/80 rounded flex items-start gap-2.5 text-rose-200 font-mono text-[11px]">
               <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
               <div>
@@ -200,11 +201,11 @@ export const QuickTradeModal: React.FC = () => {
           {/* Row 1: Asset, Direction, Timeframe, Session */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
-              <label className="block text-slate-400 font-mono mb-1">ASSET</label>
+              <label className="block text-slate-400 font-mono mb-1">Asset</label>
               <select
                 value={asset}
                 onChange={(e) => setAsset(e.target.value)}
-                className="w-full bg-[#182232] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none"
+                className="w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none"
               >
                 {assets.map((a) => (
                   <option key={a.id} value={a.symbol}>
@@ -215,8 +216,8 @@ export const QuickTradeModal: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-slate-400 font-mono mb-1">DIRECTION</label>
-              <div className="grid grid-cols-2 gap-1 bg-[#182232] p-0.5 border border-slate-700 rounded">
+              <label className="block text-slate-400 font-mono mb-1">Direction</label>
+              <div className="grid grid-cols-2 gap-1 bg-raised p-0.5 border border-slate-700 rounded">
                 <button
                   type="button"
                   onClick={() => setDirection('LONG')}
@@ -226,7 +227,7 @@ export const QuickTradeModal: React.FC = () => {
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  LONG
+                  Long
                 </button>
                 <button
                   type="button"
@@ -237,17 +238,17 @@ export const QuickTradeModal: React.FC = () => {
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  SHORT
+                  Short
                 </button>
               </div>
             </div>
 
             <div>
-              <label className="block text-slate-400 font-mono mb-1">TIMEFRAME</label>
+              <label className="block text-slate-400 font-mono mb-1">Timeframe</label>
               <select
                 value={timeframe}
                 onChange={(e) => setTimeframe(e.target.value)}
-                className="w-full bg-[#182232] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none"
+                className="w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none"
               >
                 <option value="1M">1M</option>
                 <option value="5M">5M</option>
@@ -259,14 +260,14 @@ export const QuickTradeModal: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-slate-400 font-mono mb-1">SESSION (NY TIME)</label>
+              <label className="block text-slate-400 font-mono mb-1">Session (NY time)</label>
               <div
                 className={`w-full rounded px-2.5 py-1.5 font-mono border ${
                   sessionCheck.outWindow
                     ? 'bg-rose-950/40 border-rose-800 text-rose-300'
                     : sessionCheck.session
-                    ? 'bg-[#182232] border-slate-700 text-cyan-300'
-                    : 'bg-[#182232] border-slate-700 text-slate-400'
+                    ? 'bg-raised border-slate-700 text-cyan-300'
+                    : 'bg-raised border-slate-700 text-slate-400'
                 }`}
                 title="Worked out from the entry time in New York time"
               >
@@ -277,12 +278,12 @@ export const QuickTradeModal: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-400 font-mono mb-1">ENTRY TIME (YOUR LOCAL TIME)</label>
+              <label className="block text-slate-400 font-mono mb-1">Entry time (your local time)</label>
               <input
                 type="datetime-local"
                 value={entryLocal}
                 onChange={(e) => setEntryLocal(e.target.value)}
-                className="w-full bg-[#182232] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none"
+                className="w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none"
               />
             </div>
             <p className="text-[10px] text-slate-500 font-mono self-end pb-1.5">
@@ -295,11 +296,11 @@ export const QuickTradeModal: React.FC = () => {
           {/* Row 2: Model, Grade, & Calculated R Display */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-slate-400 font-mono mb-1">EXECUTION MODEL</label>
+              <label className="block text-slate-400 font-mono mb-1">Execution model</label>
               <select
                 value={modelId}
                 onChange={(e) => setModelId(e.target.value)}
-                className="w-full bg-[#182232] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none"
+                className="w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none"
               >
                 {tradingHQ.executionModels.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -310,11 +311,11 @@ export const QuickTradeModal: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-slate-400 font-mono mb-1">SETUP GRADE</label>
+              <label className="block text-slate-400 font-mono mb-1">Setup grade</label>
               <select
                 value={setupGrade}
                 onChange={(e) => setSetupGrade(e.target.value)}
-                className="w-full bg-[#182232] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none"
+                className="w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none"
               >
                 {tradingHQ.setupGrades.map((g) => (
                   <option key={g.grade} value={g.grade}>
@@ -324,8 +325,8 @@ export const QuickTradeModal: React.FC = () => {
               </select>
             </div>
 
-            <div className="bg-[#131b26] p-2.5 rounded border border-slate-700 flex flex-col justify-center">
-              <span className="text-[10px] text-slate-400 font-mono uppercase">PLANNED R:R RATIO</span>
+            <div className="bg-raised p-2.5 rounded border border-slate-700 flex flex-col justify-center">
+              <span className="text-[10px] text-slate-400 font-mono uppercase">Planned R:R ratio</span>
               <div className="flex items-baseline gap-2">
                 <span
                   className={`text-xl font-mono font-bold ${
@@ -350,7 +351,7 @@ export const QuickTradeModal: React.FC = () => {
           {/* Row 3: Prices (Entry, Stop, Target) */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-slate-400 font-mono mb-1">ENTRY PRICE</label>
+              <label className="block text-slate-400 font-mono mb-1">Entry price</label>
               <input
                 type="number"
                 step="any"
@@ -358,12 +359,12 @@ export const QuickTradeModal: React.FC = () => {
                 value={entryPrice}
                 onChange={(e) => setEntryPrice(e.target.value)}
                 placeholder="e.g. 93450"
-                className="w-full bg-[#182232] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none"
+                className="w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-slate-400 font-mono mb-1">STOP LOSS PRICE</label>
+              <label className="block text-slate-400 font-mono mb-1">Stop loss price</label>
               <input
                 type="number"
                 step="any"
@@ -371,12 +372,12 @@ export const QuickTradeModal: React.FC = () => {
                 value={stopPrice}
                 onChange={(e) => setStopPrice(e.target.value)}
                 placeholder="e.g. 92850"
-                className="w-full bg-[#182232] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none"
+                className="w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-slate-400 font-mono mb-1">TARGET PRICE</label>
+              <label className="block text-slate-400 font-mono mb-1">Target price</label>
               <input
                 type="number"
                 step="any"
@@ -384,7 +385,7 @@ export const QuickTradeModal: React.FC = () => {
                 value={targetPrice}
                 onChange={(e) => setTargetPrice(e.target.value)}
                 placeholder="e.g. 96450"
-                className="w-full bg-[#182232] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none"
+                className="w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none"
               />
             </div>
           </div>
@@ -392,30 +393,30 @@ export const QuickTradeModal: React.FC = () => {
           {/* Pre-Trade Narrative & Setup Reasoning */}
           <div className="space-y-3">
             <div>
-              <label className="block text-slate-400 font-mono mb-1">CURRENT MARKET NARRATIVE (BEFORE TRADE)</label>
+              <label className="block text-slate-400 font-mono mb-1">Current market narrative (before trade)</label>
               <textarea
                 rows={2}
                 value={narrative}
                 onChange={(e) => setNarrative(e.target.value)}
                 placeholder="What is price currently doing? Liquidity swept, HTF context, Wyckoff phase..."
-                className="w-full bg-[#182232] border border-slate-700 rounded px-2.5 py-1.5 text-slate-200 font-sans focus:border-cyan-500 outline-none resize-none"
+                className="w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-200 font-sans focus:border-cyan-500 outline-none resize-none"
               />
             </div>
 
             <div>
-              <label className="block text-slate-400 font-mono mb-1">SETUP REASONING & EVIDENCE</label>
+              <label className="block text-slate-400 font-mono mb-1">Setup reasoning & evidence</label>
               <input
                 type="text"
                 value={setupReasoning}
                 onChange={(e) => setSetupReasoning(e.target.value)}
                 placeholder="Displacement confirmation, FVG retest, volume delta divergence..."
-                className="w-full bg-[#182232] border border-slate-700 rounded px-2.5 py-1.5 text-slate-200 font-sans focus:border-cyan-500 outline-none"
+                className="w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-200 font-sans focus:border-cyan-500 outline-none"
               />
             </div>
           </div>
 
           {/* 5-Part Process Score Checks */}
-          <div className="p-3 bg-[#131b26] border border-slate-800 rounded">
+          <div className="p-3 bg-raised border border-slate-800 rounded">
             <div className="flex items-center justify-between mb-2">
               <span className="font-mono text-slate-300 font-semibold text-[11px] uppercase flex items-center gap-1.5">
                 <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
@@ -463,7 +464,7 @@ export const QuickTradeModal: React.FC = () => {
                 value={chartLink}
                 onChange={(e) => setChartLink(e.target.value)}
                 placeholder="Or paste a TradingView snapshot link"
-                className="flex-1 bg-[#182232] border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono text-xs focus:border-cyan-500 outline-none"
+                className="flex-1 bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono text-xs focus:border-cyan-500 outline-none"
               />
               <button
                 type="button"
@@ -471,7 +472,7 @@ export const QuickTradeModal: React.FC = () => {
                 onClick={() => { setScreenshots((prev) => [...prev, chartLink.trim()]); setChartLink(''); }}
                 className="px-3 py-1.5 rounded border border-slate-700 text-cyan-300 font-mono text-xs disabled:opacity-40"
               >
-                ADD LINK
+                Add link
               </button>
             </div>
           </div>
@@ -483,13 +484,13 @@ export const QuickTradeModal: React.FC = () => {
               onClick={() => setQuickTradeModalOpen(false)}
               className="px-4 py-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono font-medium transition cursor-pointer"
             >
-              CANCEL
+              Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded bg-cyan-600 hover:bg-cyan-500 text-white font-mono font-bold tracking-wide transition cursor-pointer flex items-center gap-1.5 shadow-sm"
+              className="px-5 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-mono font-bold tracking-wide transition cursor-pointer flex items-center gap-1.5 shadow-sm"
             >
-              <span>COMMIT TRADE TO JOURNAL</span>
+              <span>Commit trade to journal</span>
             </button>
           </div>
         </form>

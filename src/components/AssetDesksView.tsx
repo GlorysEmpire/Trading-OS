@@ -28,7 +28,7 @@ const PLACEMENT_LABEL: Record<DeskChartPlacement, string> = {
   h4: '4H',
 };
 
-const inputClass = 'bg-[#162130] border border-slate-700 rounded px-2.5 py-1.5 text-slate-200 outline-none focus:border-cyan-500 font-sans';
+const inputClass = 'bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-200 outline-none focus:border-cyan-500 font-sans';
 
 export const AssetDesksView: React.FC = () => {
   const { assets, selectedAssetId, setSelectedAssetId, updateAssetDesk, createInstrument, updateInstrument, archiveInstrument, setQuickTradeModalOpen, desksLoading, desksError, pendingSetups, deskTabRequest, setDeskTabRequest } = useTrading();
@@ -286,7 +286,7 @@ export const AssetDesksView: React.FC = () => {
               <div
                 key={asset.id}
                 className={`flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-lg font-mono text-xs transition ${
-                  isSelected ? 'bg-[#182335] text-cyan-300 border border-cyan-500/40 font-bold shadow-sm' : 'bg-[#101722] text-slate-400 hover:text-slate-200 border border-slate-800'
+                  isSelected ? 'bg-raised text-cyan-300 border border-cyan-500/40 font-bold shadow-sm' : 'bg-panel text-slate-400 hover:text-slate-200 border border-slate-800'
                 }`}
               >
                 <button
@@ -318,13 +318,13 @@ export const AssetDesksView: React.FC = () => {
             );
           })}
         </div>
-        <div className="flex gap-2"><button onClick={() => setInstrumentFormOpen(v => !v)} className="bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 font-mono text-xs font-bold px-3 py-1.5 rounded">+ INSTRUMENT</button><button onClick={() => setQuickTradeModalOpen(true)} className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold px-3 py-1.5 rounded transition"><span>+ EXECUTE ON {currentDesk.symbol}</span></button></div>
+        <div className="flex gap-2"><button onClick={() => setInstrumentFormOpen(v => !v)} className="bg-panel hover:bg-raised text-ink-2 border border-line text-sm font-medium px-3 py-1.5 rounded-lg">+ Add market</button><button onClick={() => setQuickTradeModalOpen(true)} className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-3 py-1.5 rounded-lg transition"><span>+ Log {currentDesk.symbol} trade</span></button></div>
       </div>
       {instrumentError && <p className="text-xs font-mono text-rose-400">{instrumentError}</p>}
-      {instrumentFormOpen && <form onSubmit={saveInstrument} className="bg-[#101722] border border-slate-800 rounded-lg p-4 grid gap-3 md:grid-cols-2"><h3 className="md:col-span-2 text-sm font-mono font-bold text-slate-100">Add instrument / pair</h3>{([['Display symbol', 'symbol'], ['Name', 'name'], ['Canonical symbol', 'canonicalSymbol'], ['TradingView symbol (optional)', 'tradingViewSymbol']] as const).map(([title, field]) => <label key={field} className="text-[10px] font-mono text-slate-400">{title}<input required={field !== 'tradingViewSymbol'} value={instrumentDraft[field]} onChange={e => setInstrumentDraft({ ...instrumentDraft, [field]: e.target.value })} className={`${inputClass} w-full mt-1`} /></label>)}<label className="text-[10px] font-mono text-slate-400">Category<select value={instrumentDraft.category} onChange={e => setInstrumentDraft({ ...instrumentDraft, category: e.target.value as AssetCategory })} className={`${inputClass} w-full mt-1`}>{(['CRYPTO', 'INDICES', 'METALS', 'FX', 'EQUITIES', 'OTHER'] as AssetCategory[]).map(category => <option key={category}>{category}</option>)}</select></label><p className="md:col-span-2 text-xs text-slate-400">Use separate records for BTCUSD and BTCUSDT. Archive hides an instrument from new selectors without deleting desk/history.</p><button className="w-fit px-3 py-2 rounded bg-cyan-600 text-white font-mono text-xs font-bold">SAVE INSTRUMENT</button></form>}
+      {instrumentFormOpen && <form onSubmit={saveInstrument} className="bg-panel border border-slate-800 rounded-xl p-4 grid gap-3 md:grid-cols-2"><h3 className="md:col-span-2 text-sm font-mono font-bold text-slate-100">Add instrument / pair</h3>{([['Display symbol', 'symbol'], ['Name', 'name'], ['Canonical symbol', 'canonicalSymbol'], ['TradingView symbol (optional)', 'tradingViewSymbol']] as const).map(([title, field]) => <label key={field} className="text-[10px] font-mono text-slate-400">{title}<input required={field !== 'tradingViewSymbol'} value={instrumentDraft[field]} onChange={e => setInstrumentDraft({ ...instrumentDraft, [field]: e.target.value })} className={`${inputClass} w-full mt-1`} /></label>)}<label className="text-[10px] font-mono text-slate-400">Category<select value={instrumentDraft.category} onChange={e => setInstrumentDraft({ ...instrumentDraft, category: e.target.value as AssetCategory })} className={`${inputClass} w-full mt-1`}>{(['CRYPTO', 'INDICES', 'METALS', 'FX', 'EQUITIES', 'OTHER'] as AssetCategory[]).map(category => <option key={category}>{category}</option>)}</select></label><p className="md:col-span-2 text-xs text-slate-400">Use separate records for BTCUSD and BTCUSDT. Archive hides an instrument from new selectors without deleting desk/history.</p><button className="w-fit px-3 py-2 rounded-lg bg-cyan-600 text-white text-sm font-semibold">Save instrument</button></form>}
 
       {/* Desk Subheader */}
-      <div className="bg-[#101722] border border-slate-800 rounded-lg p-4 flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-panel border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
             <h2 className="font-mono text-xl font-bold text-slate-100">{currentDesk.symbol}</h2>
@@ -351,20 +351,20 @@ export const AssetDesksView: React.FC = () => {
             }`}
           >
             <Star className="w-3 h-3" fill={currentDesk.watchlisted ? 'currentColor' : 'none'} />
-            <span>{currentDesk.watchlisted ? 'ON MARKET WATCH' : 'ADD TO MARKET WATCH'}</span>
+            <span>{currentDesk.watchlisted ? 'On market watch' : 'Add to market watch'}</span>
           </button>
-          <button onClick={editCurrentInstrument} className="text-[10px] font-mono text-cyan-300">EDIT INSTRUMENT</button><button onClick={archiveCurrentInstrument} className="text-[10px] font-mono text-amber-300">ARCHIVE</button>
-          <span className="text-[11px] font-mono text-slate-400 uppercase">CURRENT BIAS:</span>
+          <button onClick={editCurrentInstrument} className="text-[10px] font-mono text-cyan-300">Edit instrument</button><button onClick={archiveCurrentInstrument} className="text-[10px] font-mono text-amber-300">Archive</button>
+          <span className="text-[11px] font-mono text-slate-400 uppercase">Current bias:</span>
           <select
             value={currentDesk.currentBias}
             onChange={e => handleBiasChange(e.target.value as BiasType)}
-            className="bg-[#162130] border border-slate-700 rounded px-3 py-1.5 text-xs font-mono font-bold text-cyan-300 outline-none focus:border-cyan-500"
+            className="bg-raised border border-slate-700 rounded px-3 py-1.5 text-xs font-mono font-bold text-cyan-300 outline-none focus:border-cyan-500"
           >
             <option value="BULLISH">BULLISH (Expansion)</option>
             <option value="BEARISH">BEARISH (Markdown)</option>
             <option value="ACCUMULATION">ACCUMULATION (Phase A/B/C)</option>
             <option value="DISTRIBUTION">DISTRIBUTION (Phase A/B/C)</option>
-            <option value="RE-ACCUMULATION">RE-ACCUMULATION</option>
+            <option value="RE-ACCUMULATION">Re-accumulation</option>
             <option value="NEUTRAL">NEUTRAL (Range Bound)</option>
           </select>
         </div>
@@ -385,7 +385,7 @@ export const AssetDesksView: React.FC = () => {
             key={tab.id}
             onClick={() => setActiveSubTab(tab.id as any)}
             className={`px-3.5 py-2 border-b-2 font-medium transition whitespace-nowrap ${
-              activeSubTab === tab.id ? 'border-cyan-400 text-cyan-300 font-bold bg-[#141d2a]' : 'border-transparent text-slate-400 hover:text-slate-200'
+              activeSubTab === tab.id ? 'border-cyan-400 text-cyan-300 font-bold bg-raised' : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             {tab.label}
@@ -396,11 +396,11 @@ export const AssetDesksView: React.FC = () => {
       {/* 1. Overview */}
       {activeSubTab === 'overview' && (
         <div className="space-y-4">
-          <div className="bg-[#101722] border border-slate-800 rounded-lg p-4 space-y-3">
+          <div className="bg-panel border border-slate-800 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="font-mono text-xs font-bold text-slate-200 uppercase flex items-center gap-2">
                 <FileText className="w-4 h-4 text-cyan-400" />
-                CURRENT MARKET NARRATIVE
+                Current market narrative
               </span>
               {editingNarrative ? (
                 <button onClick={saveNarrative} className="text-xs font-mono text-cyan-400 hover:text-cyan-300 font-bold">Save Narrative</button>
@@ -411,20 +411,20 @@ export const AssetDesksView: React.FC = () => {
               )}
             </div>
             {editingNarrative ? (
-              <textarea rows={4} value={narrativeDraft} onChange={e => setNarrativeDraft(e.target.value)} className="w-full bg-[#162130] border border-slate-700 rounded p-3 text-xs text-slate-100 font-sans focus:border-cyan-500 outline-none leading-relaxed" />
+              <textarea rows={4} value={narrativeDraft} onChange={e => setNarrativeDraft(e.target.value)} className="w-full bg-raised border border-slate-700 rounded p-3 text-xs text-slate-100 font-sans focus:border-cyan-500 outline-none leading-relaxed" />
             ) : (
-              <p className="text-xs text-slate-200 font-sans leading-relaxed bg-[#0d141f] p-3 rounded border border-slate-800 min-h-[2.5rem]">
+              <p className="text-xs text-slate-200 font-sans leading-relaxed bg-well p-3 rounded border border-slate-800 min-h-[2.5rem]">
                 {currentDesk.currentNarrative || <span className="text-slate-500">Not filled in yet.</span>}
               </p>
             )}
             {renderPlacedCharts('narrative')}
           </div>
 
-          <div className="bg-[#101722] border border-slate-800 rounded-lg p-4 space-y-3">
+          <div className="bg-panel border border-slate-800 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="font-mono text-xs font-bold text-slate-200 uppercase flex items-center gap-2">
                 <Layers className="w-4 h-4 text-purple-400" />
-                HIGH TIMEFRAME (HTF) MARKET STRUCTURE
+                High timeframe (HTF) market structure
               </span>
               {editingHTF ? (
                 <button onClick={saveHTF} className="text-xs font-mono text-cyan-400 hover:text-cyan-300 font-bold">Save HTF Structure</button>
@@ -436,10 +436,10 @@ export const AssetDesksView: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
               {(['monthly', 'weekly', 'daily', 'h4'] as const).map(tf => (
-                <div key={tf} className="p-3 rounded bg-[#162130] border border-slate-800 space-y-1">
-                  <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">{tf === 'h4' ? '4-HOUR (H4)' : tf} TIMEFRAME:</span>
+                <div key={tf} className="p-3 rounded bg-raised border border-slate-800 space-y-1">
+                  <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">{tf === 'h4' ? '4-hour (H4)' : tf} TIMEFRAME:</span>
                   {editingHTF ? (
-                    <textarea rows={2} value={htfDraft[tf]} onChange={e => setHtfDraft({ ...htfDraft, [tf]: e.target.value })} className="w-full bg-[#0d141f] border border-slate-700 rounded p-2 text-slate-100 font-sans text-xs outline-none focus:border-cyan-500" />
+                    <textarea rows={2} value={htfDraft[tf]} onChange={e => setHtfDraft({ ...htfDraft, [tf]: e.target.value })} className="w-full bg-well border border-slate-700 rounded p-2 text-slate-100 font-sans text-xs outline-none focus:border-cyan-500" />
                   ) : (
                     <p className="text-slate-200 font-sans">{currentDesk.htfStructure[tf] || <span className="text-slate-500">Not filled in yet.</span>}</p>
                   )}
@@ -454,17 +454,17 @@ export const AssetDesksView: React.FC = () => {
       {/* 2. Liquidity & POIs */}
       {activeSubTab === 'liquidity' && (
         <div className="space-y-4">
-          <div className="bg-[#101722] border border-slate-800 rounded-lg p-4 space-y-3">
+          <div className="bg-panel border border-slate-800 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <span className="font-mono text-xs font-bold text-slate-200 uppercase flex items-center gap-2">
                 <Compass className="w-4 h-4 text-amber-400" />
-                ACTIVE LIQUIDITY POOLS & SWEEP MONITOR
+                Active liquidity pools & sweep monitor
               </span>
               <span className="text-[11px] font-mono text-slate-400">Click status pill to toggle Untouched → Swept → Engineered</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {currentDesk.liquidityZones.map(zone => (
-                <div key={zone.id} className="p-3 rounded bg-[#162130] border border-slate-800 space-y-2">
+                <div key={zone.id} className="p-3 rounded bg-raised border border-slate-800 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-mono font-bold text-sm text-slate-100">{zone.level}</span>
                     <button
@@ -487,22 +487,22 @@ export const AssetDesksView: React.FC = () => {
               ))}
               {currentDesk.liquidityZones.length === 0 && <p className="text-xs font-mono text-slate-500 col-span-full">No liquidity levels recorded yet.</p>}
             </div>
-            <form onSubmit={handleAddLiquidityZone} className="p-3 bg-[#0d141f] border border-slate-800 rounded flex flex-wrap items-center gap-2 text-xs">
+            <form onSubmit={handleAddLiquidityZone} className="p-3 bg-well border border-slate-800 rounded flex flex-wrap items-center gap-2 text-xs">
               <input type="text" placeholder="Level (e.g. $94,800)" value={newLiqLevel} onChange={e => setNewLiqLevel(e.target.value)} className={`${inputClass} w-32`} />
               <select value={newLiqType} onChange={e => setNewLiqType(e.target.value as any)} className={inputClass}>
                 <option value="BSL">BSL (Buy-Side)</option>
                 <option value="SSL">SSL (Sell-Side)</option>
                 <option value="EQH">EQH (Equal Highs)</option>
                 <option value="EQL">EQL (Equal Lows)</option>
-                <option value="RANGE_HIGH">RANGE HIGH</option>
-                <option value="RANGE_LOW">RANGE LOW</option>
+                <option value="RANGE_HIGH">Range high</option>
+                <option value="RANGE_LOW">Range low</option>
               </select>
               <input type="text" placeholder="Notes & thesis" value={newLiqNotes} onChange={e => setNewLiqNotes(e.target.value)} className={`${inputClass} flex-1 min-w-[150px]`} />
               <button type="submit" className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 font-mono text-xs rounded border border-slate-700 transition">+ Add Level</button>
             </form>
           </div>
 
-          <div className="bg-[#101722] border border-slate-800 rounded-lg p-4 space-y-3">
+          <div className="bg-panel border border-slate-800 rounded-xl p-4 space-y-3">
             <span className="font-mono text-xs font-bold text-slate-200 uppercase flex items-center gap-2">
               <Shield className="w-4 h-4 text-cyan-400" />
               ACTIVE POINTS OF INTEREST (POIs)
@@ -510,7 +510,7 @@ export const AssetDesksView: React.FC = () => {
             <p className="text-[11px] font-mono text-slate-500">POI editing is planned for a later pass — liquidity zones above are the editable structured data for now.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {currentDesk.activePOIs.map(poi => (
-                <div key={poi.id} className="p-3 rounded bg-[#162130] border border-slate-800 space-y-1 text-xs">
+                <div key={poi.id} className="p-3 rounded bg-raised border border-slate-800 space-y-1 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="font-mono font-bold text-slate-100">{poi.name}</span>
                     <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-950 border border-cyan-800 text-cyan-300">{poi.timeframe}</span>
@@ -527,11 +527,11 @@ export const AssetDesksView: React.FC = () => {
 
       {/* 3. Wyckoff Development */}
       {activeSubTab === 'wyckoff' && (
-        <div className="bg-[#101722] border border-slate-800 rounded-lg p-5 space-y-4">
+        <div className="bg-panel border border-slate-800 rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-800 pb-2">
             <span className="font-mono text-xs font-bold text-slate-200 uppercase flex items-center gap-2">
               <Activity className="w-4 h-4 text-emerald-400" />
-              WYCKOFF SCHEMATIC DEVELOPMENT & EVENT TRACKER
+              Wyckoff schematic development & event tracker
             </span>
             {editingWyckoff ? (
               <button onClick={saveWyckoff} className="text-xs font-mono text-cyan-400 hover:text-cyan-300 font-bold">Save</button>
@@ -548,20 +548,20 @@ export const AssetDesksView: React.FC = () => {
             <span className="text-xs font-mono text-emerald-400 font-semibold">Current Phase: {currentDesk.wyckoffDevelopment.phase || 'Not set'}</span>
           )}
 
-          <div className="p-3 bg-[#131b26] border-l-4 border-cyan-500 rounded-r text-xs font-sans text-slate-300">
-            <strong className="text-cyan-300 font-mono text-[11px] uppercase block mb-0.5">SEMANTIC RULE: AR = AUTOMATIC REACTION</strong>
+          <div className="p-3 bg-raised border-l-4 border-cyan-500 rounded-r text-xs font-sans text-slate-300">
+            <strong className="text-cyan-300 font-mono text-[11px] uppercase block mb-0.5">Semantic rule: AR = automatic reaction</strong>
             {editingWyckoff ? (
-              <textarea rows={2} value={wyckoffNotesDraft} onChange={e => setWyckoffNotesDraft(e.target.value)} className="w-full bg-[#0d141f] border border-slate-700 rounded p-2 text-slate-100 mt-1 outline-none focus:border-cyan-500" />
+              <textarea rows={2} value={wyckoffNotesDraft} onChange={e => setWyckoffNotesDraft(e.target.value)} className="w-full bg-well border border-slate-700 rounded p-2 text-slate-100 mt-1 outline-none focus:border-cyan-500" />
             ) : (
               currentDesk.wyckoffDevelopment.notes
             )}
           </div>
 
           <div className="space-y-2">
-            <span className="text-[11px] font-mono text-slate-400 uppercase">IDENTIFIED EVENTS IN STRUCTURE:</span>
+            <span className="text-[11px] font-mono text-slate-400 uppercase">Identified events in structure:</span>
             <div className="flex flex-wrap gap-2">
               {currentDesk.wyckoffDevelopment.eventsIdentified.map((ev, i) => (
-                <span key={i} className="px-3 py-1 rounded bg-[#162130] border border-slate-700 text-slate-200 text-xs font-mono flex items-center gap-1.5">
+                <span key={i} className="px-3 py-1 rounded bg-raised border border-slate-700 text-slate-200 text-xs font-mono flex items-center gap-1.5">
                   ✓ {ev}
                   <button onClick={() => removeWyckoffEvent(i)} className="text-slate-500 hover:text-rose-400">×</button>
                 </span>
@@ -579,31 +579,31 @@ export const AssetDesksView: React.FC = () => {
       {/* 4. Scenarios */}
       {activeSubTab === 'scenarios' && (
         <div className="space-y-4">
-          <div className="bg-[#101722] border border-slate-800 rounded-lg p-4 space-y-3">
+          <div className="bg-panel border border-slate-800 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <span className="font-mono text-xs font-bold text-slate-200 uppercase">SCENARIO PLANNING (CONDITIONS & INVALIDATIONS)</span>
+              <span className="font-mono text-xs font-bold text-slate-200 uppercase">Scenario planning (conditions & invalidations)</span>
               <button onClick={() => setShowAddScenario(v => !v)} className="text-xs font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1">
                 <Plus className="w-3.5 h-3.5" /> {showAddScenario ? 'Cancel' : 'Add Scenario'}
               </button>
             </div>
 
             {showAddScenario && (
-              <form onSubmit={addScenario} className="p-3 bg-[#0d141f] border border-slate-800 rounded space-y-2 text-xs">
+              <form onSubmit={addScenario} className="p-3 bg-well border border-slate-800 rounded space-y-2 text-xs">
                 <select value={scenarioProbability} onChange={e => setScenarioProbability(e.target.value as Scenario['probability'])} className={inputClass}>
-                  <option value="PRIMARY">PRIMARY</option>
-                  <option value="SECONDARY">SECONDARY</option>
-                  <option value="INVALIDATION">INVALIDATION</option>
+                  <option value="PRIMARY">Primary</option>
+                  <option value="SECONDARY">Secondary</option>
+                  <option value="INVALIDATION">Invalidation</option>
                 </select>
                 <textarea rows={2} placeholder="Thesis" value={scenarioThesis} onChange={e => setScenarioThesis(e.target.value)} className={`${inputClass} w-full`} />
                 <textarea rows={2} placeholder="Confirmation conditions (one per line)" value={scenarioConfirm} onChange={e => setScenarioConfirm(e.target.value)} className={`${inputClass} w-full`} />
                 <textarea rows={2} placeholder="Invalidation conditions (one per line)" value={scenarioInvalidate} onChange={e => setScenarioInvalidate(e.target.value)} className={`${inputClass} w-full`} />
-                <button type="submit" className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-mono text-xs font-bold rounded transition">Save Scenario</button>
+                <button type="submit" className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold rounded-lg transition">Save Scenario</button>
               </form>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {currentDesk.scenarios.map(sc => (
-                <div key={sc.id} className="p-4 rounded bg-[#162130] border border-slate-800 space-y-3 text-xs">
+                <div key={sc.id} className="p-4 rounded bg-raised border border-slate-800 space-y-3 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="font-mono font-bold text-slate-100 text-sm">{sc.label}</span>
                     <div className="flex items-center gap-2">
@@ -638,11 +638,11 @@ export const AssetDesksView: React.FC = () => {
 
       {/* 5. External Context */}
       {activeSubTab === 'external' && (
-        <div className="bg-[#101722] border border-slate-800 rounded-lg p-5 space-y-4">
+        <div className="bg-panel border border-slate-800 rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-800 pb-2">
             <span className="font-mono text-xs font-bold text-slate-200 uppercase flex items-center gap-2">
               <DollarSign className="w-4 h-4 text-cyan-400" />
-              EXTERNAL CONTEXT & INSTITUTIONAL FLOWS
+              External context & institutional flows
             </span>
             <div className="flex items-center gap-3">
               {currentDesk.externalContext.updatedAt && <span className="text-[11px] font-mono text-slate-400">Updated: {currentDesk.externalContext.updatedAt}</span>}
@@ -656,8 +656,8 @@ export const AssetDesksView: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-3 bg-[#131b26] border-l-4 border-amber-400 rounded-r text-xs font-sans text-slate-300">
-            <strong className="text-amber-300 font-mono text-[11px] uppercase block mb-0.5">CONTEXTUAL INTELLIGENCE PRINCIPLE:</strong>
+          <div className="p-3 bg-raised border-l-4 border-amber-400 rounded-r text-xs font-sans text-slate-300">
+            <strong className="text-amber-300 font-mono text-[11px] uppercase block mb-0.5">Contextual intelligence principle:</strong>
             External context (ETF flows, OI, funding rates, liquidations, yields, DXY) is contextual intelligence.
             <strong> It must NOT automatically become a trade signal.</strong>
           </div>
@@ -665,12 +665,12 @@ export const AssetDesksView: React.FC = () => {
           {editingExternal ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs font-mono">
               {([
-                ['etfFlows', 'ETF NET FLOWS'],
-                ['openInterest', 'OPEN INTEREST'],
-                ['fundingRate', 'FUNDING RATE'],
-                ['liquidations', 'LIQUIDATIONS (24H)'],
-                ['yields10Y', 'US 10Y YIELDS'],
-                ['dxy', 'DXY (US DOLLAR)'],
+                ['etfFlows', 'ETF net flows'],
+                ['openInterest', 'Open interest'],
+                ['fundingRate', 'Funding rate'],
+                ['liquidations', 'Liquidations (24H)'],
+                ['yields10Y', 'US 10Y yields'],
+                ['dxy', 'DXY (US dollar)'],
               ] as const).map(([field, label]) => (
                 <div key={field}>
                   <label className="block text-slate-400 mb-1">{label}</label>
@@ -678,29 +678,29 @@ export const AssetDesksView: React.FC = () => {
                 </div>
               ))}
               <div className="col-span-full">
-                <label className="block text-slate-400 mb-1">MACRO NEWS</label>
+                <label className="block text-slate-400 mb-1">Macro news</label>
                 <textarea rows={2} value={externalDraft.macroNews || ''} onChange={e => setExternalDraft({ ...externalDraft, macroNews: e.target.value })} className={`${inputClass} w-full`} />
               </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
               {currentDesk.externalContext.etfFlows && (
-                <div className="p-3 rounded bg-[#162130] border border-slate-800"><span className="text-[10px] text-slate-400 block">ETF NET FLOWS:</span><span className="text-emerald-400 font-bold">{currentDesk.externalContext.etfFlows}</span></div>
+                <div className="p-3 rounded bg-raised border border-slate-800"><span className="text-[10px] text-slate-400 block">ETF net flows:</span><span className="text-emerald-400 font-bold">{currentDesk.externalContext.etfFlows}</span></div>
               )}
               {currentDesk.externalContext.openInterest && (
-                <div className="p-3 rounded bg-[#162130] border border-slate-800"><span className="text-[10px] text-slate-400 block">OPEN INTEREST:</span><span className="text-slate-200 font-bold">{currentDesk.externalContext.openInterest}</span></div>
+                <div className="p-3 rounded bg-raised border border-slate-800"><span className="text-[10px] text-slate-400 block">Open interest:</span><span className="text-slate-200 font-bold">{currentDesk.externalContext.openInterest}</span></div>
               )}
               {currentDesk.externalContext.fundingRate && (
-                <div className="p-3 rounded bg-[#162130] border border-slate-800"><span className="text-[10px] text-slate-400 block">FUNDING RATE:</span><span className="text-slate-200 font-bold">{currentDesk.externalContext.fundingRate}</span></div>
+                <div className="p-3 rounded bg-raised border border-slate-800"><span className="text-[10px] text-slate-400 block">Funding rate:</span><span className="text-slate-200 font-bold">{currentDesk.externalContext.fundingRate}</span></div>
               )}
               {currentDesk.externalContext.liquidations && (
-                <div className="p-3 rounded bg-[#162130] border border-slate-800"><span className="text-[10px] text-slate-400 block">LIQUIDATIONS (24H):</span><span className="text-amber-400 font-bold">{currentDesk.externalContext.liquidations}</span></div>
+                <div className="p-3 rounded bg-raised border border-slate-800"><span className="text-[10px] text-slate-400 block">Liquidations (24H):</span><span className="text-amber-400 font-bold">{currentDesk.externalContext.liquidations}</span></div>
               )}
               {currentDesk.externalContext.yields10Y && (
-                <div className="p-3 rounded bg-[#162130] border border-slate-800"><span className="text-[10px] text-slate-400 block">US 10Y YIELDS:</span><span className="text-slate-200 font-bold">{currentDesk.externalContext.yields10Y}</span></div>
+                <div className="p-3 rounded bg-raised border border-slate-800"><span className="text-[10px] text-slate-400 block">US 10Y yields:</span><span className="text-slate-200 font-bold">{currentDesk.externalContext.yields10Y}</span></div>
               )}
               {currentDesk.externalContext.dxy && (
-                <div className="p-3 rounded bg-[#162130] border border-slate-800"><span className="text-[10px] text-slate-400 block">DXY (US DOLLAR):</span><span className="text-slate-200 font-bold">{currentDesk.externalContext.dxy}</span></div>
+                <div className="p-3 rounded bg-raised border border-slate-800"><span className="text-[10px] text-slate-400 block">DXY (US dollar):</span><span className="text-slate-200 font-bold">{currentDesk.externalContext.dxy}</span></div>
               )}
               {!currentDesk.externalContext.etfFlows && !currentDesk.externalContext.openInterest && !currentDesk.externalContext.dxy && (
                 <p className="text-xs font-mono text-slate-500 col-span-full">Nothing recorded yet.</p>
@@ -712,17 +712,17 @@ export const AssetDesksView: React.FC = () => {
 
       {/* 6. Charts & Screenshots */}
       {activeSubTab === 'charts' && (
-        <div className="bg-[#101722] border border-slate-800 rounded-lg p-5 space-y-4">
+        <div className="bg-panel border border-slate-800 rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-800 pb-2">
             <span className="font-mono text-xs font-bold text-slate-200 uppercase flex items-center gap-2">
               <Camera className="w-4 h-4 text-cyan-400" />
-              DESK CHARTS & SCREENSHOTS
+              Desk charts & screenshots
             </span>
             <span className="text-[11px] font-mono text-slate-500">{(currentDesk.charts || []).length} attached</span>
           </div>
 
-          <div className="p-3 bg-[#131b26] border border-slate-800 rounded-md space-y-2">
-            <label className="text-[11px] font-mono font-bold text-slate-400 block">ADD CHARTS / SCREENSHOTS</label>
+          <div className="p-3 bg-raised border border-slate-800 rounded-md space-y-2">
+            <label className="text-[11px] font-mono font-bold text-slate-400 block">Add charts / screenshots</label>
             <input
               value={newChartTitle}
               onChange={e => setNewChartTitle(e.target.value)}
@@ -740,7 +740,7 @@ export const AssetDesksView: React.FC = () => {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {(currentDesk.charts || []).map((chart, idx) => (
-                <div key={chart.id} className="relative group rounded-md border border-slate-800 overflow-hidden bg-[#162130]">
+                <div key={chart.id} className="relative group rounded-md border border-slate-800 overflow-hidden bg-raised">
                   <ChartImage
                     src={chart.url}
                     alt={chart.title}
@@ -757,7 +757,7 @@ export const AssetDesksView: React.FC = () => {
                     <select
                       value={chart.placement ?? ''}
                       onChange={(e) => setChartPlacement(chart.id, e.target.value as DeskChartPlacement | '')}
-                      className="w-full bg-[#0d141f] border border-slate-700 rounded px-1.5 py-1 text-[10px] font-mono text-slate-300 outline-none"
+                      className="w-full bg-well border border-slate-700 rounded px-1.5 py-1 text-[10px] font-mono text-slate-300 outline-none"
                       title="Show this chart next to the narrative or an HTF timeframe on the Overview"
                     >
                       <option value="">Show under: Charts only</option>

@@ -68,7 +68,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col bg-slate-950/90 backdrop-blur-md text-slate-100 animate-in fade-in duration-150"
+      className="force-dark fixed inset-0 z-50 flex flex-col bg-slate-950/90 backdrop-blur-md text-slate-100 animate-in fade-in duration-150"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -102,7 +102,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             <button
               onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}
               title="Zoom out"
-              className="p-1 hover:text-white"
+              className="p-1 hover:text-ink"
             >
               <ZoomOut className="w-3.5 h-3.5" />
             </button>
@@ -110,7 +110,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             <button
               onClick={() => setZoom((z) => Math.min(3, z + 0.25))}
               title="Zoom in"
-              className="p-1 hover:text-white"
+              className="p-1 hover:text-ink"
             >
               <ZoomIn className="w-3.5 h-3.5" />
             </button>

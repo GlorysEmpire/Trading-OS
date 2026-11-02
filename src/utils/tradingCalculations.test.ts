@@ -40,7 +40,6 @@ function makeTrade(overrides: Partial<Trade> & { date: string; realizedR?: numbe
   tradeCounter += 1;
   return {
     id: `t-${tradeCounter}`,
-    date: overrides.date,
     timestamp: overrides.timestamp ?? tradeCounter,
     asset: 'ETH',
     direction: 'LONG',

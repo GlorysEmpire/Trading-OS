@@ -29,8 +29,8 @@ export const LoginView: React.FC = () => {
   };
 
   return (
-    <main className="min-h-screen bg-[#080c14] text-slate-100 flex items-center justify-center p-6">
-      <form onSubmit={submit} className="bg-[#101722] border border-slate-800 rounded-lg p-8 w-full max-w-sm space-y-5">
+    <main className="min-h-screen bg-canvas text-slate-100 flex items-center justify-center p-6">
+      <form onSubmit={submit} className="bg-panel border border-slate-800 rounded-xl p-8 w-full max-w-sm space-y-5">
         <div className="flex items-center gap-2 text-cyan-400">
           <Activity className="w-5 h-5" />
           <span className="font-mono text-xs font-bold uppercase tracking-wider">Trading OS</span>
@@ -40,7 +40,7 @@ export const LoginView: React.FC = () => {
         <label className="block space-y-1.5">
           <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Email</span>
           <input
-            className="w-full bg-[#162130] border border-slate-700 rounded px-3 py-2 text-slate-200 text-sm outline-none focus:border-cyan-500"
+            className="w-full bg-raised border border-slate-700 rounded px-3 py-2 text-slate-200 text-sm outline-none focus:border-cyan-500"
             type="email"
             required
             autoComplete="email"
@@ -52,7 +52,7 @@ export const LoginView: React.FC = () => {
         <label className="block space-y-1.5">
           <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Password</span>
           <input
-            className="w-full bg-[#162130] border border-slate-700 rounded px-3 py-2 text-slate-200 text-sm outline-none focus:border-cyan-500"
+            className="w-full bg-raised border border-slate-700 rounded px-3 py-2 text-slate-200 text-sm outline-none focus:border-cyan-500"
             type="password"
             required
             minLength={6}
@@ -66,7 +66,7 @@ export const LoginView: React.FC = () => {
         {notice && <p className="text-xs font-mono text-emerald-400">{notice}</p>}
 
         <button
-          className="w-full px-4 py-2.5 rounded bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-mono text-xs font-bold uppercase tracking-wider transition"
+          className="w-full px-4 py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-sm font-semibold uppercase tracking-wider transition"
           type="submit"
           disabled={loading}
         >
