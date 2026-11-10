@@ -39,13 +39,13 @@ app.post("/api/ai/chat", async (req, res) => {
     if (!ai) {
       // Intelligent rule-based fallback if no API key is configured
       return res.json({
-        text: `[Analyst Mode: Offline Logic Engine]\n\nBased on your active configuration and logged trade metrics:\n- **Process Compliance**: Ensure your active trade risk is strictly locked to your configured risk tier.\n- **Session Window**: Verify you are executing strictly inside the active NY/Lagos liquidity killzone.\n- **Rule Reminder**: Remember AR stands for Automatic Reaction (analytical event), never an entry trigger.\n\nTo enable full neural generative synthesis, connect your GEMINI_API_KEY in the environment secrets.`,
+        text: `AI analysis is unavailable because no model provider is configured. Review the current Trading HQ and journal data in the app. AR remains an analytical Wyckoff event, never an entry trigger.`,
       });
     }
 
     const systemInstruction = `You are the Trading OS Personal Trading Assistant for a high-performance discretionary trader.
 You have complete analytical comprehension of:
-- Trading HQ: Strategic rules, execution models (SLP, Wyckoff + ICT, Failure Swing, Range Delivery Model), session windows (NY: London 00:00-05:00, New York 05:00-12:00, Afternoon 12:00-18:00, Tokyo 18:00-00:00 — Lagos is NY+5h: 05:00-10:00, 10:00-17:00, 17:00-23:00, 23:00-05:00), 5-part Process Score (Session, Grade, Risk, Management, Structure).
+- Trading HQ: use only the active configuration included in Trader Context. If a rule or session is absent, say it is unknown.
 - Wyckoff Semantics: AR = Automatic Reaction (an analytical/event concept, NEVER an entry trigger, POI, or sequence rule). Never say "CHoCH -> AR -> POI".
 - Philosophy: "context -> narrative -> evidence -> potential setup -> trader decision -> record -> review". You are an analyst and assistant, NEVER an autonomous trader or bot.
 - Distinguish GOOD PROCESS + LOSS from BAD PROCESS + WIN.
@@ -98,8 +98,8 @@ app.post("/api/ai/analyze-trade", async (req, res) => {
 Analyze the provided trade record against the trader's active Trading HQ rules.
 Critique:
 1. Process Integrity vs Outcome (Is it Good Process + Loss or Bad Process + Win?)
-2. Execution Model & Grade verification (A+ >=5R or structural >=3R, B+ >=3R)
-3. Risk & Management (Did they adhere to 1% risk, no re-entry, no adding, scratch counts as loss?)
+2. Execution Model & Grade verification using only the active rules supplied with this request.
+3. Risk & Management using only the active rules supplied with this request. State when evidence is missing.
 4. Wyckoff & Structure accuracy (Reminder: AR = Automatic Reaction, never an entry trigger)
 5. Actionable takeaway for tomorrow's session.
 Keep it concise, rigorous, and direct.`;

@@ -226,6 +226,8 @@ export interface Trade {
   linkedPsychologyId?: string;
   linkedResearchQuestionId?: string;
   configVersionUsed: string;
+  /** Risk setting captured when this trade was opened for capital estimates. */
+  riskPercentAtEntry?: number;
   /** When the trade was closed and locked (ms epoch). Closed trades without
    * this field predate locking — they're still treated as locked. */
   closedAt?: number;

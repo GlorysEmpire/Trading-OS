@@ -45,8 +45,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 Analyze the provided trade record against the trader's active Trading HQ rules.
 Critique:
 1. Process Integrity vs Outcome (Is it Good Process + Loss or Bad Process + Win?)
-2. Execution Model & Grade verification (A+ >=5R or structural >=3R, B+ >=3R)
-3. Risk & Management (Did they adhere to 1% risk, no re-entry, no adding, scratch counts as loss?)
+2. Execution Model & Grade verification using only the active rules supplied with this request.
+3. Risk & Management using only the active rules supplied with this request. State when evidence is missing.
 4. Wyckoff & Structure accuracy (Reminder: AR = Automatic Reaction, never an entry trigger)
 5. Actionable takeaway for tomorrow's session.
 Keep it concise, rigorous, and direct.`;

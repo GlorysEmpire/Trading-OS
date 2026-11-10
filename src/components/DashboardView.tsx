@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChartImage } from './ChartImage';
+import { CapitalCard } from './CapitalCard';
 import { useTrading } from '../context/TradingContext';
 import { getAuthHeaders } from '../lib/supabaseClient';
 import { traderDateString, traderNowMinutes, isSessionActiveAt, nyTimeIn, deviceTimeZone, weekdayInZone } from '../utils/traderTime';
@@ -748,6 +749,8 @@ export const DashboardView: React.FC = () => {
             <span className="text-xs text-ink-3">Biggest drop from a high</span>
           </div>
         </div>
+
+        <CapitalCard />
 
         {/* Process vs Outcome Paradigm Card */}
         {widgetPrefs.processMatrix && (

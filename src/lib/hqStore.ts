@@ -219,29 +219,23 @@ export async function seedMissingHQCategories(supabase: SupabaseClient, userId: 
   }
 }
 
-/** Deactivates the current row for a category and inserts the next version.
- * Never rewrites history — a trade taken under v1 still shows v1's content. */
+/** Atomically replaces a category through the owner-scoped database function. */
 export async function saveHQCategory(
   supabase: SupabaseClient,
-  userId: string,
   row: HQConfigRow,
   newContent: unknown,
   changedReason: string
 ) {
-  const { error: deactivateError } = await supabase.from('trading_hq_configs').update({ is_active: false }).eq('id', row.id);
-  if (deactivateError) throw toSupabaseError(deactivateError);
-
-  const { error: insertError } = await supabase.from('trading_hq_configs').insert({
-    user_id: userId,
-    category: row.category,
-    slug: row.category.replace(/_/g, '-'),
-    title: row.category,
-    content: newContent,
-    version: row.version + 1,
-    is_active: true,
-    changed_reason: changedReason || null,
+  const { error } = await supabase.rpc('trading_os_replace_hq_category', {
+    p_row_id: row.id,
+    p_expected_version: row.version,
+    p_content: newContent,
+    p_reason: changedReason,
   });
-  if (insertError) throw toSupabaseError(insertError);
+  if (error?.code === '42883' || error?.code === 'PGRST202') {
+    throw new Error('The atomic Trading HQ revision migration has not been applied in Supabase. Your previous version is unchanged.');
+  }
+  if (error) throw toSupabaseError(error);
 }
 
 /** Normalizes rows (tolerating a legacy {description, values:string[]} shape

@@ -23,7 +23,7 @@ import { computePerformanceStats } from '../utils/tradingCalculations';
 import { supabase } from '../lib/supabaseClient';
 import { buildTradingHQConfig, loadHQConfigRows, saveHQCategory, seedMissingHQCategories, type HQCategory, type HQConfigRow } from '../lib/hqStore';
 import { archiveAssetDesk, createAssetDesk, loadAssetDesks, saveAssetDeskPatch, seedAssetDesksIfMissing, updateInstrument, type InstrumentInput } from '../lib/assetDesksStore';
-import { insertAmendment, insertTradesIfNew, loadAmendments, loadTrades, saveTrade } from '../lib/tradeStore';
+import { amendTradeRecord, insertTradesIfNew, loadAmendments, loadTrades, saveTrade } from '../lib/tradeStore';
 import { loadDebriefs, upsertDebrief } from '../lib/debriefStore';
 import { isInlineImage, uploadChart } from '../lib/chartStorage';
 import { loadWeeklyReviews, upsertWeeklyReview } from '../lib/weeklyReviewStore';
@@ -35,6 +35,9 @@ import { traderDateString as traderDay } from '../utils/traderTime';
 import { applyAmendment, assertFreeUpdate, buildClosedTrade, diffEvidence, isTradeLocked, type AmendablePatch, type CloseTradeInput } from '../utils/tradeIntegrity';
 import { importResearchQuestionsOnce, loadResearchQuestions, removeResearchQuestion, saveResearchQuestion } from '../lib/researchStore';
 import { importBacktestSamplesOnce, loadBacktestSamples, removeBacktestSample, saveBacktestSample } from '../lib/backtestStore';
+import { loadCapitalSettings, saveCapitalSettings, type CapitalSettings } from '../lib/capitalStore';
+import { calculateCapital, type CapitalSummary } from '../utils/capital';
+import { archiveAndResetDeskAnalysis, type DeskAnalysisHistory, type DeskAnalysisOutcome, type DeskAnalysisScope } from '../lib/deskAnalysisHistoryStore';
 
 /** crypto.randomUUID() is collision-safe; the old `Date.now().toString().slice(-N)`
  * scheme could (and occasionally did) collide when two records were created within
@@ -83,6 +86,7 @@ interface TradingContextType {
   createInstrument: (input: InstrumentInput) => Promise<void>;
   updateInstrument: (id: string, input: InstrumentInput) => Promise<void>;
   archiveInstrument: (id: string) => Promise<void>;
+  resolveDeskAnalysis: (deskId: string, scope: DeskAnalysisScope, outcome: DeskAnalysisOutcome, reason: string) => Promise<DeskAnalysisHistory>;
 
   trades: Trade[];
   tradesLoading: boolean;
@@ -149,6 +153,11 @@ interface TradingContextType {
   addAlert: (alert: Omit<AlertRule, 'id'>) => void;
   toggleAlert: (id: string) => void;
   performanceStats: PerformanceStats;
+  capitalSettings: CapitalSettings | null;
+  capitalSummary: CapitalSummary | null;
+  capitalLoading: boolean;
+  capitalError: string | null;
+  updateCapitalSettings: (settings: CapitalSettings) => Promise<void>;
   exportDataJSON: () => void;
   importDataJSON: (jsonString: string) => Promise<boolean>;
   quickTradeModalOpen: boolean;
@@ -210,10 +219,28 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
 
   const { config: tradingHQ, rowsByCategory } = buildTradingHQConfig(hqRows);
 
+  const [capitalSettings, setCapitalSettings] = useState<CapitalSettings | null>(null);
+  const [capitalLoading, setCapitalLoading] = useState(true);
+  const [capitalError, setCapitalError] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    setCapitalLoading(true);
+    loadCapitalSettings(supabase, userId)
+      .then(settings => { if (active) setCapitalSettings(settings); })
+      .catch(error => { if (active) setCapitalError(error instanceof Error ? error.message : 'Could not load capital settings'); })
+      .finally(() => { if (active) setCapitalLoading(false); });
+    return () => { active = false; };
+  }, [userId]);
+  const updateCapitalSettings = async (settings: CapitalSettings) => {
+    await saveCapitalSettings(supabase, userId, settings);
+    setCapitalSettings(settings);
+    setCapitalError(null);
+  };
+
   const updateHQCategory = async (category: HQCategory, newContent: unknown, changedReason: string) => {
     const row = rowsByCategory[category];
     if (!row) throw new Error(`No active row for category ${category} yet — reload and try again.`);
-    await saveHQCategory(supabase, userId, row, newContent, changedReason);
+    await saveHQCategory(supabase, row, newContent, changedReason);
     await refreshHQ();
   };
 
@@ -258,6 +285,11 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
   const createInstrument = async (input: InstrumentInput) => { await createAssetDesk(supabase, userId, input); await refreshDesks(); };
   const updateInstrumentMetadata = async (id: string, input: InstrumentInput) => { await updateInstrument(supabase, id, input); await refreshDesks(); };
   const archiveInstrument = async (id: string) => { await archiveAssetDesk(supabase, id); await refreshDesks(); };
+  const resolveDeskAnalysis = async (deskId: string, scope: DeskAnalysisScope, outcome: DeskAnalysisOutcome, reason: string) => {
+    const history = await archiveAndResetDeskAnalysis(supabase, deskId, scope, outcome, reason);
+    await refreshDesks();
+    return history;
+  };
 
   // ---- Week 2: durable, Supabase-backed journal; local entries require explicit import ----
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -405,7 +437,11 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
   useEffect(() => { localStorage.setItem(key('alerts'), JSON.stringify(alerts)); }, [alerts]);
 
   const addTrade = async (tradeData: Omit<Trade, 'id' | 'timestamp' | 'configVersionUsed'>) => {
-    const newTrade: Trade = { ...tradeData, id: genId('tr'), timestamp: Date.now(), configVersionUsed: tradingHQ.version };
+    const newTrade: Trade = {
+      ...tradeData, id: genId('tr'), timestamp: Date.now(),
+      configVersionUsed: tradingHQ.version,
+      riskPercentAtEntry: tradeData.riskPercentAtEntry ?? tradingHQ.riskRules.riskPerSetupPct,
+    };
     await saveTrade(supabase, userId, newTrade);
     setTrades(prev => [newTrade, ...prev]);
     return newTrade;
@@ -421,9 +457,6 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
     const next = buildClosedTrade(current, input);
     await saveTrade(supabase, userId, next); replaceTrade(next);
   };
-  // Amendment first, trade second: if the trade write then fails, the log
-  // shows an attempted change rather than the trade silently changing with no
-  // log — the DB trigger also refuses the trade write without the log row.
   const amendTrade = async (id: string, patch: AmendablePatch, reason: string) => {
     const current = trades.find(trade => trade.id === id); if (!current) return;
     if (!isTradeLocked(current)) throw new Error('Open trades can be edited directly — amendments are for closed trades.');
@@ -432,18 +465,18 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
     const next = applyAmendment(current, patch);
     const changes = diffEvidence(current, next);
     if (changes.length === 0) throw new Error('Nothing changed — no amendment logged.');
-    const amendment = await insertAmendment(supabase, userId, { tradeId: id, kind: 'AMEND', reason: reason.trim(), changes });
+    const amendment = await amendTradeRecord(supabase, current, next, 'AMEND', reason.trim());
     setAmendmentList(prev => [...prev, amendment]);
-    await saveTrade(supabase, userId, next); replaceTrade(next);
+    replaceTrade(next);
   };
   const voidTrade = async (id: string, reason: string) => {
     const current = trades.find(trade => trade.id === id); if (!current) return;
     if (current.voided) return;
     if (!reason.trim()) throw new Error('Voiding a trade needs a reason.');
     const next: Trade = { ...current, voided: { at: Date.now(), reason: reason.trim() } };
-    const amendment = await insertAmendment(supabase, userId, { tradeId: id, kind: 'VOID', reason: reason.trim(), changes: diffEvidence(current, next) });
+    const amendment = await amendTradeRecord(supabase, current, next, 'VOID', reason.trim());
     setAmendmentList(prev => [...prev, amendment]);
-    await saveTrade(supabase, userId, next); replaceTrade(next);
+    replaceTrade(next);
   };
   const tradeAmendments = amendmentList.reduce<Record<string, TradeAmendment[]>>((acc, a) => { (acc[a.tradeId] = acc[a.tradeId] || []).push(a); return acc; }, {});
   const importLocalTrades = async () => {
@@ -591,6 +624,9 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
   }, [tradesLoading, backtestLoading, desksLoading]);
 
   const performanceStats = computePerformanceStats(trades, tradingHQ);
+  const capitalSummary = capitalSettings
+    ? calculateCapital(capitalSettings, trades, tradingHQ.riskRules.riskPerSetupPct)
+    : null;
 
   const exportDataJSON = () => {
     const data = { exportDate: new Date().toISOString(), tradingHQ, assets, trades, tradeAmendments: amendmentList, debriefs, weeklyReviews, pendingSetups, researchQuestions, backtestSamples, psychologyEntries, calendarEvents, alerts };
@@ -654,6 +690,7 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
       createInstrument,
       updateInstrument: updateInstrumentMetadata,
       archiveInstrument,
+        resolveDeskAnalysis,
         trades,
         tradesLoading,
         tradesError,
@@ -709,6 +746,11 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
         addAlert,
         toggleAlert,
         performanceStats,
+        capitalSettings,
+        capitalSummary,
+        capitalLoading,
+        capitalError,
+        updateCapitalSettings,
         exportDataJSON,
         importDataJSON,
         quickTradeModalOpen,

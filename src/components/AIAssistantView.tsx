@@ -25,7 +25,7 @@ const INITIAL_MESSAGES: ChatMessage[] = [
   {
     id: 'msg-01',
     sender: 'assistant',
-    text: `Trading OS Assistant online. I have full operational context across your active Trading HQ rules (${'v1.4.2-live'}), current asset desks, active operational schedule, and journal history.
+    text: `Trading OS Assistant ready. I can use the Trading HQ and workspace context included with each request.
 
 How can I assist your operational preparation or post-trade review today?`,
     timestamp: '08:00 AM',
@@ -68,6 +68,11 @@ export const AIAssistantView: React.FC = () => {
           context: {
             rules: tradingHQ.riskRules,
             grades: tradingHQ.setupGrades,
+            models: tradingHQ.executionModels,
+            sessions: tradingHQ.sessions,
+            processChecks: tradingHQ.processChecks,
+            mistakeCodes: tradingHQ.mistakeCodes,
+            researchFramework: tradingHQ.researchFramework,
             version: tradingHQ.version,
             performance: performanceStats,
             assets: assets.map((a) => ({
@@ -95,7 +100,7 @@ export const AIAssistantView: React.FC = () => {
       const errorMsg: ChatMessage = {
         id: `err-${Date.now()}`,
         sender: 'assistant',
-        text: 'Operational Fallback: You are operating under active Trading HQ rules. Max 2 losses daily limit, 1% risk per setup. No re-entry allowed after stop. Active backtest assignment: ETH RQ-05 (50 sample target).',
+        text: `The assistant is unavailable right now. Check your current Trading HQ before making a decision. Active risk per setup: ${tradingHQ.riskRules.riskPerSetupPct}%; maximum daily losses: ${tradingHQ.riskRules.maxDailyLosses}.`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, errorMsg]);

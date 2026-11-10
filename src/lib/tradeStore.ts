@@ -33,14 +33,24 @@ export async function loadAmendments(supabase: SupabaseClient, userId: string): 
   return (data as AmendmentRow[] ?? []).map(row => ({ id: row.id, tradeId: row.trade_id, kind: row.kind, reason: row.reason, changes: row.changes ?? [], createdAt: row.created_at }));
 }
 
-export async function insertAmendment(supabase: SupabaseClient, userId: string, amendment: Omit<TradeAmendment, 'id' | 'createdAt'>): Promise<TradeAmendment> {
-  const { data, error } = await supabase.from('trading_os_trade_amendments')
-    .insert({ user_id: userId, trade_id: amendment.tradeId, kind: amendment.kind, reason: amendment.reason, changes: amendment.changes })
-    .select('id, trade_id, kind, reason, changes, created_at').single();
+/** The database writes the audit row and evidence update in one transaction. */
+export async function amendTradeRecord(
+  supabase: SupabaseClient,
+  before: Trade,
+  after: Trade,
+  kind: 'AMEND' | 'VOID',
+  reason: string,
+): Promise<TradeAmendment> {
+  const { data, error } = await supabase.rpc('trading_os_amend_trade', {
+    p_trade_id: before.id,
+    p_expected_trade_data: before,
+    p_next_trade_data: after,
+    p_kind: kind,
+    p_reason: reason,
+  });
   if (error) {
-    // 42P01 = table missing → the trade-lock migration hasn't been run yet.
-    if (error.code === '42P01' || /trading_os_trade_amendments/.test(error.message ?? '')) {
-      throw new Error('The amendment log isn\'t set up in Supabase yet — run supabase/migrations/20261029000000_trade_lock_amendments.sql in the SQL Editor. The trade was not changed.');
+    if (error.code === '42883' || error.code === 'PGRST202') {
+      throw new Error('The atomic trade amendment migration has not been applied in Supabase. The trade was not changed.');
     }
     throw toSupabaseError(error);
   }

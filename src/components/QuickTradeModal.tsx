@@ -25,6 +25,7 @@ export const QuickTradeModal: React.FC = () => {
   const [entryPrice, setEntryPrice] = useState<string>('');
   const [stopPrice, setStopPrice] = useState<string>('');
   const [targetPrice, setTargetPrice] = useState<string>('');
+  const [riskPercent, setRiskPercent] = useState<string>('');
   const [narrative, setNarrative] = useState('');
   const [setupReasoning, setSetupReasoning] = useState('');
   const [screenshots, setScreenshots] = useState<string[]>([]);
@@ -45,8 +46,11 @@ export const QuickTradeModal: React.FC = () => {
   };
   const [entryLocal, setEntryLocal] = useState(() => toLocalInput(new Date()));
   useEffect(() => {
-    if (quickTradeModalOpen) setEntryLocal(toLocalInput(new Date()));
-  }, [quickTradeModalOpen]);
+    if (quickTradeModalOpen) {
+      setEntryLocal(toLocalInput(new Date()));
+      setRiskPercent(String(tradingHQ.riskRules.riskPerSetupPct));
+    }
+  }, [quickTradeModalOpen, tradingHQ.riskRules.riskPerSetupPct]);
   const entryDate = useMemo(() => {
     const d = new Date(entryLocal);
     return Number.isNaN(d.getTime()) ? new Date() : d;
@@ -104,6 +108,11 @@ export const QuickTradeModal: React.FC = () => {
       alert('Invalid Risk:Reward calculation. Please check your stop and target relative to entry and direction.');
       return;
     }
+    const enteredRisk = Number(riskPercent);
+    if (!Number.isFinite(enteredRisk) || enteredRisk <= 0 || enteredRisk > 100) {
+      alert('Enter the percentage of capital actually risked on this trade (greater than 0 and at most 100).');
+      return;
+    }
 
     const processScore = {
       session: checkSession,
@@ -129,6 +138,7 @@ export const QuickTradeModal: React.FC = () => {
       stopPrice: numStop,
       targetPrice: numTarget,
       plannedR: calculatedR,
+      riskPercentAtEntry: enteredRisk,
       status: 'OPEN',
       processScore,
       violations,
@@ -388,6 +398,16 @@ export const QuickTradeModal: React.FC = () => {
                 className="w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-slate-400 font-mono mb-1">Capital risked on this trade (%)</label>
+            <input
+              type="number" min="0.01" max="100" step="0.01" required
+              value={riskPercent} onChange={e => setRiskPercent(e.target.value)}
+              className="w-full sm:w-40 bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none"
+            />
+            <p className="text-[10px] text-slate-500 mt-1">Defaults to Trading HQ; change it if your actual position risk differs. Used for the capital estimate.</p>
           </div>
 
           {/* Pre-Trade Narrative & Setup Reasoning */}

@@ -19,6 +19,7 @@ import { AssetCategory, BiasType, Scenario, LiquidityZone, AssetChartScreenshot,
 import { MultiImageDropzone, ImageThumbGrid } from './ImageUploadDropzone';
 import { ImageViewerModal, LightboxImage } from './ImageViewerModal';
 import { PendingSetupsPanel } from './PendingSetupsPanel';
+import { DeskAnalysisLifecycle } from './DeskAnalysisLifecycle';
 
 const PLACEMENT_LABEL: Record<DeskChartPlacement, string> = {
   narrative: 'Narrative',
@@ -36,7 +37,7 @@ export const AssetDesksView: React.FC = () => {
   const currentDesk = assets.find(a => a.id === selectedAssetId) || assets[0];
   const pendingCount = currentDesk ? pendingSetups.filter((p) => p.deskId === currentDesk.id && p.status === 'PENDING').length : 0;
 
-  type DeskTab = 'overview' | 'liquidity' | 'wyckoff' | 'external' | 'scenarios' | 'charts' | 'setups';
+  type DeskTab = 'overview' | 'liquidity' | 'wyckoff' | 'external' | 'scenarios' | 'charts' | 'setups' | 'history';
   const [activeSubTab, setActiveSubTab] = useState<DeskTab>('overview');
   // Open a specific sub-tab when another screen asks (e.g. the Dashboard's pending setups).
   useEffect(() => {
@@ -380,6 +381,7 @@ export const AssetDesksView: React.FC = () => {
           { id: 'external', label: '5. External Context' },
           { id: 'charts', label: '6. Charts & Screenshots' },
           { id: 'setups', label: `7. Pending Setups${pendingCount ? ` (${pendingCount})` : ''}` },
+          { id: 'history', label: '8. Analysis History' },
         ].map(tab => (
           <button
             key={tab.id}
@@ -396,6 +398,7 @@ export const AssetDesksView: React.FC = () => {
       {/* 1. Overview */}
       {activeSubTab === 'overview' && (
         <div className="space-y-4">
+          {!editingNarrative && !editingHTF && <DeskAnalysisLifecycle desk={currentDesk} mode="actions" />}
           <div className="bg-panel border border-slate-800 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="font-mono text-xs font-bold text-slate-200 uppercase flex items-center gap-2">
@@ -450,6 +453,8 @@ export const AssetDesksView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {activeSubTab === 'history' && <DeskAnalysisLifecycle desk={currentDesk} mode="history" />}
 
       {/* 2. Liquidity & POIs */}
       {activeSubTab === 'liquidity' && (
