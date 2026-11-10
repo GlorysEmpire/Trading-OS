@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { PageTitle } from './PageTitle';
 import { useTrading } from '../context/TradingContext';
 import { Sliders, ShieldCheck, Clock, AlertOctagon, Save, Tag, Info, Layers, History, Plus, Trash2, ListChecks, FlaskConical, CalendarDays } from 'lucide-react';
@@ -59,6 +59,7 @@ function SectionHeader({
 
 export const TradingHQView: React.FC = () => {
   const { tradingHQ, hqLoading, hqError, updateHQCategory } = useTrading();
+  const [activeSection, setActiveSection] = useState<HQCategory>('risk');
   const [savingCategory, setSavingCategory] = useState<HQCategory | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -113,6 +114,28 @@ export const TradingHQView: React.FC = () => {
   // ---- Section 7: Research Framework ----
   const [minSamples, setMinSamples] = useState(tradingHQ.researchFramework.minSamples);
   const [researchNotes, setResearchNotes] = useState(tradingHQ.researchFramework.notes);
+
+  // The actual saved HQ arrives after authentication. Bring every editor up
+  // to date when a version loads or is saved, rather than leaving seed values
+  // in a hidden tab.
+  const configFingerprint = JSON.stringify(tradingHQ);
+  useEffect(() => {
+    if (hqLoading) return;
+    setRiskPerSetup(tradingHQ.riskRules.riskPerSetupPct);
+    setMaxDailyLosses(tradingHQ.riskRules.maxDailyLosses);
+    setNoReEntry(tradingHQ.riskRules.noReEntry);
+    setNoAdding(tradingHQ.riskRules.noAdding);
+    setScratchCountsAsLoss(tradingHQ.riskRules.scratchCountsAsLoss);
+    setMaxOpenTrades(tradingHQ.riskRules.maxOpenTrades);
+    setSetupGrades(tradingHQ.setupGrades);
+    setExecutionModels(tradingHQ.executionModels);
+    setSessions(tradingHQ.sessions);
+    setMistakeCodes(tradingHQ.mistakeCodes);
+    setProcessChecks(tradingHQ.processChecks);
+    setFocusRotation(tradingHQ.focusRotation);
+    setMinSamples(tradingHQ.researchFramework.minSamples);
+    setResearchNotes(tradingHQ.researchFramework.notes);
+  }, [hqLoading, configFingerprint]);
 
   async function saveCategory(category: HQCategory, content: unknown, reasonPrompt = true) {
     const reason = reasonPrompt ? window.prompt('Why is this changing? (recorded on the new version, optional)') ?? '' : '';
@@ -200,14 +223,27 @@ export const TradingHQView: React.FC = () => {
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <PageTitle icon={Sliders} title="Trading HQ" description="Your rulebook: risk, grades, sessions, mistake codes and focus rotation. Every change is saved as a new version, so past trades keep the rules they were taken under." />
+        <PageTitle icon={Sliders} title="Trading HQ" description="Edit one part of your trading system at a time. Every save creates a new version." />
         <CategoryVersionBadge label={tradingHQ.version.replace(/^v/, '')} />
       </div>
 
       {hqError && <p className="text-sm font-mono text-rose-400">{hqError}</p>}
       {saveError && <p className="text-sm font-mono text-rose-400">{saveError}</p>}
 
-      <div className="p-4 bg-panel border-l-4 border-cyan-400 rounded-r-lg shadow-sm space-y-1">
+      <nav aria-label="Trading HQ sections" className="flex gap-1 overflow-x-auto rounded-xl border border-line bg-panel p-1.5">
+        {([
+          ['risk', 'Risk'], ['setup_quality', 'Grades'], ['execution_model', 'Models'],
+          ['session', 'Sessions'], ['process_score', 'Process'], ['mistake_code', 'Mistakes'],
+          ['research_framework', 'Research'], ['focus_rotation', 'Focus'],
+        ] as [HQCategory, string][]).map(([section, label]) => (
+          <button key={section} onClick={() => setActiveSection(section)} aria-current={activeSection === section ? 'page' : undefined}
+            className={`shrink-0 rounded-lg px-3.5 py-2.5 text-xs sm:text-sm transition ${activeSection === section ? 'bg-sky-600 text-white font-semibold shadow-sm' : 'text-ink-3 hover:bg-raised hover:text-ink'}`}>
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      {activeSection === 'execution_model' && <div className="p-4 bg-panel border-l-4 border-cyan-400 rounded-r-lg shadow-sm space-y-1">
         <div className="flex items-center gap-2 text-cyan-300 font-mono text-xs font-bold uppercase tracking-wider">
           <Info className="w-4 h-4 text-cyan-400" />
           Mandatory Wyckoff terminology governance: AR = automatic reaction
@@ -218,10 +254,10 @@ export const TradingHQView: React.FC = () => {
           confirmation, execution step, or mandatory sequence requirement. This note documents the default
           methodology's own terminology — it's not enforced on a different strategy's execution models below.
         </p>
-      </div>
+      </div>}
 
       {/* Section 1: Risk Rules */}
-      <div className="bg-panel border border-slate-800 rounded-xl p-5 space-y-4">
+      <div className={`bg-panel border border-slate-800 rounded-xl p-5 space-y-4 ${activeSection !== 'risk' ? 'hidden' : ''}`}>
         <SectionHeader
           icon={<ShieldCheck className="w-4 h-4 text-emerald-400" />}
           title="1. RISK RULES & DRAWDOWN CONTROLS"
@@ -288,7 +324,7 @@ export const TradingHQView: React.FC = () => {
       </div>
 
       {/* Section 2: Setup Grades */}
-      <div className="bg-panel border border-slate-800 rounded-xl p-5 space-y-4">
+      <div className={`bg-panel border border-slate-800 rounded-xl p-5 space-y-4 ${activeSection !== 'setup_quality' ? 'hidden' : ''}`}>
         <SectionHeader
           icon={<Tag className="w-4 h-4 text-purple-400" />}
           title="2. SETUP GRADES & MINIMUM THRESHOLDS"
@@ -351,7 +387,7 @@ export const TradingHQView: React.FC = () => {
       </div>
 
       {/* Section 3: Execution Models */}
-      <div className="bg-panel border border-slate-800 rounded-xl p-5 space-y-4">
+      <div className={`bg-panel border border-slate-800 rounded-xl p-5 space-y-4 ${activeSection !== 'execution_model' ? 'hidden' : ''}`}>
         <SectionHeader
           icon={<Layers className="w-4 h-4 text-cyan-400" />}
           title={`3. EXECUTION MODELS (${executionModels.length})`}
@@ -408,7 +444,7 @@ export const TradingHQView: React.FC = () => {
       </div>
 
       {/* Section 4: Sessions */}
-      <div className="bg-panel border border-slate-800 rounded-xl p-5 space-y-4">
+      <div className={`bg-panel border border-slate-800 rounded-xl p-5 space-y-4 ${activeSection !== 'session' ? 'hidden' : ''}`}>
         <SectionHeader
           icon={<Clock className="w-4 h-4 text-emerald-400" />}
           title="4. OPERATIONAL SESSION WINDOWS"
@@ -486,7 +522,7 @@ export const TradingHQView: React.FC = () => {
       </div>
 
       {/* Section 5: Mistake Codes */}
-      <div className="bg-panel border border-slate-800 rounded-xl p-5 space-y-4">
+      <div className={`bg-panel border border-slate-800 rounded-xl p-5 space-y-4 ${activeSection !== 'mistake_code' ? 'hidden' : ''}`}>
         <SectionHeader
           icon={<AlertOctagon className="w-4 h-4 text-amber-400" />}
           title="5. MISTAKE CODE TAXONOMY"
@@ -560,7 +596,7 @@ export const TradingHQView: React.FC = () => {
       </div>
 
       {/* Section 6: Process Checklist */}
-      <div className="bg-panel border border-slate-800 rounded-xl p-5 space-y-4">
+      <div className={`bg-panel border border-slate-800 rounded-xl p-5 space-y-4 ${activeSection !== 'process_score' ? 'hidden' : ''}`}>
         <SectionHeader
           icon={<ListChecks className="w-4 h-4 text-cyan-400" />}
           title="6. PROCESS CHECKLIST"
@@ -582,7 +618,7 @@ export const TradingHQView: React.FC = () => {
       </div>
 
       {/* Section 7: Research Framework */}
-      <div className="bg-panel border border-slate-800 rounded-xl p-5 space-y-4">
+      <div className={`bg-panel border border-slate-800 rounded-xl p-5 space-y-4 ${activeSection !== 'research_framework' ? 'hidden' : ''}`}>
         <SectionHeader
           icon={<FlaskConical className="w-4 h-4 text-purple-400" />}
           title="7. RESEARCH FRAMEWORK"
@@ -619,7 +655,7 @@ export const TradingHQView: React.FC = () => {
       </div>
 
       {/* Section 8: Focus Rotation */}
-      <div className="bg-panel border border-slate-800 rounded-xl p-5 space-y-4">
+      <div className={`bg-panel border border-slate-800 rounded-xl p-5 space-y-4 ${activeSection !== 'focus_rotation' ? 'hidden' : ''}`}>
         <SectionHeader
           icon={<CalendarDays className="w-4 h-4 text-cyan-400" />}
           title="8. WEEKLY FOCUS ROTATION"

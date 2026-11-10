@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { TradingProvider, useTrading } from './context/TradingContext';
 import { LoginView } from './components/LoginView';
-import { Header } from './components/Header';
+import { AppNavigation } from './components/AppNavigation';
 import { QuickTradeModal } from './components/QuickTradeModal';
 import { DashboardView } from './components/DashboardView';
 import { CalendarView } from './components/CalendarView';
@@ -78,8 +78,8 @@ const MainShell: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col font-sans bg-canvas text-ink transition-colors duration-200">
-      <Header />
-      <main className="flex-1 overflow-x-hidden">{renderActiveView()}</main>
+      <AppNavigation />
+      <main className="flex-1 overflow-x-hidden pb-18 md:pb-0">{renderActiveView()}</main>
       <QuickTradeModal />
     </div>
   );

@@ -19,6 +19,7 @@ export const ResearchView: React.FC = () => {
   const { tradingHQ, researchQuestions, addResearchQuestion, backtestSamples, setActiveTab, researchLoading, researchError, localResearchImportCount, importLocalResearchQuestions } = useTrading();
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [openQuestionId, setOpenQuestionId] = useState<string | null>(null);
   const [code, setCode] = useState(`RQ-0${researchQuestions.length + 1}`);
   const [title, setTitle] = useState('');
   const [hypothesis, setHypothesis] = useState('');
@@ -75,8 +76,10 @@ export const ResearchView: React.FC = () => {
         )}
       </div>
 
-      {/* Scientific Workflow Diagram */}
-      <div className="p-3 bg-panel border border-slate-800 rounded-xl flex flex-wrap items-center justify-around gap-2 text-xs font-mono">
+      {/* Process guide is available on demand. */}
+      <details className="bg-panel border border-line rounded-xl p-4">
+        <summary className="cursor-pointer text-sm font-medium text-ink-2">How research becomes a rule</summary>
+        <div className="mt-4 flex flex-wrap items-center justify-around gap-2 text-xs font-mono">
         <span className="text-slate-400 font-semibold">1. Observation</span>
         <ArrowRight className="w-3.5 h-3.5 text-slate-600" />
         <span className="text-purple-300 font-semibold">2. Hypothesis</span>
@@ -88,7 +91,8 @@ export const ResearchView: React.FC = () => {
         <span className="text-emerald-400 font-bold flex items-center gap-1">
           <Lock className="w-3 h-3" /> 5. Locked rule (trading HQ)
         </span>
-      </div>
+        </div>
+      </details>
 
       {/* Questions Cards */}
       <div className="space-y-4">
@@ -124,14 +128,21 @@ export const ResearchView: React.FC = () => {
                   >
                     STATUS: {rq.status}
                   </span>
+                  <button onClick={() => setOpenQuestionId(openQuestionId === rq.id ? null : rq.id)}
+                    aria-expanded={openQuestionId === rq.id}
+                    className="rounded-lg border border-line px-3 py-1.5 text-xs text-cyan-300 hover:bg-raised">
+                    {openQuestionId === rq.id ? 'Close' : 'Open question'}
+                  </button>
                 </div>
               </div>
 
               {/* Hypothesis */}
+              {openQuestionId === rq.id && <>
               <div className="bg-canvas p-3 rounded border border-slate-800 space-y-1">
                 <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Core hypothesis:</span>
                 <p className="text-xs text-slate-200 font-sans leading-relaxed italic">"{rq.hypothesis}"</p>
               </div>
+              </>}
 
               {/* Sample Progress */}
               <div className="space-y-1.5 font-mono text-xs">
@@ -150,10 +161,12 @@ export const ResearchView: React.FC = () => {
               </div>
 
               {/* Findings */}
+              {openQuestionId === rq.id && <>
               <div className="space-y-1 text-xs">
                 <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Preliminary findings & evidence:</span>
                 <p className="text-slate-300 font-sans leading-relaxed">{rq.findings}</p>
               </div>
+              </>}
 
               {/* Action Bar */}
               <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 text-xs font-mono">
@@ -174,7 +187,7 @@ export const ResearchView: React.FC = () => {
       {/* Add Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-panel border border-slate-700 rounded-lg max-w-lg w-full text-slate-200 p-6 space-y-4">
+          <div className="bg-panel border border-line rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto text-ink p-5 sm:p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="font-mono text-sm font-bold text-slate-100 uppercase">Register research question</h3>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-200">

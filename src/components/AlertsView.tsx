@@ -107,7 +107,7 @@ export const AlertsView: React.FC = () => {
       {/* Add Alert Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-panel border border-slate-700 rounded-lg max-w-lg w-full text-slate-200 p-6 space-y-4">
+          <div className="bg-panel border border-line rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto text-ink p-5 sm:p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="font-mono text-sm font-bold text-slate-100 uppercase">Create conceptual alert</h3>
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-200">

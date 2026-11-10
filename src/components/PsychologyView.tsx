@@ -26,7 +26,7 @@ export const PsychologyView: React.FC = () => {
   const [fearOfMissingOut, setFearOfMissingOut] = useState(false);
   const [protectingPnL, setProtectingPnL] = useState(false);
   const [tradeId, setTradeId] = useState('');
-  const [keyLesson, setKeyLesson] = useState('Strict execution of plan without emotional bargaining.');
+  const [keyLesson, setKeyLesson] = useState('');
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,7 +58,7 @@ export const PsychologyView: React.FC = () => {
       emotionalState,
       hesitationNotes: hesitation ? 'Felt hesitation despite meeting all Trading HQ setup criteria' : undefined,
       recurringPatternObserved: patterns.join(', ') || undefined,
-      keyLesson: keyLesson.trim() || 'Process adherence is the primary goal.',
+      keyLesson: keyLesson.trim(),
     });
 
     setThoughtsText('');
@@ -98,17 +98,14 @@ export const PsychologyView: React.FC = () => {
         </button>
       </div>
 
-      {/* Behavioral Pattern Frequency Radar */}
-      <div className="bg-panel border border-slate-800 rounded-xl p-4 space-y-3">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-          <span className="font-mono text-xs font-bold text-slate-200 uppercase flex items-center gap-2">
-            <Activity className="w-4 h-4 text-rose-400" />
-            Recurring behavioral patterns detected
-          </span>
-          <span className="text-[11px] font-mono text-slate-400">Systemic friction radar</span>
-        </div>
+      {/* Patterns stay available without crowding the journal. */}
+      {Object.keys(patternCounts).length > 0 && <details className="bg-panel border border-line rounded-xl p-4">
+        <summary className="list-none cursor-pointer flex items-center justify-between text-sm font-medium text-ink-2">
+          <span className="inline-flex items-center gap-2"><Activity className="w-4 h-4 text-cyan-400" /> Patterns you've tagged</span>
+          <span className="text-xs text-ink-3">{Object.keys(patternCounts).length} themes · View</span>
+        </summary>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
           {Object.entries(patternCounts).map(([pattern, count]) => (
             <div key={pattern} className="p-3 rounded bg-raised border border-slate-800 space-y-1">
               <div className="flex items-center justify-between font-mono">
@@ -118,12 +115,12 @@ export const PsychologyView: React.FC = () => {
                 </span>
               </div>
               <span className="text-[10px] text-slate-500 block font-sans">
-                Flagged across psychological journals
+                Tagged in your notes
               </span>
             </div>
           ))}
         </div>
-      </div>
+      </details>}
 
       {/* Entries List */}
       <div className="space-y-3">
@@ -177,7 +174,7 @@ export const PsychologyView: React.FC = () => {
       {/* Add Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-panel border border-slate-700 rounded-lg max-w-lg w-full text-slate-200 p-6 space-y-4">
+          <div className="bg-panel border border-line rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto text-ink p-5 sm:p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="font-mono text-sm font-bold text-slate-100 uppercase">Log psychology reflection</h3>
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-200">
@@ -186,6 +183,16 @@ export const PsychologyView: React.FC = () => {
             </div>
 
             <form onSubmit={handleCreate} className="space-y-4 text-xs font-mono">
+              <div>
+                <label className="block text-ink-2 mb-1.5 text-sm font-medium">What's on your mind?</label>
+                <textarea rows={5} required
+                  placeholder="Write freely about the decision, your thoughts, or what you noticed."
+                  value={thoughtsText} onChange={event => setThoughtsText(event.target.value)}
+                  className="w-full bg-raised border border-line rounded-lg px-3 py-2.5 text-ink outline-none focus:border-cyan-500 font-sans text-sm resize-y" />
+              </div>
+              <details className="rounded-lg border border-line bg-raised p-3">
+                <summary className="cursor-pointer text-xs font-medium text-ink-2">Add context (optional)</summary>
+                <div className="space-y-4 mt-4">
               <div>
                 <label className="block text-slate-400 mb-1">Linked trade (optional)</label>
                 <select
@@ -276,18 +283,8 @@ export const PsychologyView: React.FC = () => {
                   </label>
                 </div>
               </div>
-
-              <div>
-                <label className="block text-slate-400 mb-1">Honest internal reflection</label>
-                <textarea
-                  rows={3}
-                  required
-                  placeholder="What were you thinking and feeling? Were you adhering strictly to the process, or feeling defensive about paper gains?"
-                  value={thoughtsText}
-                  onChange={(e) => setThoughtsText(e.target.value)}
-                  className="w-full bg-raised border border-slate-700 rounded px-3 py-2 text-slate-100 outline-none font-sans"
-                />
-              </div>
+                </div>
+              </details>
 
               <div>
                 <label className="block text-slate-400 mb-1">Key takeaway / lesson</label>

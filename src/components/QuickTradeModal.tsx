@@ -12,6 +12,7 @@ export const QuickTradeModal: React.FC = () => {
     setQuickTradeModalOpen,
     tradingHQ,
     assets,
+    selectedAssetId,
     addTrade,
     performanceStats,
   } = useTrading();
@@ -49,8 +50,10 @@ export const QuickTradeModal: React.FC = () => {
     if (quickTradeModalOpen) {
       setEntryLocal(toLocalInput(new Date()));
       setRiskPercent(String(tradingHQ.riskRules.riskPerSetupPct));
+      const selected = assets.find(item => item.id === selectedAssetId);
+      if (selected) setAsset(selected.symbol);
     }
-  }, [quickTradeModalOpen, tradingHQ.riskRules.riskPerSetupPct]);
+  }, [quickTradeModalOpen, tradingHQ.riskRules.riskPerSetupPct, selectedAssetId]);
   const entryDate = useMemo(() => {
     const d = new Date(entryLocal);
     return Number.isNaN(d.getTime()) ? new Date() : d;

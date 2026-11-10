@@ -123,7 +123,6 @@ export const DashboardView: React.FC = () => {
     performanceStats,
     setActiveTab,
     setSelectedAssetId,
-    setQuickTradeModalOpen,
     debriefs,
     setDebriefDate,
     weeklyReviews,
@@ -134,6 +133,7 @@ export const DashboardView: React.FC = () => {
 
   const [aiBriefLoading, setAiBriefLoading] = useState(false);
   const [aiBriefText, setAiBriefText] = useState<string | null>(null);
+  const [dashboardPane, setDashboardPane] = useState<'today' | 'markets' | 'progress'>('today');
 
   // Ticks once a minute so the active-session indicator (and the LIVE
   // badge in the sessions card) actually moves across sessions over the
@@ -281,14 +281,19 @@ export const DashboardView: React.FC = () => {
             <Sparkles className="w-4 h-4 text-sky-400" />
             <span>{aiBriefLoading ? 'Writing your brief…' : 'Daily brief'}</span>
           </button>
-          <button
-            onClick={() => setQuickTradeModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition shadow-sm"
-          >
-            <span>+ Log trade</span>
-          </button>
         </div>
       </div>
+
+      <nav aria-label="Dashboard sections" className="inline-flex max-w-full overflow-x-auto rounded-xl border border-line bg-panel p-1">
+        {([
+          ['today', 'Today'], ['markets', 'Markets'], ['progress', 'Progress'],
+        ] as const).map(([pane, label]) => (
+          <button key={pane} onClick={() => setDashboardPane(pane)} aria-current={dashboardPane === pane ? 'page' : undefined}
+            className={`rounded-lg px-4 py-2 text-sm whitespace-nowrap transition ${dashboardPane === pane ? 'bg-raised text-ink font-semibold shadow-sm' : 'text-ink-3 hover:text-ink'}`}>
+            {label}
+          </button>
+        ))}
+      </nav>
 
       {performanceStats.riskStatus === 'MAX_LOSS_HALT' && (
         <div className="bg-rose-950/50 border border-rose-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
@@ -313,7 +318,7 @@ export const DashboardView: React.FC = () => {
         </div>
       )}
 
-      {showMission && (
+      {dashboardPane === 'today' && <>{showMission && (
         <div className="bg-panel border border-slate-800 rounded-xl px-4 py-3 grid grid-cols-1 md:grid-cols-[auto_1fr_1fr_auto] gap-3 items-center font-mono text-xs">
           <div className="min-w-0">
             <span className="text-[10px] text-slate-500 uppercase tracking-wider block">Today's focus</span>
@@ -557,9 +562,10 @@ export const DashboardView: React.FC = () => {
           </div>
         </div>
       </section>
+      </>}
 
       {/* SECTION 2: MARKET — What am I watching? */}
-      <section className="space-y-3">
+      {dashboardPane === 'markets' && <section className="space-y-3">
         <div className="flex items-center justify-between border-b border-slate-800 pb-2">
           <h3 className="text-base font-semibold text-ink flex items-center gap-2">
             <Layers className="w-4 h-4 text-emerald-400" />
@@ -689,10 +695,10 @@ export const DashboardView: React.FC = () => {
           })}
         </div>
         )}
-      </section>
+      </section>}
 
       {/* SECTION 3: TRADING — Performance & Process Score Matrix */}
-      <section className="space-y-3">
+      {dashboardPane === 'progress' && <section className="space-y-3">
         <div className="flex items-center justify-between border-b border-slate-800 pb-2">
           <h3 className="text-base font-semibold text-ink flex items-center gap-2">
             <Activity className="w-4 h-4 text-cyan-400" />
@@ -802,10 +808,10 @@ export const DashboardView: React.FC = () => {
           </div>
         </div>
         )}
-      </section>
+      </section>}
 
       {/* SECTION 4: RESEARCH & LEARNING */}
-      {widgetPrefs.research && (
+      {dashboardPane === 'progress' && widgetPrefs.research && (
       <section className="space-y-3">
         <div className="flex items-center justify-between border-b border-slate-800 pb-2">
           <h3 className="text-base font-semibold text-ink flex items-center gap-2">

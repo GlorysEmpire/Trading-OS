@@ -30,7 +30,8 @@ export const JournalView: React.FC = () => {
   const [filterAsset, setFilterAsset] = useState<string>('ALL');
   const [filterProcess, setFilterProcess] = useState<string>('ALL');
   const [filterOutcome, setFilterOutcome] = useState<string>('ALL');
-  const [expandedTradeId, setExpandedTradeId] = useState<string | null>(trades[0]?.id || null);
+  const [expandedTradeId, setExpandedTradeId] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Lightbox Modal state
   const [lightboxImages, setLightboxImages] = useState<LightboxImage[]>([]);
@@ -182,7 +183,15 @@ Provide an objective assessment:
       </div>
 
       {/* Filters Bar */}
-      <div className="bg-panel border border-slate-800 rounded-xl p-3 flex flex-wrap items-center gap-4 text-xs font-mono">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-ink-3">{filteredTrades.length} trade{filteredTrades.length === 1 ? '' : 's'}</p>
+        <button onClick={() => setFiltersOpen(open => !open)} aria-expanded={filtersOpen}
+          className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel hover:bg-raised px-3 py-2 text-xs text-ink-2">
+          <Filter className="w-3.5 h-3.5" />
+          Filters{[filterAsset, filterProcess, filterOutcome].filter(value => value !== 'ALL').length > 0 ? ` · ${[filterAsset, filterProcess, filterOutcome].filter(value => value !== 'ALL').length} active` : ''}
+        </button>
+      </div>
+      {filtersOpen && <div className="bg-panel border border-slate-800 rounded-xl p-3 flex flex-wrap items-center gap-4 text-xs font-mono">
         <div className="flex items-center gap-2">
           <Filter className="w-3.5 h-3.5 text-slate-400" />
           <span className="text-slate-400">Asset:</span>
@@ -224,7 +233,7 @@ Provide an objective assessment:
             <option value="SCRATCH">Scratch / BE</option>
           </select>
         </div>
-      </div>
+      </div>}
 
       {/* Trades List */}
       <div className="space-y-3">

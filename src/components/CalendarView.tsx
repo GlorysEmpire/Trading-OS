@@ -18,6 +18,7 @@ export const CalendarView: React.FC = () => {
   const { calendarEvents, addCalendarEvent, toggleCalendarEvent } = useTrading();
 
   const [filterType, setFilterType] = useState<string>('ALL');
+  const [showCompleted, setShowCompleted] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
 
   // Form states
@@ -30,9 +31,10 @@ export const CalendarView: React.FC = () => {
   const [reminderMin, setReminderMin] = useState(15);
 
   const filteredEvents = calendarEvents.filter((ev) => {
+    if (!showCompleted && ev.completed) return false;
     if (filterType !== 'ALL' && ev.type !== filterType) return false;
     return true;
-  });
+  }).sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`));
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,31 +71,26 @@ export const CalendarView: React.FC = () => {
         </button>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto text-xs font-mono border-b border-slate-800 pb-2">
-        {[
-          { id: 'ALL', label: 'All Events' },
-          { id: 'NEWS', label: 'High-Impact News' },
-          { id: 'BACKTEST', label: 'Backtest Sessions' },
-          { id: 'TRADING_SESSION', label: 'Market Windows' },
-          { id: 'REVIEW', label: 'Process Reviews' },
-        ].map((f) => (
-          <button
-            key={f.id}
-            onClick={() => setFilterType(f.id)}
-            className={`px-3 py-1.5 rounded transition ${
-              filterType === f.id
-                ? 'bg-raised text-cyan-300 border border-cyan-500/40 font-bold'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-ink-3">{filteredEvents.length} scheduled item{filteredEvents.length === 1 ? '' : 's'}</p>
+        <div className="flex flex-wrap items-center gap-3">
+        <label className="text-xs text-ink-3">Show
+          <select value={filterType} onChange={event => setFilterType(event.target.value)}
+            className="ml-2 rounded-lg border border-line bg-panel px-3 py-2 text-xs text-ink-2">
+            <option value="ALL">All events</option>
+            <option value="NEWS">News</option>
+            <option value="BACKTEST">Backtesting</option>
+            <option value="TRADING_SESSION">Trading windows</option>
+            <option value="REVIEW">Reviews</option>
+          </select>
+        </label>
+        <label className="inline-flex items-center gap-1.5 text-xs text-ink-3"><input type="checkbox" checked={showCompleted} onChange={event => setShowCompleted(event.target.checked)} className="accent-cyan-500" /> Completed</label>
+        </div>
       </div>
 
       {/* Events Timeline / Matrix */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {filteredEvents.length === 0 && <p className="col-span-full rounded-xl border border-line bg-panel p-6 text-sm text-ink-3">No items in this view. Change the filter or add an event.</p>}
         {filteredEvents.map((ev) => {
           return (
             <div
@@ -171,7 +168,7 @@ export const CalendarView: React.FC = () => {
       {/* Add Event Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-panel border border-slate-700 rounded-lg max-w-lg w-full text-slate-200 p-6 space-y-4">
+          <div className="bg-panel border border-line rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto text-ink p-5 sm:p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="font-mono text-sm font-bold text-slate-100 uppercase">Schedule operational event</h3>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-200">

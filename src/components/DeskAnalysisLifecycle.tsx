@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Archive, CheckCircle2, RotateCcw } from 'lucide-react';
-import { useTrading } from '../context/TradingContext';
+import { CheckCircle2 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import {
   loadDeskAnalysisHistory, type DeskAnalysisHistory,
@@ -8,20 +7,10 @@ import {
 } from '../lib/deskAnalysisHistoryStore';
 import type { AssetDeskData } from '../types';
 
-const SCOPES: { value: DeskAnalysisScope; label: string; description: string }[] = [
-  { value: 'narrative', label: 'Narrative & bias', description: 'Clears the current narrative, bias and charts placed with the narrative.' },
-  { value: 'monthly', label: 'Monthly structure', description: 'Clears only monthly structure and its placed charts.' },
-  { value: 'weekly', label: 'Weekly structure', description: 'Clears only weekly structure and its placed charts.' },
-  { value: 'daily', label: 'Daily structure', description: 'Clears only daily structure and its placed charts.' },
-  { value: 'h4', label: '4H structure', description: 'Clears only 4H structure and its placed charts.' },
-  { value: 'all', label: 'Entire analysis', description: 'Clears narrative, bias, structure, liquidity, POIs, Wyckoff, scenarios, context, notes and charts.' },
-];
-const OUTCOMES: { value: DeskAnalysisOutcome; label: string }[] = [
-  { value: 'TARGET_HIT', label: 'Target hit' },
-  { value: 'INVALIDATED', label: 'Invalidated' },
-  { value: 'COMPLETED', label: 'Analysis complete' },
-  { value: 'RESET', label: 'Start a new analysis' },
-];
+const SCOPES: Record<DeskAnalysisScope, string> = {
+  narrative: 'Narrative', monthly: 'Monthly', weekly: 'Weekly',
+  daily: 'Daily', h4: '4H', all: 'Entire analysis',
+};
 const LABEL: Record<DeskAnalysisOutcome, string> = {
   TARGET_HIT: 'Target hit', INVALIDATED: 'Invalidated',
   COMPLETED: 'Analysis complete', RESET: 'Reset',
@@ -72,12 +61,7 @@ function HistoryContent({ item }: { item: DeskAnalysisHistory }) {
   );
 }
 
-export const DeskAnalysisLifecycle: React.FC<{ desk: AssetDeskData; mode: 'actions' | 'history' }> = ({ desk, mode }) => {
-  const { resolveDeskAnalysis } = useTrading();
-  const [scope, setScope] = useState<DeskAnalysisScope>('narrative');
-  const [outcome, setOutcome] = useState<DeskAnalysisOutcome>('TARGET_HIT');
-  const [reason, setReason] = useState('');
-  const [saving, setSaving] = useState(false);
+export const DeskAnalysisLifecycle: React.FC<{ desk: AssetDeskData }> = ({ desk }) => {
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<DeskAnalysisHistory[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -102,72 +86,19 @@ export const DeskAnalysisLifecycle: React.FC<{ desk: AssetDeskData; mode: 'actio
     return () => { active = false; };
   }, [desk.id]);
 
-  const selectedScope = SCOPES.find(item => item.value === scope)!;
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (outcome === 'INVALIDATED' && !reason.trim()) {
-      setError('Add a short reason so you can review what invalidated the analysis later.');
-      return;
-    }
-    setError(null);
-    setSaving(true);
-    try {
-      const archived = await resolveDeskAnalysis(desk.id, scope, outcome, reason.trim());
-      setHistory(previous => [archived, ...previous]);
-      setExpandedId(archived.id);
-      setReason('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not archive analysis');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   return (
     <div className="space-y-4">
-      {mode === 'actions' && (
-        <form onSubmit={submit} className="rounded-2xl border border-cyan-800/50 bg-gradient-to-br from-cyan-950/30 via-panel to-panel p-4 sm:p-5 space-y-4">
-          <div className="flex items-start gap-3">
-            <div className="rounded-xl bg-cyan-900/40 p-2 text-cyan-300"><RotateCcw className="w-5 h-5" /></div>
-            <div>
-              <h3 className="text-sm sm:text-base font-semibold text-ink">Close this analysis, then start fresh</h3>
-              <p className="text-xs text-ink-3 mt-1">A snapshot is saved to History before the selected active analysis is cleared.</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <label className="text-xs text-ink-3">What is finished?
-              <select value={scope} onChange={e => setScope(e.target.value as DeskAnalysisScope)} className="block w-full mt-1.5 bg-raised border border-line rounded-lg p-2.5 text-ink">
-                {SCOPES.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
-              </select>
-            </label>
-            <label className="text-xs text-ink-3">What happened?
-              <select value={outcome} onChange={e => setOutcome(e.target.value as DeskAnalysisOutcome)} className="block w-full mt-1.5 bg-raised border border-line rounded-lg p-2.5 text-ink">
-                {OUTCOMES.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
-              </select>
-            </label>
-          </div>
-          <p className="text-xs text-cyan-200/80">{selectedScope.description}</p>
-          <label className="text-xs text-ink-3 block">Why? {outcome === 'INVALIDATED' ? '(required)' : '(optional)'}
-            <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2}
-              placeholder={outcome === 'TARGET_HIT' ? 'Which target was reached?' : 'What changed in the market?'}
-              className="block w-full mt-1.5 bg-raised border border-line rounded-lg p-2.5 text-ink resize-y" />
-          </label>
-          <button disabled={saving} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-cyan-700 hover:bg-cyan-600 disabled:opacity-50 text-white text-sm font-semibold">
-            <Archive className="w-4 h-4" /> {saving ? 'Saving snapshot…' : 'Archive & start fresh'}
-          </button>
-        </form>
-      )}
       {error && <p role="alert" className="text-xs text-rose-400">{error}</p>}
-      {mode === 'history' && <div><h3 className="text-base font-semibold text-ink">Analysis history</h3><p className="text-xs text-ink-3 mt-1">Previous narratives and structure stay here for review.</p></div>}
+      <div><h3 className="text-base font-semibold text-ink">Analysis history</h3><p className="text-xs text-ink-3 mt-1">Previous narratives and structure stay here for review.</p></div>
       {loadingHistory && <p className="text-xs text-ink-3">Loading history…</p>}
-      {history.length === 0 && !loadingHistory && mode === 'history' && <p className="rounded-xl border border-line bg-panel p-5 text-sm text-ink-3">No analysis has been archived yet.</p>}
-      {(mode === 'history' ? history : history.slice(0, 1)).map(item => (
+      {history.length === 0 && !loadingHistory && <p className="rounded-xl border border-line bg-panel p-5 text-sm text-ink-3">No analysis has been archived yet.</p>}
+      {history.map(item => (
         <div key={item.id} className="rounded-xl border border-line bg-panel p-4">
           <button type="button" onClick={() => setExpandedId(expandedId === item.id ? null : item.id)} className="w-full text-left flex items-start gap-3">
             <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
             <span className="min-w-0 flex-1">
               <span className="flex flex-wrap gap-2 items-center text-sm font-semibold text-ink">
-                {LABEL[item.outcome]} · {SCOPES.find(s => s.value === item.scope)?.label}
+                {LABEL[item.outcome]} · {SCOPES[item.scope]}
                 <span className="text-xs font-normal text-ink-3">{new Date(item.createdAt).toLocaleString()}</span>
               </span>
               <span className="block text-xs text-ink-3 mt-1 line-clamp-2">{summary(item)}</span>

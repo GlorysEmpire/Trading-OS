@@ -168,7 +168,9 @@ export const BacktestingView: React.FC = () => {
       </div>
 
       {/* Analytics Comparison: Live vs Backtest */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
+      <details className="rounded-xl border border-line bg-panel p-4">
+        <summary className="cursor-pointer text-sm font-medium text-ink-2">Results snapshot <span className="text-ink-3 font-normal">· {totalSamples} samples · {btWinRate}% win rate</span></summary>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono mt-4">
         <div className="p-4 rounded-lg bg-panel border border-slate-800">
           <span className="text-[10px] text-slate-400 block uppercase">Backtest samples</span>
           <div className="text-xl font-bold text-slate-100 mt-1">{totalSamples}</div>
@@ -193,6 +195,7 @@ export const BacktestingView: React.FC = () => {
           <span className="text-[10px] text-slate-500">Expected sample payoff</span>
         </div>
       </div>
+      </details>
 
       {(backtestLoading || backtestError) && (
         <div className="space-y-1">

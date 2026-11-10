@@ -14,12 +14,16 @@ import {
   Activity,
   Camera,
   Star,
+  Archive,
+  History,
 } from 'lucide-react';
 import { AssetCategory, BiasType, Scenario, LiquidityZone, AssetChartScreenshot, DeskChartPlacement } from '../types';
 import { MultiImageDropzone, ImageThumbGrid } from './ImageUploadDropzone';
 import { ImageViewerModal, LightboxImage } from './ImageViewerModal';
 import { PendingSetupsPanel } from './PendingSetupsPanel';
 import { DeskAnalysisLifecycle } from './DeskAnalysisLifecycle';
+import { DeskAnalysisFinishDialog } from './DeskAnalysisFinishDialog';
+import type { DeskAnalysisScope } from '../lib/deskAnalysisHistoryStore';
 
 const PLACEMENT_LABEL: Record<DeskChartPlacement, string> = {
   narrative: 'Narrative',
@@ -32,7 +36,7 @@ const PLACEMENT_LABEL: Record<DeskChartPlacement, string> = {
 const inputClass = 'bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-200 outline-none focus:border-cyan-500 font-sans';
 
 export const AssetDesksView: React.FC = () => {
-  const { assets, selectedAssetId, setSelectedAssetId, updateAssetDesk, createInstrument, updateInstrument, archiveInstrument, setQuickTradeModalOpen, desksLoading, desksError, pendingSetups, deskTabRequest, setDeskTabRequest } = useTrading();
+  const { assets, selectedAssetId, setSelectedAssetId, updateAssetDesk, createInstrument, updateInstrument, archiveInstrument, desksLoading, desksError, pendingSetups, deskTabRequest, setDeskTabRequest } = useTrading();
 
   const currentDesk = assets.find(a => a.id === selectedAssetId) || assets[0];
   const pendingCount = currentDesk ? pendingSetups.filter((p) => p.deskId === currentDesk.id && p.status === 'PENDING').length : 0;
@@ -87,6 +91,9 @@ export const AssetDesksView: React.FC = () => {
   const [instrumentFormOpen, setInstrumentFormOpen] = useState(false);
   const [instrumentError, setInstrumentError] = useState<string | null>(null);
   const [instrumentDraft, setInstrumentDraft] = useState({ symbol: '', name: '', canonicalSymbol: '', category: 'CRYPTO' as AssetCategory, tradingViewSymbol: '' });
+  const [finishScope, setFinishScope] = useState<DeskAnalysisScope | null>(null);
+  const [analysisNotice, setAnalysisNotice] = useState<string | null>(null);
+  useEffect(() => { setFinishScope(null); setAnalysisNotice(null); }, [currentDesk?.id]);
 
   if (desksLoading) {
     return (
@@ -319,7 +326,7 @@ export const AssetDesksView: React.FC = () => {
             );
           })}
         </div>
-        <div className="flex gap-2"><button onClick={() => setInstrumentFormOpen(v => !v)} className="bg-panel hover:bg-raised text-ink-2 border border-line text-sm font-medium px-3 py-1.5 rounded-lg">+ Add market</button><button onClick={() => setQuickTradeModalOpen(true)} className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-3 py-1.5 rounded-lg transition"><span>+ Log {currentDesk.symbol} trade</span></button></div>
+        <button onClick={() => setInstrumentFormOpen(v => !v)} className="bg-panel hover:bg-raised text-ink-2 border border-line text-sm font-medium px-3 py-1.5 rounded-lg">+ Add market</button>
       </div>
       {instrumentError && <p className="text-xs font-mono text-rose-400">{instrumentError}</p>}
       {instrumentFormOpen && <form onSubmit={saveInstrument} className="bg-panel border border-slate-800 rounded-xl p-4 grid gap-3 md:grid-cols-2"><h3 className="md:col-span-2 text-sm font-mono font-bold text-slate-100">Add instrument / pair</h3>{([['Display symbol', 'symbol'], ['Name', 'name'], ['Canonical symbol', 'canonicalSymbol'], ['TradingView symbol (optional)', 'tradingViewSymbol']] as const).map(([title, field]) => <label key={field} className="text-[10px] font-mono text-slate-400">{title}<input required={field !== 'tradingViewSymbol'} value={instrumentDraft[field]} onChange={e => setInstrumentDraft({ ...instrumentDraft, [field]: e.target.value })} className={`${inputClass} w-full mt-1`} /></label>)}<label className="text-[10px] font-mono text-slate-400">Category<select value={instrumentDraft.category} onChange={e => setInstrumentDraft({ ...instrumentDraft, category: e.target.value as AssetCategory })} className={`${inputClass} w-full mt-1`}>{(['CRYPTO', 'INDICES', 'METALS', 'FX', 'EQUITIES', 'OTHER'] as AssetCategory[]).map(category => <option key={category}>{category}</option>)}</select></label><p className="md:col-span-2 text-xs text-slate-400">Use separate records for BTCUSD and BTCUSDT. Archive hides an instrument from new selectors without deleting desk/history.</p><button className="w-fit px-3 py-2 rounded-lg bg-cyan-600 text-white text-sm font-semibold">Save instrument</button></form>}
@@ -327,7 +334,7 @@ export const AssetDesksView: React.FC = () => {
       {/* Desk Subheader */}
       <div className="bg-panel border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-1">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-mono text-xl font-bold text-slate-100">{currentDesk.symbol}</h2>
             <span className="text-xs text-slate-400 font-mono">({currentDesk.name})</span>
             <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">{currentDesk.category}</span>
@@ -344,22 +351,12 @@ export const AssetDesksView: React.FC = () => {
             </a>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => toggleWatchlist(currentDesk.id, !currentDesk.watchlisted)}
-            className={`flex items-center gap-1 text-[10px] font-mono px-2 py-1 rounded border ${
-              currentDesk.watchlisted ? 'border-amber-700 text-amber-300 bg-amber-950/40' : 'border-slate-700 text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Star className="w-3 h-3" fill={currentDesk.watchlisted ? 'currentColor' : 'none'} />
-            <span>{currentDesk.watchlisted ? 'On market watch' : 'Add to market watch'}</span>
-          </button>
-          <button onClick={editCurrentInstrument} className="text-[10px] font-mono text-cyan-300">Edit instrument</button><button onClick={archiveCurrentInstrument} className="text-[10px] font-mono text-amber-300">Archive</button>
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] font-mono text-slate-400 uppercase">Current bias:</span>
           <select
             value={currentDesk.currentBias}
             onChange={e => handleBiasChange(e.target.value as BiasType)}
-            className="bg-raised border border-slate-700 rounded px-3 py-1.5 text-xs font-mono font-bold text-cyan-300 outline-none focus:border-cyan-500"
+            className="max-w-full bg-raised border border-slate-700 rounded px-3 py-1.5 text-xs font-mono font-bold text-cyan-300 outline-none focus:border-cyan-500"
           >
             <option value="BULLISH">BULLISH (Expansion)</option>
             <option value="BEARISH">BEARISH (Markdown)</option>
@@ -368,50 +365,75 @@ export const AssetDesksView: React.FC = () => {
             <option value="RE-ACCUMULATION">Re-accumulation</option>
             <option value="NEUTRAL">NEUTRAL (Range Bound)</option>
           </select>
+          <details className="relative">
+            <summary className="list-none cursor-pointer rounded-lg border border-line px-3 py-1.5 text-xs text-ink-3 hover:bg-raised hover:text-ink">Market options</summary>
+            <div className="absolute right-0 top-full mt-2 z-20 w-44 rounded-xl border border-line bg-panel p-1.5 shadow-xl">
+              <button onClick={() => toggleWatchlist(currentDesk.id, !currentDesk.watchlisted)} className="block w-full rounded-lg px-3 py-2 text-left text-xs text-ink-2 hover:bg-raised">{currentDesk.watchlisted ? 'Remove from watchlist' : 'Add to watchlist'}</button>
+              <button onClick={editCurrentInstrument} className="block w-full rounded-lg px-3 py-2 text-left text-xs text-ink-2 hover:bg-raised">Edit instrument</button>
+              <button onClick={archiveCurrentInstrument} className="block w-full rounded-lg px-3 py-2 text-left text-xs text-amber-400 hover:bg-raised">Archive market</button>
+            </div>
+          </details>
         </div>
       </div>
 
       {/* Desk Internal Navigation Tabs */}
-      <div className="flex items-center border-b border-slate-800 gap-2 overflow-x-auto text-xs font-mono">
-        {[
-          { id: 'overview', label: '1. Narrative & Structure' },
-          { id: 'liquidity', label: '2. Liquidity & POIs' },
-          { id: 'wyckoff', label: '3. Wyckoff Development' },
-          { id: 'scenarios', label: '4. Scenarios' },
-          { id: 'external', label: '5. External Context' },
-          { id: 'charts', label: '6. Charts & Screenshots' },
-          { id: 'setups', label: `7. Pending Setups${pendingCount ? ` (${pendingCount})` : ''}` },
-          { id: 'history', label: '8. Analysis History' },
-        ].map(tab => (
+      <div className="flex flex-wrap items-center border-b border-line gap-1 text-sm">
+        {([
+          { id: 'overview', label: 'Analysis' },
+          { id: 'setups', label: `Setups${pendingCount ? ` (${pendingCount})` : ''}` },
+          { id: 'charts', label: 'Charts' },
+          { id: 'history', label: 'History' },
+        ] as { id: DeskTab; label: string }[]).map(tab => (
           <button
             key={tab.id}
-            onClick={() => setActiveSubTab(tab.id as any)}
-            className={`px-3.5 py-2 border-b-2 font-medium transition whitespace-nowrap ${
-              activeSubTab === tab.id ? 'border-cyan-400 text-cyan-300 font-bold bg-raised' : 'border-transparent text-slate-400 hover:text-slate-200'
+            onClick={() => setActiveSubTab(tab.id)}
+            className={`px-3.5 py-2.5 border-b-2 font-medium transition whitespace-nowrap ${
+              activeSubTab === tab.id ? 'border-cyan-400 text-cyan-300 font-semibold' : 'border-transparent text-ink-3 hover:text-ink'
             }`}
           >
             {tab.label}
           </button>
         ))}
+        <select aria-label="More analysis details"
+          value={(['liquidity', 'wyckoff', 'scenarios', 'external'] as DeskTab[]).includes(activeSubTab) ? activeSubTab : ''}
+          onChange={event => setActiveSubTab(event.target.value as DeskTab)}
+          className={`ml-auto rounded-lg border border-line bg-panel px-3 py-2 text-xs outline-none ${(['liquidity', 'wyckoff', 'scenarios', 'external'] as DeskTab[]).includes(activeSubTab) ? 'text-cyan-300' : 'text-ink-3'}`}>
+          <option value="" disabled>More analysis</option>
+          <option value="liquidity">Liquidity & POIs</option>
+          <option value="wyckoff">Wyckoff development</option>
+          <option value="scenarios">Scenarios</option>
+          <option value="external">External context</option>
+        </select>
       </div>
 
       {/* 1. Overview */}
       {activeSubTab === 'overview' && (
         <div className="space-y-4">
-          {!editingNarrative && !editingHTF && <DeskAnalysisLifecycle desk={currentDesk} mode="actions" />}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-cyan-400 font-semibold">Current analysis</p>
+              <h3 className="text-lg font-semibold text-ink">Narrative & structure</h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setActiveSubTab('history')} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel hover:bg-raised px-3 py-2 text-xs text-ink-2"><History className="w-3.5 h-3.5" /> History</button>
+              <button onClick={() => setFinishScope('all')} disabled={editingNarrative || editingHTF} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel hover:border-cyan-700 px-3 py-2 text-xs font-medium text-ink disabled:opacity-40"><Archive className="w-3.5 h-3.5" /> Finish analysis</button>
+            </div>
+          </div>
+          {analysisNotice && <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-900/60 bg-emerald-950/20 px-4 py-3 text-xs text-emerald-200"><span>{analysisNotice} You can write the next analysis in the cleared space below.</span><button onClick={() => setActiveSubTab('history')} className="font-semibold underline underline-offset-2">View history</button></div>}
           <div className="bg-panel border border-slate-800 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="font-mono text-xs font-bold text-slate-200 uppercase flex items-center gap-2">
                 <FileText className="w-4 h-4 text-cyan-400" />
                 Current market narrative
               </span>
-              {editingNarrative ? (
-                <button onClick={saveNarrative} className="text-xs font-mono text-cyan-400 hover:text-cyan-300 font-bold">Save Narrative</button>
-              ) : (
-                <button onClick={startEditNarrative} className="text-xs font-mono text-slate-400 hover:text-slate-200 flex items-center gap-1">
-                  <Edit3 className="w-3 h-3" /> Edit
-                </button>
-              )}
+              <div className="flex items-center gap-3">
+                {!editingNarrative && <button onClick={() => setFinishScope('narrative')} className="text-xs text-ink-3 hover:text-cyan-300">Finish</button>}
+                {editingNarrative ? (
+                  <button onClick={saveNarrative} className="text-xs font-mono text-cyan-400 hover:text-cyan-300 font-bold">Save Narrative</button>
+                ) : (
+                  <button onClick={startEditNarrative} className="text-xs font-mono text-slate-400 hover:text-slate-200 flex items-center gap-1"><Edit3 className="w-3 h-3" /> Edit</button>
+                )}
+              </div>
             </div>
             {editingNarrative ? (
               <textarea rows={4} value={narrativeDraft} onChange={e => setNarrativeDraft(e.target.value)} className="w-full bg-raised border border-slate-700 rounded p-3 text-xs text-slate-100 font-sans focus:border-cyan-500 outline-none leading-relaxed" />
@@ -440,7 +462,10 @@ export const AssetDesksView: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
               {(['monthly', 'weekly', 'daily', 'h4'] as const).map(tf => (
                 <div key={tf} className="p-3 rounded bg-raised border border-slate-800 space-y-1">
-                  <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">{tf === 'h4' ? '4-hour (H4)' : tf} TIMEFRAME:</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">{tf === 'h4' ? '4-hour (H4)' : tf} TIMEFRAME:</span>
+                    {!editingHTF && <button onClick={() => setFinishScope(tf)} className="text-[10px] text-ink-3 hover:text-cyan-300">Finish</button>}
+                  </div>
                   {editingHTF ? (
                     <textarea rows={2} value={htfDraft[tf]} onChange={e => setHtfDraft({ ...htfDraft, [tf]: e.target.value })} className="w-full bg-well border border-slate-700 rounded p-2 text-slate-100 font-sans text-xs outline-none focus:border-cyan-500" />
                   ) : (
@@ -454,7 +479,7 @@ export const AssetDesksView: React.FC = () => {
         </div>
       )}
 
-      {activeSubTab === 'history' && <DeskAnalysisLifecycle desk={currentDesk} mode="history" />}
+      {activeSubTab === 'history' && <div className="space-y-4"><button onClick={() => setActiveSubTab('overview')} className="text-xs text-cyan-400 hover:text-cyan-300">← Back to current analysis</button><DeskAnalysisLifecycle desk={currentDesk} /></div>}
 
       {/* 2. Liquidity & POIs */}
       {activeSubTab === 'liquidity' && (
@@ -779,6 +804,17 @@ export const AssetDesksView: React.FC = () => {
         </div>
       )}
       {activeSubTab === 'setups' && <PendingSetupsPanel desk={currentDesk} />}
+
+      {finishScope && <DeskAnalysisFinishDialog
+        key={`${currentDesk.id}-${finishScope}`}
+        desk={currentDesk}
+        scope={finishScope}
+        onClose={() => setFinishScope(null)}
+        onSaved={entry => {
+          setFinishScope(null);
+          setAnalysisNotice(entry.outcome === 'INVALIDATED' ? 'Analysis marked invalidated and saved.' : 'Analysis saved to History.');
+        }}
+      />}
 
       <ImageViewerModal
         images={lightboxImages}
