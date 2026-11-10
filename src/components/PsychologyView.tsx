@@ -13,11 +13,14 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { PsychologyEntry } from '../types';
+import { PersonalWorkspaceNotice } from './PersonalWorkspaceNotice';
+import { getActiveSession, traderDateString } from '../utils/traderTime';
 
 export const PsychologyView: React.FC = () => {
-  const { psychologyEntries, addPsychologyEntry, trades } = useTrading();
+  const { psychologyEntries, addPsychologyEntry, trades, personalWorkspaceStatus, tradingHQ } = useTrading();
 
   const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [thoughtsText, setThoughtsText] = useState('');
   const [confidence, setConfidence] = useState(7);
   const [fear, setFear] = useState(3);
@@ -28,7 +31,7 @@ export const PsychologyView: React.FC = () => {
   const [tradeId, setTradeId] = useState('');
   const [keyLesson, setKeyLesson] = useState('');
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!thoughtsText.trim()) return;
 
@@ -48,9 +51,10 @@ export const PsychologyView: React.FC = () => {
       ? 'FOCUSED'
       : 'CALM';
 
-    addPsychologyEntry({
-      date: new Date().toISOString().split('T')[0],
-      session: 'New York Session',
+    setSaving(true);
+    try { await addPsychologyEntry({
+      date: traderDateString(),
+      session: getActiveSession(tradingHQ.sessions)?.name ?? 'Outside session',
       linkedTradeId: tradeId || undefined,
       thoughts: thoughtsText.trim(),
       confidenceLevel: confidence,
@@ -67,6 +71,8 @@ export const PsychologyView: React.FC = () => {
     setFearOfMissingOut(false);
     setProtectingPnL(false);
     setShowModal(false);
+    } catch { /* The account error remains visible in this form. */ }
+    finally { setSaving(false); }
   };
 
   // Compute pattern frequencies
@@ -90,13 +96,15 @@ export const PsychologyView: React.FC = () => {
         <PageTitle icon={Brain} title="Psychology" description="Notes on your mindset (hesitation, fear, impatience) and the patterns behind your decisions." />
 
         <button
-          onClick={() => setShowModal(true)}
+          onClick={() => setShowModal(true)} disabled={personalWorkspaceStatus.psychology.loading}
           className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold transition shadow-sm cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>New entry</span>
         </button>
       </div>
+
+      <PersonalWorkspaceNotice workspace="psychology" />
 
       {/* Patterns stay available without crowding the journal. */}
       {Object.keys(patternCounts).length > 0 && <details className="bg-panel border border-line rounded-xl p-4">
@@ -177,12 +185,13 @@ export const PsychologyView: React.FC = () => {
           <div className="bg-panel border border-line rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto text-ink p-5 sm:p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="font-mono text-sm font-bold text-slate-100 uppercase">Log psychology reflection</h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-200">
+              <button onClick={() => setShowModal(false)} disabled={saving} className="text-slate-400 hover:text-slate-200 disabled:opacity-50">
                 ✕
               </button>
             </div>
 
             <form onSubmit={handleCreate} className="space-y-4 text-xs font-mono">
+              {personalWorkspaceStatus.psychology.error && <p role="alert" className="text-rose-400">{personalWorkspaceStatus.psychology.error}</p>}
               <div>
                 <label className="block text-ink-2 mb-1.5 text-sm font-medium">What's on your mind?</label>
                 <textarea rows={5} required
@@ -300,15 +309,17 @@ export const PsychologyView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
+                  disabled={saving}
                   className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded text-slate-300"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
+                  disabled={saving}
                   className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-white font-bold"
                 >
-                  Commit Reflection
+                  {saving ? 'Saving…' : 'Save reflection'}
                 </button>
               </div>
             </form>

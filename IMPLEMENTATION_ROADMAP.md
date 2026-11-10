@@ -9,6 +9,9 @@ This plan applies to the active `Trading-OS-main` Vite/React checkout. Keep the 
 - Asset Desk analysis can be closed as target hit, invalidated, completed, or reset. Narrative, individual HTF structure, or the entire active analysis can be archived and cleared; history remains reviewable.
 - Applied `20261110000000_atomic_hq_revisions.sql`, `20261110000001_atomic_trade_amendments.sql`, `20261110000002_capital_settings.sql`, then `20261110000003_desk_analysis_history.sql` to the live Trading OS Supabase project (`zhcrlqhwszmibvodnzhy`). The earlier manually applied migrations were reconciled in Supabase's history first.
 - Live schema checks confirmed the new tables/functions, RLS on capital and analysis history, and removal of direct HQ deletion and trade truncation grants. Authenticated owner-flow tests, cross-device checks, and app deployment remain open.
+- Calendar, Psychology, and Alerts now save to owner-scoped Supabase tables. Existing browser records remain in place and can be imported explicitly, without overwriting account records. Migration `20261110112831_durable_calendar_psychology_alerts.sql` is applied to the live Trading OS project; table grants, RLS, and owner policies were verified. Signed-in save/refresh/cross-device testing remains open.
+- New calendar items record Lagos or New York time explicitly. Reminder lead time is stored, but delivery is not active yet; the UI now says so.
+- The internal `rls_auto_enable()` event-trigger function can no longer be called by app roles; the security advisor no longer reports its public RPC exposure. Supabase still reports leaked-password protection as disabled.
 
 ## 1. Establish a verifiable baseline
 
@@ -26,7 +29,7 @@ This plan applies to the active `Trading-OS-main` Vite/React checkout. Keep the 
 
 ## 3. Complete durable user workflows
 
-- Move Calendar, Psychology, and Alerts from localStorage into user-owned Supabase tables; preserve existing browser data with a previewed, idempotent import.
+- [x] Move Calendar, Psychology, and Alerts from localStorage into user-owned Supabase tables; preserve existing browser data with an explicit, idempotent import.
 - Keep appearance preferences local. Add a real reminder scheduler and delivery status, with timezone and daylight-saving tests.
 - Make export/restore cover all durable entities, validate schema before writes, and report partial failures accurately.
 - Gate: records appear across devices and survive browser-data clearing; reminders fire once at the expected local time.

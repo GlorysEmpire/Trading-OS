@@ -319,6 +319,7 @@ export interface OperationalCalendarEvent {
   type: 'NEWS' | 'TRADING_SESSION' | 'BACKTEST' | 'RESEARCH' | 'REVIEW' | 'PERSONAL';
   date: string; // YYYY-MM-DD
   time: string;
+  timeZone?: 'Africa/Lagos' | 'America/New_York';
   assetOrCurrency?: string;
   impact?: 'HIGH' | 'MEDIUM' | 'LOW';
   completed?: boolean;

@@ -14,11 +14,7 @@ import {
   PerformanceStats,
   TradingHQConfig,
 } from '../types';
-import {
-  INITIAL_PSYCHOLOGY_ENTRIES,
-  INITIAL_CALENDAR_EVENTS,
-  INITIAL_ALERTS,
-} from '../data/seedData';
+import { importWorkspaceRecords, loadWorkspace, readLocalWorkspace, saveWorkspaceRecord } from '../lib/personalWorkspaceStore';
 import { computePerformanceStats } from '../utils/tradingCalculations';
 import { supabase } from '../lib/supabaseClient';
 import { buildTradingHQConfig, loadHQConfigRows, saveHQCategory, seedMissingHQCategories, type HQCategory, type HQConfigRow } from '../lib/hqStore';
@@ -64,6 +60,8 @@ export type NavSection =
   | 'ai-assistant';
 
 export type PendingSetupInput = Omit<PendingSetup, 'id' | 'status' | 'resolution' | 'createdAt' | 'updatedAt' | 'configVersionAtPlan' | 'plannedR'>;
+export type PersonalWorkspace = 'calendar' | 'psychology' | 'alerts';
+type PersonalWorkspaceStatus = Record<PersonalWorkspace, { loading: boolean; error: string | null; localCount: number }>;
 
 interface TradingContextType {
   theme: 'ash' | 'dark';
@@ -145,13 +143,15 @@ interface TradingContextType {
   deleteBacktestSample: (id: string) => Promise<void>;
   importLocalBacktestSamples: () => Promise<number>;
   psychologyEntries: PsychologyEntry[];
-  addPsychologyEntry: (entry: Omit<PsychologyEntry, 'id' | 'timestamp'>) => void;
+  addPsychologyEntry: (entry: Omit<PsychologyEntry, 'id' | 'timestamp'>) => Promise<void>;
   calendarEvents: OperationalCalendarEvent[];
-  addCalendarEvent: (event: Omit<OperationalCalendarEvent, 'id'>) => void;
-  toggleCalendarEvent: (id: string) => void;
+  addCalendarEvent: (event: Omit<OperationalCalendarEvent, 'id'>) => Promise<void>;
+  toggleCalendarEvent: (id: string) => Promise<void>;
   alerts: AlertRule[];
-  addAlert: (alert: Omit<AlertRule, 'id'>) => void;
-  toggleAlert: (id: string) => void;
+  addAlert: (alert: Omit<AlertRule, 'id'>) => Promise<void>;
+  toggleAlert: (id: string) => Promise<void>;
+  personalWorkspaceStatus: PersonalWorkspaceStatus;
+  importLocalWorkspace: (workspace: PersonalWorkspace) => Promise<number>;
   performanceStats: PerformanceStats;
   capitalSettings: CapitalSettings | null;
   capitalSummary: CapitalSummary | null;
@@ -398,18 +398,43 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
   const [backtestLoading, setBacktestLoading] = useState(true);
   const [backtestError, setBacktestError] = useState<string | null>(null);
   const [localBacktestImportCount, setLocalBacktestImportCount] = useState(0);
-  const [psychologyEntries, setPsychologyEntries] = useState<PsychologyEntry[]>(() => {
-    const saved = localStorage.getItem(key('psychology'));
-    return saved ? JSON.parse(saved) : INITIAL_PSYCHOLOGY_ENTRIES;
+  const [psychologyEntries, setPsychologyEntries] = useState<PsychologyEntry[]>([]);
+  const [calendarEvents, setCalendarEvents] = useState<OperationalCalendarEvent[]>([]);
+  const [alerts, setAlerts] = useState<AlertRule[]>([]);
+  const [personalWorkspaceStatus, setPersonalWorkspaceStatus] = useState<PersonalWorkspaceStatus>({
+    calendar: { loading: true, error: null, localCount: 0 },
+    psychology: { loading: true, error: null, localCount: 0 },
+    alerts: { loading: true, error: null, localCount: 0 },
   });
-  const [calendarEvents, setCalendarEvents] = useState<OperationalCalendarEvent[]>(() => {
-    const saved = localStorage.getItem(key('calendar'));
-    return saved ? JSON.parse(saved) : INITIAL_CALENDAR_EVENTS;
-  });
-  const [alerts, setAlerts] = useState<AlertRule[]>(() => {
-    const saved = localStorage.getItem(key('alerts'));
-    return saved ? JSON.parse(saved) : INITIAL_ALERTS;
-  });
+  const setWorkspaceError = (workspace: PersonalWorkspace, error: unknown) => {
+    setPersonalWorkspaceStatus(prev => ({ ...prev, [workspace]: {
+      ...prev[workspace], error: error instanceof Error ? error.message : 'Could not save. Please try again.',
+    } }));
+  };
+  const clearWorkspaceError = (workspace: PersonalWorkspace) => {
+    setPersonalWorkspaceStatus(prev => ({ ...prev, [workspace]: { ...prev[workspace], error: null } }));
+  };
+
+  useEffect(() => {
+    const workspaces = ['calendar', 'psychology', 'alerts'] as const;
+    for (const workspace of workspaces) {
+      const localRecords = readLocalWorkspace(key(workspace), workspace);
+      setPersonalWorkspaceStatus(prev => ({ ...prev, [workspace]: { loading: true, error: null, localCount: localRecords.length } }));
+      loadWorkspace(supabase, userId, workspace)
+        .then(items => {
+          if (workspace === 'calendar') setCalendarEvents(items as OperationalCalendarEvent[]);
+          if (workspace === 'psychology') setPsychologyEntries(items as PsychologyEntry[]);
+          if (workspace === 'alerts') setAlerts(items as AlertRule[]);
+          const accountIds = new Set(items.map(item => item.id));
+          const localCount = localRecords.filter(item => !accountIds.has(item.id)).length;
+          setPersonalWorkspaceStatus(prev => ({ ...prev, [workspace]: { loading: false, error: null, localCount } }));
+        })
+        .catch(error => setPersonalWorkspaceStatus(prev => ({ ...prev, [workspace]: {
+          ...prev[workspace], loading: false,
+          error: error instanceof Error ? error.message : 'Could not load account data.',
+        } })));
+    }
+  }, [userId]);
 
   useEffect(() => {
     const raw = localStorage.getItem(key('trades'));
@@ -432,9 +457,6 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
     setBacktestLoading(true);
     loadBacktestSamples(supabase, userId).then(setBacktestSamples).catch(error => setBacktestError(error instanceof Error ? error.message : 'Failed to load backtest samples')).finally(() => setBacktestLoading(false));
   }, [userId]);
-  useEffect(() => { localStorage.setItem(key('psychology'), JSON.stringify(psychologyEntries)); }, [psychologyEntries]);
-  useEffect(() => { localStorage.setItem(key('calendar'), JSON.stringify(calendarEvents)); }, [calendarEvents]);
-  useEffect(() => { localStorage.setItem(key('alerts'), JSON.stringify(alerts)); }, [alerts]);
 
   const addTrade = async (tradeData: Omit<Trade, 'id' | 'timestamp' | 'configVersionUsed'>) => {
     const newTrade: Trade = {
@@ -532,22 +554,57 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
     return count;
   };
 
-  const addPsychologyEntry = (entryData: Omit<PsychologyEntry, 'id' | 'timestamp'>) => {
+  const addPsychologyEntry = async (entryData: Omit<PsychologyEntry, 'id' | 'timestamp'>) => {
     const newEntry: PsychologyEntry = { ...entryData, id: genId('psy'), timestamp: Date.now() };
+    try { await saveWorkspaceRecord(supabase, userId, 'psychology', newEntry); }
+    catch (error) { setWorkspaceError('psychology', error); throw error; }
+    clearWorkspaceError('psychology');
     setPsychologyEntries(prev => [newEntry, ...prev]);
   };
 
-  const addCalendarEvent = (eventData: Omit<OperationalCalendarEvent, 'id'>) => {
+  const addCalendarEvent = async (eventData: Omit<OperationalCalendarEvent, 'id'>) => {
     const newEvent: OperationalCalendarEvent = { ...eventData, id: genId('cal') };
+    try { await saveWorkspaceRecord(supabase, userId, 'calendar', newEvent); }
+    catch (error) { setWorkspaceError('calendar', error); throw error; }
+    clearWorkspaceError('calendar');
     setCalendarEvents(prev => [...prev, newEvent]);
   };
-  const toggleCalendarEvent = (id: string) => setCalendarEvents(prev => prev.map(ev => (ev.id === id ? { ...ev, completed: !ev.completed } : ev)));
+  const toggleCalendarEvent = async (id: string) => {
+    const current = calendarEvents.find(ev => ev.id === id); if (!current) return;
+    const next = { ...current, completed: !current.completed };
+    try { await saveWorkspaceRecord(supabase, userId, 'calendar', next); }
+    catch (error) { setWorkspaceError('calendar', error); throw error; }
+    clearWorkspaceError('calendar');
+    setCalendarEvents(prev => prev.map(ev => ev.id === id ? next : ev));
+  };
 
-  const addAlert = (alertData: Omit<AlertRule, 'id'>) => {
+  const addAlert = async (alertData: Omit<AlertRule, 'id'>) => {
     const newAlert: AlertRule = { ...alertData, id: genId('al') };
+    try { await saveWorkspaceRecord(supabase, userId, 'alerts', newAlert); }
+    catch (error) { setWorkspaceError('alerts', error); throw error; }
+    clearWorkspaceError('alerts');
     setAlerts(prev => [newAlert, ...prev]);
   };
-  const toggleAlert = (id: string) => setAlerts(prev => prev.map(al => (al.id === id ? { ...al, active: !al.active } : al)));
+  const toggleAlert = async (id: string) => {
+    const current = alerts.find(al => al.id === id); if (!current) return;
+    const next = { ...current, active: !current.active };
+    try { await saveWorkspaceRecord(supabase, userId, 'alerts', next); }
+    catch (error) { setWorkspaceError('alerts', error); throw error; }
+    clearWorkspaceError('alerts');
+    setAlerts(prev => prev.map(al => al.id === id ? next : al));
+  };
+
+  const importLocalWorkspace = async (workspace: PersonalWorkspace) => {
+    const items = readLocalWorkspace(key(workspace), workspace);
+    try {
+      const count = await importWorkspaceRecords(supabase, userId, workspace, items);
+      if (workspace === 'calendar') setCalendarEvents(await loadWorkspace(supabase, userId, 'calendar'));
+      if (workspace === 'psychology') setPsychologyEntries(await loadWorkspace(supabase, userId, 'psychology'));
+      if (workspace === 'alerts') setAlerts(await loadWorkspace(supabase, userId, 'alerts'));
+      setPersonalWorkspaceStatus(prev => ({ ...prev, [workspace]: { ...prev[workspace], localCount: 0, error: null } }));
+      return count;
+    } catch (error) { setWorkspaceError(workspace, error); throw error; }
+  };
 
   // One-time background move of legacy inline (base64) screenshots into
   // Supabase Storage, so records stay small and the app stays fast. Runs once
@@ -660,9 +717,18 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
         for (const sample of parsed.backtestSamples as BacktestSample[]) await saveBacktestSample(supabase, userId, sample);
         setBacktestSamples(await loadBacktestSamples(supabase, userId));
       }
-      if (parsed.psychologyEntries) setPsychologyEntries(parsed.psychologyEntries);
-      if (parsed.calendarEvents) setCalendarEvents(parsed.calendarEvents);
-      if (parsed.alerts) setAlerts(parsed.alerts);
+      if (Array.isArray(parsed.psychologyEntries)) {
+        await importWorkspaceRecords(supabase, userId, 'psychology', parsed.psychologyEntries);
+        setPsychologyEntries(await loadWorkspace(supabase, userId, 'psychology'));
+      }
+      if (Array.isArray(parsed.calendarEvents)) {
+        await importWorkspaceRecords(supabase, userId, 'calendar', parsed.calendarEvents);
+        setCalendarEvents(await loadWorkspace(supabase, userId, 'calendar'));
+      }
+      if (Array.isArray(parsed.alerts)) {
+        await importWorkspaceRecords(supabase, userId, 'alerts', parsed.alerts);
+        setAlerts(await loadWorkspace(supabase, userId, 'alerts'));
+      }
       return true;
     } catch (e) {
       console.error('Import failed', e);
@@ -745,6 +811,8 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
         alerts,
         addAlert,
         toggleAlert,
+        personalWorkspaceStatus,
+        importLocalWorkspace,
         performanceStats,
         capitalSettings,
         capitalSummary,

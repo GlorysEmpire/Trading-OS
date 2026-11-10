@@ -93,7 +93,7 @@ export const AppNavigation: React.FC = () => {
       const content = reader.result;
       if (typeof content !== 'string') return;
       importDataJSON(content).then(success => {
-        window.alert(success ? 'Trading OS backup restored.' : 'Could not restore this backup. Your current data was not changed.');
+        window.alert(success ? 'Trading OS backup restored.' : 'Restore did not finish. Some records may have imported; review your workspaces before trying again.');
       });
     };
     reader.readAsText(file);

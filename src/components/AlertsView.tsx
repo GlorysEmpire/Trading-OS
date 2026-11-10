@@ -13,21 +13,24 @@ import {
   Radio,
 } from 'lucide-react';
 import { AlertRule } from '../types';
+import { PersonalWorkspaceNotice } from './PersonalWorkspaceNotice';
 
 export const AlertsView: React.FC = () => {
-  const { alerts, addAlert, toggleAlert } = useTrading();
+  const { alerts, addAlert, toggleAlert, personalWorkspaceStatus } = useTrading();
 
   const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [asset, setAsset] = useState('BTC');
   const [alertType, setAlertType] = useState<AlertRule['type']>('LIQUIDITY');
   const [conditionText, setConditionText] = useState('');
   const [title, setTitle] = useState('');
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!conditionText.trim()) return;
 
-    addAlert({
+    setSaving(true);
+    try { await addAlert({
       title: title.trim() || `${asset} Alert`,
       asset,
       type: alertType,
@@ -39,22 +42,26 @@ export const AlertsView: React.FC = () => {
     setTitle('');
     setConditionText('');
     setShowModal(false);
+    } catch { /* The account error remains visible in this form. */ }
+    finally { setSaving(false); }
   };
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <PageTitle icon={Radio} title="Alerts" description="Reminders tied to prices, sessions and your risk rules." />
+        <PageTitle icon={Radio} title="Alerts" description="Keep your alert conditions in one place. Automatic monitoring and delivery are coming next." />
 
         <button
-          onClick={() => setShowModal(true)}
+          onClick={() => setShowModal(true)} disabled={personalWorkspaceStatus.alerts.loading}
           className="flex items-center gap-1.5 px-4 py-2 rounded bg-amber-600 hover:bg-amber-500 text-white font-mono text-xs font-bold transition shadow-sm cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>New alert</span>
         </button>
       </div>
+
+      <PersonalWorkspaceNotice workspace="alerts" />
 
       {/* Alerts Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -84,7 +91,7 @@ export const AlertsView: React.FC = () => {
               </div>
 
               <button
-                onClick={() => toggleAlert(al.id)}
+                onClick={() => { void toggleAlert(al.id).catch(() => {}); }}
                 className={`text-xs font-mono px-2.5 py-1 rounded border transition cursor-pointer ${
                   al.active
                     ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300 font-bold'
@@ -109,13 +116,14 @@ export const AlertsView: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-panel border border-line rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto text-ink p-5 sm:p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="font-mono text-sm font-bold text-slate-100 uppercase">Create conceptual alert</h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-200">
+              <h3 className="font-mono text-sm font-bold text-slate-100 uppercase">Save alert condition</h3>
+              <button onClick={() => setShowModal(false)} disabled={saving} className="text-slate-400 hover:text-slate-200 disabled:opacity-50">
                 ✕
               </button>
             </div>
 
             <form onSubmit={handleCreate} className="space-y-3 text-xs font-mono">
+              {personalWorkspaceStatus.alerts.error && <p role="alert" className="text-rose-400">{personalWorkspaceStatus.alerts.error}</p>}
               <div>
                 <label className="block text-slate-400 mb-1">Title</label>
                 <input
@@ -178,15 +186,17 @@ export const AlertsView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
+                  disabled={saving}
                   className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded text-slate-300"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
+                  disabled={saving}
                   className="px-4 py-1.5 bg-amber-600 hover:bg-amber-500 rounded text-white font-bold"
                 >
-                  Arm Alert
+                  {saving ? 'Saving…' : 'Save alert'}
                 </button>
               </div>
             </form>
