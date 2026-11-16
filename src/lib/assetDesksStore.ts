@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { toSupabaseError } from './supabaseErrors';
-import type { ActivePOI, AssetChartScreenshot, AssetCategory, AssetDeskData, LiquidityZone, Scenario } from '../types';
+import type { ActivePOI, AssetChartScreenshot, AssetCategory, AssetDeskData, ExternalLevel, LiquidityZone, Scenario } from '../types';
 
 /** The 5 primary assets/platforms from the context handoff. Configurable in
  * principle — this is just the starting seed, not a hardcoded universe. */
@@ -61,6 +61,9 @@ type NotesBundle = {
   wyckoffEvents?: string[];
   charts?: AssetChartScreenshot[];
   watchlisted?: boolean;
+  externalLevels?: ExternalLevel[];
+  confluenceBandPct?: number;
+  referencePrice?: { value: string; asOf: string };
 };
 
 function safeParse<T>(text: string | null, fallback: T): T {
@@ -98,6 +101,9 @@ function rowToDesk(row: DeskRow): AssetDeskData {
     quickLevels,
     charts: notesBundle.charts ?? [],
     watchlisted: notesBundle.watchlisted ?? false,
+    externalLevels: notesBundle.externalLevels ?? [],
+    confluenceBandPct: notesBundle.confluenceBandPct,
+    referencePrice: notesBundle.referencePrice,
   };
 }
 
@@ -166,17 +172,22 @@ export async function saveAssetDeskPatch(supabase: SupabaseClient, deskId: strin
   }
 
   const touchesNotesBundle =
-    patch.liquidityZones !== undefined || patch.charts !== undefined || patch.wyckoffDevelopment?.eventsIdentified !== undefined || patch.watchlisted !== undefined;
+    patch.liquidityZones !== undefined || patch.charts !== undefined || patch.wyckoffDevelopment?.eventsIdentified !== undefined || patch.watchlisted !== undefined ||
+    patch.externalLevels !== undefined || patch.confluenceBandPct !== undefined || patch.referencePrice !== undefined;
 
   if (touchesNotesBundle) {
     const { data: existingRow, error: fetchErr } = await supabase.from('asset_desks').select('notes').eq('id', deskId).single();
     if (fetchErr) throw toSupabaseError(fetchErr);
     const current = safeParse<NotesBundle>((existingRow as { notes: string | null } | null)?.notes ?? null, {});
     const merged: NotesBundle = {
+      ...current, // keep anything this version doesn't know about
       liquidityZones: patch.liquidityZones !== undefined ? patch.liquidityZones : current.liquidityZones ?? [],
       wyckoffEvents: patch.wyckoffDevelopment?.eventsIdentified !== undefined ? patch.wyckoffDevelopment.eventsIdentified : current.wyckoffEvents ?? [],
       charts: patch.charts !== undefined ? patch.charts : current.charts ?? [],
       watchlisted: patch.watchlisted !== undefined ? patch.watchlisted : current.watchlisted ?? false,
+      externalLevels: patch.externalLevels !== undefined ? patch.externalLevels : current.externalLevels ?? [],
+      confluenceBandPct: patch.confluenceBandPct !== undefined ? patch.confluenceBandPct : current.confluenceBandPct,
+      referencePrice: patch.referencePrice !== undefined ? patch.referencePrice : current.referencePrice,
     };
     update.notes = JSON.stringify(merged);
   }

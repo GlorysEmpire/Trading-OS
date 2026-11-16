@@ -21,6 +21,8 @@ import { AssetCategory, BiasType, Scenario, LiquidityZone, AssetChartScreenshot,
 import { MultiImageDropzone, ImageThumbGrid } from './ImageUploadDropzone';
 import { ImageViewerModal, LightboxImage } from './ImageViewerModal';
 import { PendingSetupsPanel } from './PendingSetupsPanel';
+import { MarketContextStrip } from './MarketContextStrip';
+import { LevelsLadder } from './LevelsLadder';
 import { DeskAnalysisLifecycle } from './DeskAnalysisLifecycle';
 import { DeskAnalysisFinishDialog } from './DeskAnalysisFinishDialog';
 import type { DeskAnalysisScope } from '../lib/deskAnalysisHistoryStore';
@@ -36,16 +38,16 @@ const PLACEMENT_LABEL: Record<DeskChartPlacement, string> = {
 const inputClass = 'bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-200 outline-none focus:border-cyan-500 font-sans';
 
 export const AssetDesksView: React.FC = () => {
-  const { assets, selectedAssetId, setSelectedAssetId, updateAssetDesk, createInstrument, updateInstrument, archiveInstrument, desksLoading, desksError, pendingSetups, deskTabRequest, setDeskTabRequest } = useTrading();
+  const { assets, selectedAssetId, setSelectedAssetId, updateAssetDesk, createInstrument, updateInstrument, archiveInstrument, desksLoading, desksError, pendingSetups, deskTabRequest, setDeskTabRequest, calendarEvents } = useTrading();
 
   const currentDesk = assets.find(a => a.id === selectedAssetId) || assets[0];
   const pendingCount = currentDesk ? pendingSetups.filter((p) => p.deskId === currentDesk.id && p.status === 'PENDING').length : 0;
 
-  type DeskTab = 'overview' | 'liquidity' | 'wyckoff' | 'external' | 'scenarios' | 'charts' | 'setups' | 'history';
+  type DeskTab = 'overview' | 'levels' | 'wyckoff' | 'scenarios' | 'charts' | 'setups' | 'history';
   const [activeSubTab, setActiveSubTab] = useState<DeskTab>('overview');
   // Open a specific sub-tab when another screen asks (e.g. the Dashboard's pending setups).
   useEffect(() => {
-    if (deskTabRequest) { setActiveSubTab(deskTabRequest as DeskTab); setDeskTabRequest(null); }
+    if (deskTabRequest) { setActiveSubTab((deskTabRequest === 'external' ? 'overview' : deskTabRequest === 'liquidity' ? 'levels' : deskTabRequest) as DeskTab); setDeskTabRequest(null); }
   }, [deskTabRequest, setDeskTabRequest]);
 
   // Narrative edit
@@ -61,15 +63,6 @@ export const AssetDesksView: React.FC = () => {
   const [wyckoffPhaseDraft, setWyckoffPhaseDraft] = useState('');
   const [wyckoffNotesDraft, setWyckoffNotesDraft] = useState('');
   const [newEvent, setNewEvent] = useState('');
-
-  // External context edit
-  const [editingExternal, setEditingExternal] = useState(false);
-  const [externalDraft, setExternalDraft] = useState<Record<string, string>>({});
-
-  // Liquidity zone add
-  const [newLiqLevel, setNewLiqLevel] = useState('');
-  const [newLiqType, setNewLiqType] = useState<LiquidityZone['type']>('BSL');
-  const [newLiqNotes, setNewLiqNotes] = useState('');
 
   // Scenario add
   const [showAddScenario, setShowAddScenario] = useState(false);
@@ -207,44 +200,7 @@ export const AssetDesksView: React.FC = () => {
     updateAssetDesk(currentDesk.id, { charts: (currentDesk.charts || []).filter(c => c.id !== chartId) });
   };
 
-  const startEditExternal = () => {
-    setExternalDraft({
-      etfFlows: currentDesk.externalContext.etfFlows || '',
-      openInterest: currentDesk.externalContext.openInterest || '',
-      fundingRate: currentDesk.externalContext.fundingRate || '',
-      liquidations: currentDesk.externalContext.liquidations || '',
-      yields10Y: currentDesk.externalContext.yields10Y || '',
-      dxy: currentDesk.externalContext.dxy || '',
-      macroNews: currentDesk.externalContext.macroNews || '',
-    });
-    setEditingExternal(true);
-  };
-  const saveExternal = () => {
-    updateAssetDesk(currentDesk.id, {
-      externalContext: { ...externalDraft, updatedAt: new Date().toLocaleString() },
-    });
-    setEditingExternal(false);
-  };
-
   const handleBiasChange = (bias: BiasType) => updateAssetDesk(currentDesk.id, { currentBias: bias });
-
-  const handleAddLiquidityZone = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newLiqLevel.trim()) return;
-    const newZone: LiquidityZone = { id: `l-${Date.now().toString().slice(-4)}`, level: newLiqLevel.trim(), type: newLiqType, status: 'UNTOUCHED', notes: newLiqNotes.trim() || 'Key liquidity level' };
-    updateAssetDesk(currentDesk.id, { liquidityZones: [...currentDesk.liquidityZones, newZone] });
-    setNewLiqLevel('');
-    setNewLiqNotes('');
-  };
-  const handleToggleLiqStatus = (zoneId: string) => {
-    const updated = currentDesk.liquidityZones.map(z => {
-      if (z.id !== zoneId) return z;
-      const nextStatus: LiquidityZone['status'] = z.status === 'UNTOUCHED' ? 'SWEPT' : z.status === 'SWEPT' ? 'ENGINEERED' : 'UNTOUCHED';
-      return { ...z, status: nextStatus };
-    });
-    updateAssetDesk(currentDesk.id, { liquidityZones: updated });
-  };
-  const handleDeleteLiqZone = (zoneId: string) => updateAssetDesk(currentDesk.id, { liquidityZones: currentDesk.liquidityZones.filter(z => z.id !== zoneId) });
 
   const addScenario = (e: React.FormEvent) => {
     e.preventDefault();
@@ -381,6 +337,7 @@ export const AssetDesksView: React.FC = () => {
         {([
           { id: 'overview', label: 'Analysis' },
           { id: 'setups', label: `Setups${pendingCount ? ` (${pendingCount})` : ''}` },
+          { id: 'levels', label: 'Levels' },
           { id: 'charts', label: 'Charts' },
           { id: 'history', label: 'History' },
         ] as { id: DeskTab; label: string }[]).map(tab => (
@@ -395,20 +352,23 @@ export const AssetDesksView: React.FC = () => {
           </button>
         ))}
         <select aria-label="More analysis details"
-          value={(['liquidity', 'wyckoff', 'scenarios', 'external'] as DeskTab[]).includes(activeSubTab) ? activeSubTab : ''}
+          value={(['wyckoff', 'scenarios'] as DeskTab[]).includes(activeSubTab) ? activeSubTab : ''}
           onChange={event => setActiveSubTab(event.target.value as DeskTab)}
-          className={`ml-auto rounded-lg border border-line bg-panel px-3 py-2 text-xs outline-none ${(['liquidity', 'wyckoff', 'scenarios', 'external'] as DeskTab[]).includes(activeSubTab) ? 'text-cyan-300' : 'text-ink-3'}`}>
+          className={`ml-auto rounded-lg border border-line bg-panel px-3 py-2 text-xs outline-none ${(['wyckoff', 'scenarios'] as DeskTab[]).includes(activeSubTab) ? 'text-cyan-300' : 'text-ink-3'}`}>
           <option value="" disabled>More analysis</option>
-          <option value="liquidity">Liquidity & POIs</option>
           <option value="wyckoff">Wyckoff development</option>
           <option value="scenarios">Scenarios</option>
-          <option value="external">External context</option>
         </select>
       </div>
 
       {/* 1. Overview */}
       {activeSubTab === 'overview' && (
         <div className="space-y-4">
+          <MarketContextStrip
+            desk={currentDesk}
+            calendarEvents={calendarEvents}
+            onSave={(externalContext) => updateAssetDesk(currentDesk.id, { externalContext })}
+          />
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-[10px] uppercase tracking-widest text-cyan-400 font-semibold">Current analysis</p>
@@ -481,78 +441,9 @@ export const AssetDesksView: React.FC = () => {
 
       {activeSubTab === 'history' && <div className="space-y-4"><button onClick={() => setActiveSubTab('overview')} className="text-xs text-cyan-400 hover:text-cyan-300">← Back to current analysis</button><DeskAnalysisLifecycle desk={currentDesk} /></div>}
 
-      {/* 2. Liquidity & POIs */}
-      {activeSubTab === 'liquidity' && (
-        <div className="space-y-4">
-          <div className="bg-panel border border-slate-800 rounded-xl p-4 space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <span className="font-mono text-xs font-bold text-slate-200 uppercase flex items-center gap-2">
-                <Compass className="w-4 h-4 text-amber-400" />
-                Active liquidity pools & sweep monitor
-              </span>
-              <span className="text-[11px] font-mono text-slate-400">Click status pill to toggle Untouched → Swept → Engineered</span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {currentDesk.liquidityZones.map(zone => (
-                <div key={zone.id} className="p-3 rounded bg-raised border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono font-bold text-sm text-slate-100">{zone.level}</span>
-                    <button
-                      onClick={() => handleToggleLiqStatus(zone.id)}
-                      className={`text-[10px] font-mono px-2 py-0.5 rounded border transition ${
-                        zone.status === 'UNTOUCHED' ? 'bg-amber-950/60 border-amber-800 text-amber-300' : zone.status === 'SWEPT' ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300 font-bold' : 'bg-purple-950/60 border-purple-800 text-purple-300'
-                      }`}
-                    >
-                      {zone.status}
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                    <span>Type: {zone.type}</span>
-                    <button onClick={() => handleDeleteLiqZone(zone.id)} className="text-slate-500 hover:text-rose-400">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                  <p className="text-xs text-slate-300 font-sans">{zone.notes}</p>
-                </div>
-              ))}
-              {currentDesk.liquidityZones.length === 0 && <p className="text-xs font-mono text-slate-500 col-span-full">No liquidity levels recorded yet.</p>}
-            </div>
-            <form onSubmit={handleAddLiquidityZone} className="p-3 bg-well border border-slate-800 rounded flex flex-wrap items-center gap-2 text-xs">
-              <input type="text" placeholder="Level (e.g. $94,800)" value={newLiqLevel} onChange={e => setNewLiqLevel(e.target.value)} className={`${inputClass} w-32`} />
-              <select value={newLiqType} onChange={e => setNewLiqType(e.target.value as any)} className={inputClass}>
-                <option value="BSL">BSL (Buy-Side)</option>
-                <option value="SSL">SSL (Sell-Side)</option>
-                <option value="EQH">EQH (Equal Highs)</option>
-                <option value="EQL">EQL (Equal Lows)</option>
-                <option value="RANGE_HIGH">Range high</option>
-                <option value="RANGE_LOW">Range low</option>
-              </select>
-              <input type="text" placeholder="Notes & thesis" value={newLiqNotes} onChange={e => setNewLiqNotes(e.target.value)} className={`${inputClass} flex-1 min-w-[150px]`} />
-              <button type="submit" className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 font-mono text-xs rounded border border-slate-700 transition">+ Add Level</button>
-            </form>
-          </div>
-
-          <div className="bg-panel border border-slate-800 rounded-xl p-4 space-y-3">
-            <span className="font-mono text-xs font-bold text-slate-200 uppercase flex items-center gap-2">
-              <Shield className="w-4 h-4 text-cyan-400" />
-              ACTIVE POINTS OF INTEREST (POIs)
-            </span>
-            <p className="text-[11px] font-mono text-slate-500">POI editing is planned for a later pass — liquidity zones above are the editable structured data for now.</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {currentDesk.activePOIs.map(poi => (
-                <div key={poi.id} className="p-3 rounded bg-raised border border-slate-800 space-y-1 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono font-bold text-slate-100">{poi.name}</span>
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-950 border border-cyan-800 text-cyan-300">{poi.timeframe}</span>
-                  </div>
-                  <div className="font-mono text-cyan-400 font-semibold">{poi.priceRange}</div>
-                  <div className="text-slate-400 text-[11px]">Type: {poi.type}</div>
-                </div>
-              ))}
-              {currentDesk.activePOIs.length === 0 && <p className="text-xs font-mono text-slate-500">None recorded yet.</p>}
-            </div>
-          </div>
-        </div>
+      {/* 2. Levels ladder (liquidity, POIs and outside levels) */}
+      {activeSubTab === 'levels' && (
+        <LevelsLadder desk={currentDesk} allDesks={assets} onUpdate={(patch) => updateAssetDesk(currentDesk.id, patch)} />
       )}
 
       {/* 3. Wyckoff Development */}
@@ -663,80 +554,6 @@ export const AssetDesksView: React.FC = () => {
               {currentDesk.scenarios.length === 0 && <p className="text-xs font-mono text-slate-500 col-span-full">No scenarios recorded yet.</p>}
             </div>
           </div>
-        </div>
-      )}
-
-      {/* 5. External Context */}
-      {activeSubTab === 'external' && (
-        <div className="bg-panel border border-slate-800 rounded-xl p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-            <span className="font-mono text-xs font-bold text-slate-200 uppercase flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-cyan-400" />
-              External context & institutional flows
-            </span>
-            <div className="flex items-center gap-3">
-              {currentDesk.externalContext.updatedAt && <span className="text-[11px] font-mono text-slate-400">Updated: {currentDesk.externalContext.updatedAt}</span>}
-              {editingExternal ? (
-                <button onClick={saveExternal} className="text-xs font-mono text-cyan-400 hover:text-cyan-300 font-bold">Save</button>
-              ) : (
-                <button onClick={startEditExternal} className="text-xs font-mono text-slate-400 hover:text-slate-200 flex items-center gap-1">
-                  <Edit3 className="w-3 h-3" /> Edit
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="p-3 bg-raised border-l-4 border-amber-400 rounded-r text-xs font-sans text-slate-300">
-            <strong className="text-amber-300 font-mono text-[11px] uppercase block mb-0.5">Contextual intelligence principle:</strong>
-            External context (ETF flows, OI, funding rates, liquidations, yields, DXY) is contextual intelligence.
-            <strong> It must NOT automatically become a trade signal.</strong>
-          </div>
-
-          {editingExternal ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs font-mono">
-              {([
-                ['etfFlows', 'ETF net flows'],
-                ['openInterest', 'Open interest'],
-                ['fundingRate', 'Funding rate'],
-                ['liquidations', 'Liquidations (24H)'],
-                ['yields10Y', 'US 10Y yields'],
-                ['dxy', 'DXY (US dollar)'],
-              ] as const).map(([field, label]) => (
-                <div key={field}>
-                  <label className="block text-slate-400 mb-1">{label}</label>
-                  <input value={externalDraft[field] || ''} onChange={e => setExternalDraft({ ...externalDraft, [field]: e.target.value })} className={`${inputClass} w-full`} />
-                </div>
-              ))}
-              <div className="col-span-full">
-                <label className="block text-slate-400 mb-1">Macro news</label>
-                <textarea rows={2} value={externalDraft.macroNews || ''} onChange={e => setExternalDraft({ ...externalDraft, macroNews: e.target.value })} className={`${inputClass} w-full`} />
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
-              {currentDesk.externalContext.etfFlows && (
-                <div className="p-3 rounded bg-raised border border-slate-800"><span className="text-[10px] text-slate-400 block">ETF net flows:</span><span className="text-emerald-400 font-bold">{currentDesk.externalContext.etfFlows}</span></div>
-              )}
-              {currentDesk.externalContext.openInterest && (
-                <div className="p-3 rounded bg-raised border border-slate-800"><span className="text-[10px] text-slate-400 block">Open interest:</span><span className="text-slate-200 font-bold">{currentDesk.externalContext.openInterest}</span></div>
-              )}
-              {currentDesk.externalContext.fundingRate && (
-                <div className="p-3 rounded bg-raised border border-slate-800"><span className="text-[10px] text-slate-400 block">Funding rate:</span><span className="text-slate-200 font-bold">{currentDesk.externalContext.fundingRate}</span></div>
-              )}
-              {currentDesk.externalContext.liquidations && (
-                <div className="p-3 rounded bg-raised border border-slate-800"><span className="text-[10px] text-slate-400 block">Liquidations (24H):</span><span className="text-amber-400 font-bold">{currentDesk.externalContext.liquidations}</span></div>
-              )}
-              {currentDesk.externalContext.yields10Y && (
-                <div className="p-3 rounded bg-raised border border-slate-800"><span className="text-[10px] text-slate-400 block">US 10Y yields:</span><span className="text-slate-200 font-bold">{currentDesk.externalContext.yields10Y}</span></div>
-              )}
-              {currentDesk.externalContext.dxy && (
-                <div className="p-3 rounded bg-raised border border-slate-800"><span className="text-[10px] text-slate-400 block">DXY (US dollar):</span><span className="text-slate-200 font-bold">{currentDesk.externalContext.dxy}</span></div>
-              )}
-              {!currentDesk.externalContext.etfFlows && !currentDesk.externalContext.openInterest && !currentDesk.externalContext.dxy && (
-                <p className="text-xs font-mono text-slate-500 col-span-full">Nothing recorded yet.</p>
-              )}
-            </div>
-          )}
         </div>
       )}
 

@@ -1,3 +1,4 @@
+import { contextSummary, getLanes } from '../utils/marketContext';
 import React, { useState, useEffect, useRef } from 'react';
 import { ChartImage } from './ChartImage';
 import { CapitalCard } from './CapitalCard';
@@ -100,16 +101,7 @@ function getPrimaryScenario(asset: AssetDeskData) {
 /** A short, glanceable external-context line — only the fields that are
  * actually filled in, so an empty desk doesn't show a row of em-dashes. */
 function getExternalContextSummary(asset: AssetDeskData): string {
-  const ctx = asset.externalContext;
-  const parts: string[] = [];
-  if (ctx.dxy) parts.push(`DXY ${ctx.dxy}`);
-  if (ctx.yields10Y) parts.push(`10Y ${ctx.yields10Y}`);
-  if (ctx.fundingRate) parts.push(`Funding ${ctx.fundingRate}`);
-  if (ctx.openInterest) parts.push(`OI ${ctx.openInterest}`);
-  if (ctx.etfFlows) parts.push(`ETF ${ctx.etfFlows}`);
-  if (ctx.liquidations) parts.push(`Liq ${ctx.liquidations}`);
-  if (parts.length === 0 && ctx.macroNews) parts.push(ctx.macroNews);
-  return parts.join(' · ');
+  return contextSummary(getLanes(asset));
 }
 
 export const DashboardView: React.FC = () => {

@@ -10,9 +10,28 @@ export type BiasType = 'BULLISH' | 'BEARISH' | 'NEUTRAL' | 'ACCUMULATION' | 'DIS
 export interface LiquidityZone {
   id: string;
   level: string;
-  type: 'BSL' | 'SSL' | 'EQH' | 'EQL' | 'RANGE_HIGH' | 'RANGE_LOW';
+  /** The trader's own name for the kind of liquidity (e.g. "Bull liquidity",
+   * "Inducement"). Free text; older zones hold BSL / SSL / EQH / EQL / RANGE_*. */
+  type: string;
   status: 'UNTOUCHED' | 'SWEPT' | 'ENGINEERED';
   notes: string;
+}
+
+/** A level that comes from outside the chart: a cost basis, a big option
+ * strike, a liquidation cluster. Context for the ladder, never a signal. */
+export interface ExternalLevel {
+  id: string;
+  label: string;
+  kind: string;
+  /** Price or range as typed, e.g. "75.6k" or "59.5–62.6k". */
+  price: string;
+  source: string;
+  /** ISO timestamp of when the level was true. */
+  asOf: string;
+  staleAfterHours?: number;
+  enteredBy: ContextEntryBy;
+  confirmedAt?: string;
+  note?: string;
 }
 
 export interface ActivePOI {
@@ -48,6 +67,46 @@ export interface AssetChartScreenshot {
 
 export type DeskChartPlacement = 'narrative' | 'monthly' | 'weekly' | 'daily' | 'h4';
 
+/** Who put a value on the desk. AI drafts stay marked until the trader confirms. */
+export type ContextEntryBy = 'MANUAL' | 'AI_DRAFT' | 'PROVIDER';
+
+/** The trader's read of a lane against the desk narrative. Context, never a signal. */
+export type ContextLaneState = 'SUPPORTS' | 'AGAINST' | 'NEUTRAL';
+
+/** One external-context value on a desk, always with its source and as-of time. */
+export interface ContextField {
+  id: string;
+  label: string;
+  value: string;
+  /** Short free-text note on how it changed, e.g. "-21% since Nov 2". */
+  changeNote?: string;
+  source: string;
+  /** ISO timestamp of when the value was true (not when it was typed). */
+  asOf: string;
+  /** Grey the value out once it is older than this many hours. Unset = never. */
+  staleAfterHours?: number;
+  enteredBy: ContextEntryBy;
+  /** Set when the trader confirms an AI draft or provider value. */
+  confirmedAt?: string;
+  /** The value this one replaced, kept for "changed since". */
+  previous?: { value: string; asOf: string };
+  /** The trader's own note on what this field means and how to read it. */
+  conceptNote?: string;
+}
+
+/** A row of the context strip: spot demand, leverage, forced, macro… All editable. */
+export interface ContextLane {
+  id: string;
+  name: string;
+  /** The question the lane answers, e.g. "Is real buying showing up?". */
+  question?: string;
+  state?: ContextLaneState;
+  stateBy?: ContextEntryBy;
+  fields: ContextField[];
+  /** Lane that lists the desk's linked Calendar events instead of fields. */
+  kind?: 'FIELDS' | 'EVENTS';
+}
+
 export interface AssetDeskData {
   id: string;
   symbol: string;
@@ -78,6 +137,10 @@ export interface AssetDeskData {
     dxy?: string;
     macroNews?: string;
     updatedAt: string;
+    /** Market Context lanes (v2). When present they are the source of truth;
+     * the flat legacy fields above are kept untouched for old readers. */
+    version?: 2;
+    lanes?: ContextLane[];
   };
   scenarios: Scenario[];
   researchNotes: string;
@@ -87,6 +150,12 @@ export interface AssetDeskData {
     keySustainedLevel: string;
   };
   charts?: AssetChartScreenshot[];
+  /** Levels from outside the chart, shown in the levels ladder. */
+  externalLevels?: ExternalLevel[];
+  /** Levels closer than this % of price are flagged as confluence (default 1). */
+  confluenceBandPct?: number;
+  /** A price typed in for the ladder's "price now" row, with when it was true. */
+  referencePrice?: { value: string; asOf: string };
   /** Whether this instrument appears in the Dashboard's Market Watch —
    * opt-in so the watch only shows what's actively being monitored, not
    * every configured instrument. */
