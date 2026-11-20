@@ -368,7 +368,7 @@ function CloseForm({ trade }: { trade: Trade }) {
     if (!pnlByAccount) { setError('Actual P/L must be a number, e.g. -95 or 312.50.'); return; }
     setSaving(true); setError(null);
     const finalCodes = [...new Set([...codes, ...beState.forced])];
-    try { await closeTrade(trade.id, { exitPrice: exitNum, outcome: outcome === 'AUTO' ? undefined : outcome, processScore: trade.processScore, mistakeCodes: finalCodes, breakeven: beState.record, pnlByAccount }); }
+    try { await closeTrade(trade.id, { exitPrice: exitNum, outcome: outcome === 'AUTO' ? undefined : outcome, processScore: trade.processScore, mistakeCodes: finalCodes, breakeven: beState.record, pnlByAccount }); window.dispatchEvent(new CustomEvent('tos-trade-closed', { detail: trade.id })); }
     catch (e) { setError(e instanceof Error ? e.message : 'Could not close the trade.'); }
     finally { setSaving(false); }
   };

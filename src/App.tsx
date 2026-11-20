@@ -4,7 +4,10 @@ import { TradingProvider, useTrading } from './context/TradingContext';
 import { LoginView } from './components/LoginView';
 import { AppNavigation } from './components/AppNavigation';
 import { QuickTradeModal } from './components/QuickTradeModal';
-import { DashboardView } from './components/DashboardView';
+import { TodayView } from './components/TodayView';
+import { DisciplineView } from './components/DisciplineView';
+import { BadgeUnlockToast } from './components/BadgeUnlockToast';
+import { CloseVerdict } from './components/CloseVerdict';
 import { CalendarView } from './components/CalendarView';
 import { AlertsView } from './components/AlertsView';
 import { TradingHQView } from './components/TradingHQView';
@@ -36,7 +39,7 @@ const MainShell: React.FC = () => {
   const renderActiveView = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <DashboardView />;
+        return <TodayView />;
       case 'calendar':
         return <CalendarView />;
       case 'alerts':
@@ -45,6 +48,8 @@ const MainShell: React.FC = () => {
         return <TradingHQView />;
       case 'asset-desks':
         return <AssetDesksView />;
+      case 'discipline':
+        return <DisciplineView />;
       case 'journal':
         return <JournalView />;
       case 'debrief':
@@ -64,7 +69,7 @@ const MainShell: React.FC = () => {
       case 'ai-assistant':
         return <AIAssistantView />;
       default:
-        return <DashboardView />;
+        return <TodayView />;
     }
   };
 
@@ -77,10 +82,19 @@ const MainShell: React.FC = () => {
   }, [theme]);
 
   return (
-    <div className="min-h-screen flex flex-col font-sans bg-canvas text-ink transition-colors duration-200">
+    <div className="relative isolate min-h-screen flex flex-col font-sans text-ink">
+      <div className="tos-ambient" aria-hidden="true">
+        <div className="tos-blob tos-blob-1" />
+        <div className="tos-blob tos-blob-2" />
+        <div className="tos-blob tos-blob-3" />
+        <div className="tos-floor" />
+        <div className="tos-grain" />
+      </div>
       <AppNavigation />
-      <main className="flex-1 overflow-x-hidden pb-18 md:pb-0">{renderActiveView()}</main>
+      <main className="flex-1 overflow-x-hidden pb-24 md:pb-6">{renderActiveView()}</main>
       <QuickTradeModal />
+      <BadgeUnlockToast />
+      <CloseVerdict />
     </div>
   );
 };

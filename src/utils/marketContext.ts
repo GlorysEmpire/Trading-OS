@@ -226,7 +226,7 @@ export function needsConfirmation(field: ContextField): boolean {
   return field.enteredBy === 'AI_DRAFT' && !field.confirmedAt;
 }
 
-/** One line for the Dashboard's Market Watch. */
+/** One line for Today's starred analysis. */
 export function contextSummary(lanes: ContextLane[], max = 5): string {
   const parts: string[] = [];
   for (const lane of lanes) {

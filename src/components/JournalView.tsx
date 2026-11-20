@@ -1,3 +1,4 @@
+import { RCurve } from './RCurve';
 import React, { useState } from 'react';
 import { PageTitle } from './PageTitle';
 import { AccountsCard } from './AccountsCard';
@@ -33,7 +34,13 @@ export const JournalView: React.FC = () => {
   const [filterProcess, setFilterProcess] = useState<string>('ALL');
   const [filterOutcome, setFilterOutcome] = useState<string>('ALL');
   const [filterAccount, setFilterAccount] = useState<string>('ALL');
-  const [view, setView] = useState<'trades' | 'accounts'>('trades');
+  const [view, setView] = useState<'trades' | 'accounts'>(() => {
+    try {
+      const v = sessionStorage.getItem('tos-journal-view');
+      sessionStorage.removeItem('tos-journal-view');
+      return v === 'accounts' ? 'accounts' : 'trades';
+    } catch { return 'trades'; }
+  });
   const [expandedTradeId, setExpandedTradeId] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -199,6 +206,7 @@ Provide an objective assessment:
       </div>
 
       {view === 'accounts' ? <AccountsCard /> : (<>
+      <RCurve trades={trades} />
       {/* Filters Bar */}
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-ink-3">{filteredTrades.length} trade{filteredTrades.length === 1 ? '' : 's'}</p>

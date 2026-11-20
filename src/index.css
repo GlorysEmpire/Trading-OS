@@ -40,31 +40,60 @@
 }
 
 :root {
-  --tos-canvas: #0b1018;
-  --tos-panel: #111824;
-  --tos-raised: #172132;
-  --tos-well: #0d131d;
-  --tos-line: #1f2a3b;
-  --tos-line-strong: #2b384c;
-  --tos-ink: #e8edf4;
-  --tos-ink-2: #aeb9c9;
-  --tos-ink-3: #7c889b;
-  --tos-accent: #38bdf8;
+  /* Dark: deep black with depth; panels are smoked glass over the ambient light. */
+  --tos-canvas: #04060a;
+  --tos-panel: rgba(17, 23, 33, 0.74);
+  --tos-raised: rgba(255, 255, 255, 0.045);
+  --tos-well: rgba(0, 0, 0, 0.28);
+  --tos-line: rgba(255, 255, 255, 0.075);
+  --tos-line-strong: rgba(255, 255, 255, 0.13);
+  --tos-ink: #eef3f8;
+  --tos-ink-2: #b6c2cf;
+  --tos-ink-3: #8593a4;
+  --tos-accent: #5eead4;
+  /* Surfaces */
+  --tos-card-bg: linear-gradient(165deg, rgba(30, 40, 56, 0.72) 0%, rgba(14, 19, 28, 0.78) 55%, rgba(10, 14, 21, 0.82) 100%);
+  --tos-card-edge: rgba(255, 255, 255, 0.08);
+  --tos-card-highlight: rgba(255, 255, 255, 0.07);
+  --tos-card-shadow: 0 1px 1px rgba(0, 0, 0, 0.35), 0 12px 24px -12px rgba(0, 0, 0, 0.6), 0 40px 80px -40px rgba(0, 0, 0, 0.75);
+  --tos-glass: rgba(14, 19, 28, 0.62);
+  --tos-blob-1: #0e7490;
+  --tos-blob-2: #1e3a8a;
+  --tos-blob-3: #115e59;
+  --tos-blob-opacity: 0.42;
+  --tos-grid: rgba(94, 234, 212, 0.055);
+  --tos-cta: linear-gradient(180deg, #6ee7d8 0%, #14b8a6 100%);
+  --tos-cta-ink: #032420;
+  --tos-cta-glow: rgba(45, 212, 191, 0.45);
   color-scheme: dark;
 }
 
 /* Light, eye-friendly theme */
 .ash-theme {
-  --tos-canvas: #eef1f6;
-  --tos-panel: #ffffff;
-  --tos-raised: #f4f6fa;
-  --tos-well: #f1f4f8;
-  --tos-line: #e1e6ee;
-  --tos-line-strong: #cdd5e1;
-  --tos-ink: #111827;
-  --tos-ink-2: #3c4a5d;
-  --tos-ink-3: #6b7789;
-  --tos-accent: #0284c7;
+  /* Light: pearl and mist, white frosted glass. */
+  --tos-canvas: #e8eff4;
+  --tos-panel: rgba(255, 255, 255, 0.8);
+  --tos-raised: rgba(15, 27, 42, 0.035);
+  --tos-well: rgba(15, 27, 42, 0.045);
+  --tos-line: rgba(15, 27, 42, 0.08);
+  --tos-line-strong: rgba(15, 27, 42, 0.14);
+  --tos-ink: #0f1b2a;
+  --tos-ink-2: #334457;
+  --tos-ink-3: #5b6b7c;
+  --tos-accent: #0d9488;
+  --tos-card-bg: linear-gradient(165deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0.76) 100%);
+  --tos-card-edge: rgba(255, 255, 255, 0.95);
+  --tos-card-highlight: rgba(255, 255, 255, 1);
+  --tos-card-shadow: 0 1px 1px rgba(15, 40, 70, 0.05), 0 10px 22px -12px rgba(15, 40, 70, 0.16), 0 34px 70px -40px rgba(15, 40, 70, 0.3);
+  --tos-glass: rgba(255, 255, 255, 0.66);
+  --tos-blob-1: #a5f3fc;
+  --tos-blob-2: #c7d2fe;
+  --tos-blob-3: #99f6e4;
+  --tos-blob-opacity: 0.6;
+  --tos-grid: rgba(14, 116, 144, 0.06);
+  --tos-cta: linear-gradient(180deg, #2dd4bf 0%, #0d9488 100%);
+  --tos-cta-ink: #ffffff;
+  --tos-cta-glow: rgba(13, 148, 136, 0.35);
   color-scheme: light;
   --color-slate-50: oklch(12.9% 0.042 264.695);
   --color-slate-100: oklch(20.8% 0.042 265.755);
@@ -455,8 +484,91 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   outline-offset: 1px;
 }
 
-/* Gentle elevation for panels in light mode (dark mode uses borders only). */
-.ash-theme .bg-panel { box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04); }
+/* ---- Premium surfaces ----------------------------------------------------
+   Cards (a panel with a large radius) become layered glass: a soft gradient
+   body, a bright top edge, and a long, quiet shadow for depth. Small panels
+   (buttons, chips) keep a flat fill so the page never feels busy. */
+.bg-panel.rounded-xl, .bg-panel.rounded-2xl, .bg-panel.rounded-3xl, .tos-card {
+  background: var(--tos-card-bg);
+  border-color: var(--tos-card-edge);
+  box-shadow: inset 0 1px 0 var(--tos-card-highlight), var(--tos-card-shadow);
+}
+.bg-panel.rounded-xl, .bg-panel.rounded-2xl { border-radius: 1.125rem; }
+.tos-card { border: 1px solid var(--tos-card-edge); border-radius: 1.5rem; }
+.tos-card-hover { transition: transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s cubic-bezier(.2,.8,.2,1); }
+.tos-card-hover:hover { transform: translateY(-2px); }
+
+/* Frosted glass for things that float: the navigation and dialogs. */
+.tos-glass {
+  background: var(--tos-glass);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  backdrop-filter: blur(22px) saturate(1.5);
+  border: 1px solid var(--tos-card-edge);
+  box-shadow: inset 0 1px 0 var(--tos-card-highlight), var(--tos-card-shadow);
+}
+.fixed .bg-panel.rounded-xl, .fixed .bg-panel.rounded-2xl {
+  -webkit-backdrop-filter: blur(26px) saturate(1.4);
+  backdrop-filter: blur(26px) saturate(1.4);
+}
+
+/* The primary action: a soft aqua pill with a little light in it. */
+.tos-cta {
+  background: var(--tos-cta);
+  color: var(--tos-cta-ink);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 10px 24px -10px var(--tos-cta-glow);
+  transition: transform .2s ease, box-shadow .2s ease, filter .2s ease;
+}
+.tos-cta:hover { filter: brightness(1.05); box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 14px 30px -10px var(--tos-cta-glow); }
+.tos-cta:active { transform: translateY(1px); }
+/* Every screen's primary action shares the CTA finish. */
+button.bg-emerald-600, button.bg-cyan-600, button.bg-sky-600, a.bg-sky-600 {
+  background: var(--tos-cta); color: var(--tos-cta-ink); font-family: var(--font-sans);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 8px 20px -10px var(--tos-cta-glow);
+  border-radius: .75rem;
+}
+button.bg-emerald-600:hover:not(:disabled), button.bg-cyan-600:hover:not(:disabled), button.bg-sky-600:hover:not(:disabled) { filter: brightness(1.06); }
+button.bg-emerald-600 svg, button.bg-cyan-600 svg, button.bg-sky-600 svg { color: inherit; }
+
+/* Big numbers: tight, tabular, calm. */
+.tos-figure { font-variant-numeric: tabular-nums; letter-spacing: -0.035em; font-weight: 700; }
+
+/* ---- Ambient background ------------------------------------------------- */
+.tos-ambient { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; background: radial-gradient(120% 80% at 50% -10%, color-mix(in oklab, var(--tos-blob-1) 14%, var(--tos-canvas)) 0%, var(--tos-canvas) 62%); }
+.tos-blob { position: absolute; filter: blur(80px); opacity: var(--tos-blob-opacity); will-change: transform; }
+.tos-blob-1 { left: -10%; top: -14%; width: 52vw; height: 46vw; background: radial-gradient(circle at 40% 40%, var(--tos-blob-1), transparent 70%); animation: tos-drift-1 34s ease-in-out infinite; }
+.tos-blob-2 { right: -12%; top: 22%; width: 48vw; height: 46vw; background: radial-gradient(circle, var(--tos-blob-2), transparent 70%); animation: tos-drift-2 42s ease-in-out infinite; }
+.tos-blob-3 { left: 28%; bottom: -24%; width: 56vw; height: 40vw; background: radial-gradient(circle, var(--tos-blob-3), transparent 70%); animation: tos-drift-1 48s ease-in-out infinite reverse; }
+.tos-floor { position: absolute; left: -20%; right: -20%; bottom: 0; height: 46vh; background-image: linear-gradient(var(--tos-grid) 1px, transparent 1px), linear-gradient(90deg, var(--tos-grid) 1px, transparent 1px); background-size: 72px 72px; transform: perspective(800px) rotateX(66deg); transform-origin: 50% 100%; -webkit-mask-image: linear-gradient(to top, #000 10%, transparent); mask-image: linear-gradient(to top, #000 10%, transparent); }
+.tos-grain { position: absolute; inset: -50%; opacity: .035; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+.ash-theme .tos-grain { opacity: .05; mix-blend-mode: multiply; }
+@keyframes tos-drift-1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(8vw, 5vh) scale(1.12); } }
+@keyframes tos-drift-2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-9vw, -4vh) scale(1.18); } }
+
+/* ---- Motion ---------------------------------------------------------------- */
+@keyframes tos-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.tos-rise { animation: tos-rise .55s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes tos-wave { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes tos-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes tos-flicker { 0%,100% { transform: scale(1) rotate(-2deg); } 50% { transform: scale(1.08) rotate(2deg); } }
+@keyframes tos-spin-y { from { transform: rotateY(0) rotateX(10deg); } to { transform: rotateY(360deg) rotateX(10deg); } }
+@keyframes tos-shine { 0% { transform: translateX(-130%) skewX(-20deg); } 55%,100% { transform: translateX(260%) skewX(-20deg); } }
+@keyframes tos-breathe { 0%,100% { box-shadow: 0 0 0 0 rgba(251,146,60,0); } 50% { box-shadow: 0 0 0 14px rgba(251,146,60,.09); } }
+@keyframes tos-pop { 0% { opacity: 0; transform: translateY(16px) scale(.96); } 100% { opacity: 1; transform: none; } }
+.tos-wave-fast { animation: tos-wave 3.2s linear infinite; }
+.tos-wave-slow { animation: tos-wave 5.5s linear infinite reverse; }
+.tos-flame { transform-origin: 50% 90%; animation: tos-flicker 1.6s ease-in-out infinite; }
+.tos-coin { transform: rotateX(8deg); transition: transform .6s cubic-bezier(.2,.8,.2,1); transform-style: preserve-3d; }
+.group:hover .tos-coin { transform: rotateY(-18deg) rotateX(12deg) translateY(-3px); }
+.tos-coin-spin { animation: tos-spin-y 2.4s cubic-bezier(.2,.8,.2,1) 1 both; transform-style: preserve-3d; }
+.tos-coin-shine { left: 0; animation: tos-shine 5s ease-in-out infinite; }
+.tos-bob { animation: tos-bob 6s ease-in-out infinite; }
+.tos-breathe { animation: tos-breathe 2.8s ease-in-out infinite; }
+.tos-pop { animation: tos-pop .5s cubic-bezier(.2,.8,.2,1) both; }
+/* Hairline section label used across cards. */
+.tos-label { font-size: 10.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--tos-ink-3); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}
 
 /* Modal backdrops stay dark in both themes. */
 .ash-theme .bg-black\/80, .ash-theme .bg-black\/70 { background-color: rgba(15, 23, 42, 0.45); }

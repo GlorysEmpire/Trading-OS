@@ -256,7 +256,7 @@ export const AssetDesksView: React.FC = () => {
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); toggleWatchlist(asset.id, !asset.watchlisted); }}
-                  title={asset.watchlisted ? 'Remove from Market Watch' : 'Add to Market Watch'}
+                  title={asset.watchlisted ? 'Unstar: remove from Today' : 'Star: pin this analysis on Today'}
                   className={`p-1 rounded hover:bg-slate-700/60 transition ${asset.watchlisted ? 'text-amber-400' : 'text-slate-600 hover:text-slate-400'}`}
                 >
                   <Star className="w-3 h-3" fill={asset.watchlisted ? 'currentColor' : 'none'} />
