@@ -1,6 +1,48 @@
 import React, { useMemo, useState } from 'react';
-import { AccountSelect } from './AccountSelect';
-import { formatMoney } from '../utils/accounts';
+import { AccountPicker } from './AccountSelect';
+import { actualPnl, formatMoney, tradeAccountIds } from '../utils/accounts';
+
+/** One "actual P/L" box per account the trade is on. Blank = estimate. */
+function PnlInputs({ accountIds, values, onChange, estimateFor }: {
+  accountIds: string[];
+  values: Record<string, string>;
+  onChange: (next: Record<string, string>) => void;
+  estimateFor?: (accountId: string) => number | undefined;
+}) {
+  const { accounts } = useTrading();
+  if (accountIds.length === 0) return null;
+  return (
+    <div className="space-y-1.5">
+      <span className="text-[10px] font-mono text-slate-400 block">Actual P/L from your broker (optional; blank = estimate from risk % × R)</span>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {accountIds.map((id) => {
+          const a = accounts.find((x) => x.id === id);
+          const est = estimateFor?.(id);
+          return (
+            <label key={id} className="space-y-1 font-mono">
+              <span className="text-[10px] text-slate-400 block truncate">{a?.name ?? 'Unknown account'}{a ? ` (${a.currency})` : ''}</span>
+              <input type="number" step="any" value={values[id] ?? ''} onChange={(e) => onChange({ ...values, [id]: e.target.value })} className={field}
+                placeholder={est !== undefined && a ? `Estimate ${formatMoney(est, a.currency)}` : 'e.g. -95 or 312.50'} />
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Parses the P/L boxes. Returns null when a box holds something that isn't a number. */
+function parsePnl(accountIds: string[], values: Record<string, string>): Record<string, number> | null {
+  const out: Record<string, number> = {};
+  for (const id of accountIds) {
+    const raw = (values[id] ?? '').trim();
+    if (!raw) continue;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return null;
+    out[id] = n;
+  }
+  return out;
+}
 import { Lock, PenLine, Ban, History, X, CheckCircle2 } from 'lucide-react';
 import { useTrading } from '../context/TradingContext';
 import type { BreakevenRecord, ProcessScore, Trade, TradeAmendmentChange } from '../types';
@@ -151,8 +193,9 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 
 function AmendModal({ trade, onClose }: { trade: Trade; onClose: () => void }) {
   const { amendTrade, tradingHQ } = useTrading();
-  const [accountId, setAccountId] = useState(trade.accountId ?? '');
-  const [pnl, setPnl] = useState(trade.pnlAmount?.toString() ?? '');
+  const [accountIds, setAccountIds] = useState<string[]>(tradeAccountIds(trade));
+  const [pnl, setPnl] = useState<Record<string, string>>(() =>
+    Object.fromEntries(tradeAccountIds(trade).map((id) => [id, actualPnl(trade, id)?.toString() ?? ''])));
   const [exitPrice, setExitPrice] = useState(trade.exitPrice?.toString() ?? '');
   const [entryPrice, setEntryPrice] = useState(trade.entryPrice.toString());
   const [stopPrice, setStopPrice] = useState(trade.stopPrice.toString());
@@ -182,11 +225,19 @@ function AmendModal({ trade, onClose }: { trade: Trade; onClose: () => void }) {
     const finalCodes = [...new Set([...codes, ...beState.forced])];
     if (JSON.stringify([...finalCodes].sort()) !== JSON.stringify([...trade.mistakeCodes].sort())) p.mistakeCodes = finalCodes;
     if (JSON.stringify(beState.record ?? null) !== JSON.stringify(trade.breakeven ?? null)) p.breakeven = beState.record;
-    if ((accountId || undefined) !== trade.accountId) p.accountId = accountId || undefined;
-    const pnlNum = pnl.trim() === '' ? undefined : num(pnl);
-    if (pnlNum !== trade.pnlAmount && (pnlNum === undefined || Number.isFinite(pnlNum))) p.pnlAmount = pnlNum;
+    if (JSON.stringify([...accountIds].sort()) !== JSON.stringify([...tradeAccountIds(trade)].sort())) {
+      p.accountIds = accountIds;
+      if (trade.accountId !== undefined) p.accountId = undefined;
+    }
+    const parsed = parsePnl(accountIds, pnl);
+    const before: Record<string, number> = {};
+    for (const id of tradeAccountIds(trade)) { const v = actualPnl(trade, id); if (v !== undefined) before[id] = v; }
+    if (parsed && JSON.stringify(parsed) !== JSON.stringify(before)) {
+      p.pnlByAccount = Object.keys(parsed).length ? parsed : undefined;
+      if (trade.pnlAmount !== undefined) p.pnlAmount = undefined;
+    }
     return p;
-  }, [accountId, pnl, exitPrice, entryPrice, stopPrice, targetPrice, date, setupGrade, outcome, checks, codes, trade, beState.record, beState.forced]);
+  }, [accountIds, pnl, exitPrice, entryPrice, stopPrice, targetPrice, date, setupGrade, outcome, checks, codes, trade, beState.record, beState.forced]);
 
   const preview = useMemo(() => diffEvidence(trade, applyAmendment(trade, patch)), [trade, patch]);
 
@@ -221,15 +272,8 @@ function AmendModal({ trade, onClose }: { trade: Trade; onClose: () => void }) {
           </select>
         </label>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono">
-        <div className="space-y-1">
-          <label htmlFor={`amend-acct-${trade.id}`} className="text-[10px] text-slate-400 block">Account</label>
-          <AccountSelect id={`amend-acct-${trade.id}`} value={accountId} onChange={setAccountId} className={field} />
-        </div>
-        <label className="space-y-1"><span className="text-[10px] text-slate-400 block">Actual P/L (blank = estimate from R)</span>
-          <input type="number" step="any" value={pnl} onChange={(e) => setPnl(e.target.value)} className={field} />
-        </label>
-      </div>
+      <AccountPicker value={accountIds} onChange={setAccountIds} />
+      <PnlInputs accountIds={accountIds} values={pnl} onChange={setPnl} />
       <div className="space-y-1.5"><span className="text-[10px] font-mono text-slate-400 block">Process checks</span>
         <ProcessChecks score={checks} onToggle={(k) => setChecks((prev) => ({ ...prev, [k]: !prev[k] }))} />
       </div>
@@ -291,7 +335,7 @@ function VoidModal({ trade, onClose }: { trade: Trade; onClose: () => void }) {
 function CloseForm({ trade }: { trade: Trade }) {
   const { closeTrade, updateTrade, accounts, accountSummaries } = useTrading();
   const [exit, setExit] = useState('');
-  const [pnl, setPnl] = useState('');
+  const [pnl, setPnl] = useState<Record<string, string>>({});
   const [outcome, setOutcome] = useState<'AUTO' | Outcome>('AUTO');
   const [codes, setCodes] = useState<string[]>(trade.mistakeCodes);
   const [be, setBe] = useState<BeDraft>(beDraftFrom(trade.breakeven));
@@ -301,11 +345,15 @@ function CloseForm({ trade }: { trade: Trade }) {
 
   const exitNum = exit.trim() === '' ? NaN : Number(exit);
   const previewR = Number.isFinite(exitNum) ? calculateRealizedR(trade.direction, trade.entryPrice, trade.stopPrice, exitNum) : undefined;
-  const account = accounts.find((a) => a.id === trade.accountId);
-  const estimate = account && previewR !== undefined
-    ? (accountSummaries[account.id]?.balance ?? account.startingBalance) * ((trade.riskPercentAtEntry ?? 0) / 100) * previewR
-    : undefined;
-  const pnlNum = pnl.trim() === '' ? undefined : Number(pnl);
+  const ids = tradeAccountIds(trade);
+  const estimateFor = (id: string) => {
+    const account = accounts.find((a) => a.id === id);
+    if (!account || previewR === undefined) return undefined;
+    return (accountSummaries[id]?.balance ?? account.startingBalance) * ((trade.riskPercentAtEntry ?? 0) / 100) * previewR;
+  };
+  const setAccounts = (next: string[]) =>
+    updateTrade(trade.id, { accountIds: next, ...(trade.accountId !== undefined ? { accountId: undefined } : {}) })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Could not save'));
 
   const toggleCheck = (key: typeof CHECK_KEYS[number]) =>
     updateTrade(trade.id, { processScore: scoreProcess({ ...trade.processScore, [key]: !trade.processScore[key] }) }).catch((e) => setError(e instanceof Error ? e.message : 'Could not save'));
@@ -313,10 +361,11 @@ function CloseForm({ trade }: { trade: Trade }) {
   const submit = async () => {
     if (!window.confirm('Close and lock this trade? After this, the numbers, outcome, process score and mistake codes can only change through a logged amendment.')) return;
     if (be.moved && !beState.record) { setError('Enter the R at which the stop was moved to breakeven.'); return; }
-    if (pnlNum !== undefined && !Number.isFinite(pnlNum)) { setError('Actual P/L must be a number, e.g. -95 or 312.50.'); return; }
+    const pnlByAccount = parsePnl(ids, pnl);
+    if (!pnlByAccount) { setError('Actual P/L must be a number, e.g. -95 or 312.50.'); return; }
     setSaving(true); setError(null);
     const finalCodes = [...new Set([...codes, ...beState.forced])];
-    try { await closeTrade(trade.id, { exitPrice: exitNum, outcome: outcome === 'AUTO' ? undefined : outcome, processScore: trade.processScore, mistakeCodes: finalCodes, breakeven: beState.record, pnlAmount: pnlNum }); }
+    try { await closeTrade(trade.id, { exitPrice: exitNum, outcome: outcome === 'AUTO' ? undefined : outcome, processScore: trade.processScore, mistakeCodes: finalCodes, breakeven: beState.record, pnlByAccount }); }
     catch (e) { setError(e instanceof Error ? e.message : 'Could not close the trade.'); }
     finally { setSaving(false); }
   };
@@ -366,18 +415,8 @@ function CloseForm({ trade }: { trade: Trade }) {
             </select>
           </label>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono">
-          <div className="space-y-1">
-            <label htmlFor={`acct-${trade.id}`} className="text-[10px] text-slate-400 block">Account</label>
-            <AccountSelect id={`acct-${trade.id}`} value={trade.accountId ?? ''} className={field}
-              onChange={(id) => updateTrade(trade.id, { accountId: id || undefined }).catch((e) => setError(e instanceof Error ? e.message : 'Could not save'))} />
-          </div>
-          <label className="space-y-1"><span className="text-[10px] text-slate-400 block">Actual P/L{account ? ` (${account.currency})` : ''} — optional</span>
-            <input type="number" step="any" value={pnl} onChange={(e) => setPnl(e.target.value)} className={field}
-              placeholder={estimate !== undefined ? `Estimate ${formatMoney(estimate, account!.currency)}` : 'e.g. -95 or 312.50'} />
-            <span className="text-[10px] text-slate-500 block font-sans">From your broker. Left blank, the balance uses risk % × R.</span>
-          </label>
-        </div>
+        <AccountPicker value={ids} onChange={setAccounts} />
+        <PnlInputs accountIds={ids} values={pnl} onChange={setPnl} estimateFor={estimateFor} />
         <div className="space-y-1.5"><span className="text-[10px] font-mono text-slate-400 block">Breakeven</span>
           <BreakevenFields draft={be} onChange={setBe} verdict={beState.verdict} />
         </div>
@@ -397,15 +436,26 @@ function CloseForm({ trade }: { trade: Trade }) {
 
 function LockedView({ trade }: { trade: Trade }) {
   const { accounts, accountSummaries } = useTrading();
-  const account = accounts.find((a) => a.id === trade.accountId);
-  const money = account ? accountSummaries[account.id]?.perTrade[trade.id] : undefined;
+  const ids = tradeAccountIds(trade);
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11px]">
-        <span className="text-slate-400">Account: <span className="text-slate-200">{account ? account.name : trade.accountId ? 'Unknown account' : 'Not assigned'}</span></span>
-        {account && money && (
-          <span className="text-slate-400">P/L: <span className={money.amount > 0 ? 'text-emerald-400 font-bold' : money.amount < 0 ? 'text-rose-400 font-bold' : 'text-slate-200'}>{formatMoney(money.amount, account.currency)}</span>{money.estimated ? ' (estimated from risk % × R)' : ''}</span>
-        )}
+      <div className="space-y-1 font-mono text-[11px]">
+        {ids.length === 0 && <span className="text-slate-400">Account: <span className="text-slate-200">Not on an account</span></span>}
+        {ids.map((id) => {
+          const account = accounts.find((a) => a.id === id);
+          const money = account ? accountSummaries[id]?.perTrade[trade.id] : undefined;
+          return (
+            <div key={id} className="flex flex-wrap gap-x-3">
+              <span className="text-slate-200">{account ? account.name : 'Unknown account'}</span>
+              {account && money && (
+                <span className="text-slate-400">
+                  <span className={money.amount > 0 ? 'text-emerald-400 font-bold' : money.amount < 0 ? 'text-rose-400 font-bold' : 'text-slate-200'}>{money.amount > 0 ? '+' : ''}{formatMoney(money.amount, account.currency)}</span>
+                  {money.estimated ? ' (estimated from risk % × R)' : ''}
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono">
         <div className="p-3 rounded bg-raised border border-slate-800"><span className="text-[10px] text-slate-400 block">Exit price</span><span className="text-slate-100 font-bold">{fmt(trade.exitPrice)}</span></div>

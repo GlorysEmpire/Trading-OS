@@ -16,7 +16,7 @@ export const EVIDENCE_FIELDS = [
   'narrative', 'setupReasoning', 'entryPrice', 'stopPrice', 'targetPrice', 'exitPrice',
   'plannedR', 'realizedR', 'status', 'outcome', 'processScore', 'processCategory',
   'mistakeCodes', 'violations', 'configVersionUsed', 'closedAt', 'voided',
-  'entryAt', 'breakeven', 'riskPercentAtEntry', 'accountId', 'pnlAmount',
+  'entryAt', 'breakeven', 'riskPercentAtEntry', 'accountId', 'pnlAmount', 'accountIds', 'pnlByAccount',
 ] as const;
 
 /** Documentation that can still be added to after a trade closes: a reflection
@@ -33,7 +33,7 @@ export const FREE_AFTER_CLOSE_FIELDS = [
 export type AmendablePatch = Partial<Pick<Trade,
   'date' | 'asset' | 'direction' | 'timeframe' | 'session' | 'modelId' | 'setupGrade' |
   'entryPrice' | 'stopPrice' | 'targetPrice' | 'exitPrice' | 'outcome' | 'processScore' | 'mistakeCodes' |
-  'entryAt' | 'breakeven' | 'accountId' | 'pnlAmount'
+  'entryAt' | 'breakeven' | 'accountId' | 'pnlAmount' | 'accountIds' | 'pnlByAccount'
 >>;
 
 export function isTradeLocked(trade: Trade): boolean {
@@ -63,8 +63,15 @@ export interface CloseTradeInput {
   outcome?: 'WIN' | 'LOSS' | 'SCRATCH';
   processScore: ProcessScore;
   mistakeCodes: string[];
-  /** Actual money result in the account's currency (optional). */
-  pnlAmount?: number;
+  /** Actual money result per account, in each account's currency (optional). */
+  pnlByAccount?: Record<string, number>;
+}
+
+/** Keeps only finite amounts; undefined when nothing is left. */
+function cleanPnl(map: Record<string, number> | undefined): Record<string, number> | undefined {
+  if (!map) return undefined;
+  const entries = Object.entries(map).filter(([, v]) => Number.isFinite(v));
+  return entries.length ? Object.fromEntries(entries) : undefined;
 }
 
 export function buildClosedTrade(trade: Trade, input: CloseTradeInput, now = Date.now()): Trade {
@@ -82,7 +89,7 @@ export function buildClosedTrade(trade: Trade, input: CloseTradeInput, now = Dat
     processCategory: determineProcessCategory(processScore, outcome),
     mistakeCodes: [...input.mistakeCodes],
     ...(input.breakeven ? { breakeven: { ...input.breakeven } } : {}),
-    ...(input.pnlAmount !== undefined && Number.isFinite(input.pnlAmount) ? { pnlAmount: input.pnlAmount } : {}),
+    ...(cleanPnl(input.pnlByAccount) ? { pnlByAccount: cleanPnl(input.pnlByAccount) } : {}),
     status: 'CLOSED',
     closedAt: now,
   };

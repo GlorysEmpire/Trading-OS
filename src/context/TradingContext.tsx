@@ -34,7 +34,7 @@ import { importResearchQuestionsOnce, loadResearchQuestions, removeResearchQuest
 import { importBacktestSamplesOnce, loadBacktestSamples, removeBacktestSample, saveBacktestSample } from '../lib/backtestStore';
 import { loadCapitalSettings, saveCapitalSettings, type CapitalSettings } from '../lib/capitalStore';
 import { loadAccounts, saveAccount } from '../lib/accountStore';
-import { summarizeAccount, type AccountSummary } from '../utils/accounts';
+import { summarizeAccount, tradeAccountIds, type AccountSummary } from '../utils/accounts';
 import { calculateCapital, type CapitalSummary } from '../utils/capital';
 import { archiveAndResetDeskAnalysis, type DeskAnalysisHistory, type DeskAnalysisOutcome, type DeskAnalysisScope } from '../lib/deskAnalysisHistoryStore';
 
@@ -537,10 +537,13 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
     const failed: string[] = [];
     for (const id of tradeIds) {
       const current = trades.find(t => t.id === id);
-      if (!current || current.accountId === accountId || current.voided) continue;
+      if (!current || current.voided || tradeAccountIds(current).includes(accountId)) continue;
+      // Replace accounts that no longer exist; clear the older single-account field.
+      const kept = tradeAccountIds(current).filter(x => accounts.some(a => a.id === x));
+      const patch = { accountIds: [...kept, accountId], accountId: undefined };
       try {
-        if (isTradeLocked(current)) await amendTrade(id, { accountId }, reason);
-        else await updateTrade(id, { accountId });
+        if (isTradeLocked(current)) await amendTrade(id, patch, reason);
+        else await updateTrade(id, patch);
         moved++;
       } catch (error) {
         failed.push(`${current.asset} ${current.date}: ${error instanceof Error ? error.message : String(error)}`);

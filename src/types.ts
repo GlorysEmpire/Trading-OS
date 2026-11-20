@@ -297,10 +297,14 @@ export interface Trade {
   configVersionUsed: string;
   /** Risk setting captured when this trade was opened for capital estimates. */
   riskPercentAtEntry?: number;
-  /** The trading account this trade was taken on. */
+  /** The trading accounts this trade was taken on. One decision, one Journal
+   * entry, one set of stats; each account's balance moves by its own result. */
+  accountIds?: string[];
+  /** Actual money result per account (in that account's currency), if entered
+   * at close. Accounts without one use risk % × R as an estimate. */
+  pnlByAccount?: Record<string, number>;
+  /** Older single-account fields (read only; new trades use the two above). */
   accountId?: string;
-  /** Actual money result in the account's currency, if entered at close.
-   * Without it, the balance uses risk % × R as an estimate. */
   pnlAmount?: number;
   /** When the trade was closed and locked (ms epoch). Closed trades without
    * this field predate locking — they're still treated as locked. */
@@ -552,7 +556,9 @@ export interface PendingSetup {
   validUntil?: string;
   status: 'PENDING' | 'TRIGGERED' | 'INVALIDATED' | 'EXPIRED';
   resolution?: { at: string; reason?: string; tradeId?: string };
-  /** The account the setup is planned for; can be changed when it triggers. */
+  /** Accounts the setup is planned for; can be changed when it triggers. */
+  accountIds?: string[];
+  /** Older single-account field (read only). */
   accountId?: string;
   /** Trading HQ version when the setup was planned. */
   configVersionAtPlan: string;

@@ -34,10 +34,25 @@ export interface AccountSummary {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-/** Money result for one closed trade: the actual amount if entered, else the
- * balance at the time × risk % × R. */
-export function tradePnl(trade: Trade, balanceBefore: number, fallbackRiskPct: number): { amount: number; estimated: boolean; fallbackRisk: boolean } {
-  if (trade.pnlAmount !== undefined && Number.isFinite(trade.pnlAmount)) return { amount: trade.pnlAmount, estimated: false, fallbackRisk: false };
+/** The accounts a trade is on (new multi-account field, or the older single one). */
+export function tradeAccountIds(trade: Pick<Trade, 'accountIds' | 'accountId'>): string[] {
+  if (Array.isArray(trade.accountIds)) return trade.accountIds;
+  return trade.accountId ? [trade.accountId] : [];
+}
+
+/** The actual money result entered for one account, if any. */
+export function actualPnl(trade: Trade, accountId: string): number | undefined {
+  const v = trade.pnlByAccount?.[accountId];
+  if (v !== undefined && Number.isFinite(v)) return v;
+  if (trade.accountId === accountId && trade.pnlAmount !== undefined && Number.isFinite(trade.pnlAmount)) return trade.pnlAmount;
+  return undefined;
+}
+
+/** Money result of a closed trade on one account: the actual amount if
+ * entered, else the account's balance at the time × risk % × R. */
+export function tradePnl(trade: Trade, accountId: string, balanceBefore: number, fallbackRiskPct: number): { amount: number; estimated: boolean; fallbackRisk: boolean } {
+  const actual = actualPnl(trade, accountId);
+  if (actual !== undefined) return { amount: actual, estimated: false, fallbackRisk: false };
   const risk = trade.riskPercentAtEntry ?? fallbackRiskPct;
   const r = trade.realizedR ?? 0;
   if (!Number.isFinite(risk) || risk < 0 || !Number.isFinite(r)) return { amount: 0, estimated: true, fallbackRisk: trade.riskPercentAtEntry === undefined };
@@ -48,7 +63,7 @@ const countsTowardBalance = (t: Trade) => t.status === 'CLOSED' && !t.voided;
 
 /** Balance and stats for one account, replaying trades and deposits/withdrawals in date order. */
 export function summarizeAccount(account: TradingAccount, trades: Trade[], fallbackRiskPct: number): AccountSummary {
-  const mine = trades.filter((t) => t.accountId === account.id && !t.voided);
+  const mine = trades.filter((t) => tradeAccountIds(t).includes(account.id) && !t.voided);
   const closed = mine.filter(countsTowardBalance);
   type Ev = { at: number; order: number; kind: 'trade'; trade: Trade } | { at: number; order: number; kind: 'adj'; amount: number };
   const events: Ev[] = [
@@ -76,7 +91,7 @@ export function summarizeAccount(account: TradingAccount, trades: Trade[], fallb
       peak = Math.max(peak, balance);
       continue;
     }
-    const r = tradePnl(e.trade, balance, fallbackRiskPct);
+    const r = tradePnl(e.trade, account.id, balance, fallbackRiskPct);
     if (r.estimated) estimatedTrades++;
     if (r.estimated && r.fallbackRisk) fallbackRiskTrades++;
     balance += r.amount;
@@ -109,7 +124,7 @@ export function summarizeAccount(account: TradingAccount, trades: Trade[], fallb
 /** Trades (not voided) that aren't on any existing account. */
 export function unassignedTrades(trades: Trade[], accounts: TradingAccount[]): Trade[] {
   const ids = new Set(accounts.map((a) => a.id));
-  return trades.filter((t) => !t.voided && (t.status === 'OPEN' || t.status === 'CLOSED') && (!t.accountId || !ids.has(t.accountId)));
+  return trades.filter((t) => !t.voided && (t.status === 'OPEN' || t.status === 'CLOSED') && !tradeAccountIds(t).some((id) => ids.has(id)));
 }
 
 export function formatMoney(amount: number, currency: string): string {
@@ -120,13 +135,14 @@ export function formatMoney(amount: number, currency: string): string {
   }
 }
 
-/** The account to preselect when logging a trade: the last one used if it's
- * still active, else the only active account, else none. */
-export function defaultAccountId(accounts: TradingAccount[], trades: Trade[]): string {
-  const active = accounts.filter((a) => !a.archivedAt);
-  const last = [...trades].filter((t) => t.accountId).sort((a, b) => b.timestamp - a.timestamp)[0];
-  if (last && active.some((a) => a.id === last.accountId)) return last.accountId!;
-  return active.length === 1 ? active[0].id : '';
+/** Accounts to preselect when logging a trade: the ones used on the last
+ * trade that are still active, else the only active account, else none. */
+export function defaultAccountIds(accounts: TradingAccount[], trades: Trade[]): string[] {
+  const active = new Set(accounts.filter((a) => !a.archivedAt).map((a) => a.id));
+  const last = [...trades].filter((t) => tradeAccountIds(t).length).sort((a, b) => b.timestamp - a.timestamp)[0];
+  const fromLast = last ? tradeAccountIds(last).filter((id) => active.has(id)) : [];
+  if (fromLast.length) return fromLast;
+  return active.size === 1 ? [...active] : [];
 }
 
 export function newAccountId(): string {

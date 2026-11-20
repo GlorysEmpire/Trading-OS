@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultAccountId, summarizeAccount, tradePnl, unassignedTrades } from './accounts';
+import { actualPnl, defaultAccountIds, summarizeAccount, tradeAccountIds, tradePnl, unassignedTrades } from './accounts';
 import type { Trade, TradingAccount } from '../types';
 
 const acc = (id: string, over: Partial<TradingAccount> = {}): TradingAccount => ({
@@ -16,11 +16,13 @@ const trade = (over: Partial<Trade>): Trade => ({
 
 describe('tradePnl', () => {
   it('uses the actual amount when entered', () => {
-    expect(tradePnl(trade({ pnlAmount: 312.5, realizedR: 3 }), 10_000, 1)).toEqual({ amount: 312.5, estimated: false, fallbackRisk: false });
+    expect(tradePnl(trade({ accountIds: ['a', 'b'], pnlByAccount: { a: 312.5 }, realizedR: 3 }), 'a', 10_000, 1)).toEqual({ amount: 312.5, estimated: false, fallbackRisk: false });
+    // b has no actual amount: estimated on b's own balance
+    expect(tradePnl(trade({ accountIds: ['a', 'b'], pnlByAccount: { a: 312.5 }, realizedR: 3, riskPercentAtEntry: 1 }), 'b', 500, 1).amount).toBe(15);
   });
   it('estimates from risk % and R otherwise', () => {
-    expect(tradePnl(trade({ realizedR: 3, riskPercentAtEntry: 1 }), 10_000, 2).amount).toBe(300);
-    const r = tradePnl(trade({ realizedR: -1 }), 10_000, 2);
+    expect(tradePnl(trade({ realizedR: 3, riskPercentAtEntry: 1 }), 'a', 10_000, 2).amount).toBe(300);
+    const r = tradePnl(trade({ realizedR: -1 }), 'a', 10_000, 2);
     expect(r).toEqual({ amount: -200, estimated: true, fallbackRisk: true });
   });
 });
@@ -63,15 +65,35 @@ describe('summarizeAccount', () => {
   });
 });
 
+describe('one trade on several accounts', () => {
+  it('moves every ticked account by its own result, and counts the trade once on each', () => {
+    const t = trade({ accountIds: ['a', 'b'], realizedR: 2, outcome: 'WIN', riskPercentAtEntry: 1, pnlByAccount: { b: 9.5 } });
+    const a = summarizeAccount(acc('a'), [t], 1);
+    const b = summarizeAccount(acc('b', { startingBalance: 500 }), [t], 1);
+    expect(a.balance).toBe(10_200);
+    expect(b.balance).toBe(509.5);
+    expect(a.closedTrades).toBe(1);
+    expect(b.estimatedTrades).toBe(0);
+  });
+  it('still reads the older single-account fields', () => {
+    const t = trade({ accountId: 'a', pnlAmount: -50, realizedR: -1 });
+    expect(tradeAccountIds(t)).toEqual(['a']);
+    expect(actualPnl(t, 'a')).toBe(-50);
+    expect(actualPnl(t, 'b')).toBeUndefined();
+    expect(tradeAccountIds(trade({ accountIds: [], accountId: 'a' }))).toEqual([]);
+  });
+});
+
 describe('helpers', () => {
   it('finds trades on no account or a missing one', () => {
-    const list = [trade({}), trade({ accountId: 'a' }), trade({ accountId: 'gone' }), trade({ voided: { at: 1, reason: 'x' } })];
-    expect(unassignedTrades(list, [acc('a')]).map((t) => t.accountId)).toEqual([undefined, 'gone']);
+    const list = [trade({}), trade({ accountIds: ['a'] }), trade({ accountIds: ['gone'] }), trade({ accountIds: ['gone', 'a'] }), trade({ voided: { at: 1, reason: 'x' } })];
+    expect(unassignedTrades(list, [acc('a')]).map((t) => tradeAccountIds(t))).toEqual([[], ['gone']]);
   });
-  it('preselects the last used active account, else the only one', () => {
-    const t1 = trade({ accountId: 'b', timestamp: 2 });
-    expect(defaultAccountId([acc('a'), acc('b')], [trade({ accountId: 'a', timestamp: 1 }), t1])).toBe('b');
-    expect(defaultAccountId([acc('a'), acc('b', { archivedAt: 'x' })], [t1])).toBe('a');
-    expect(defaultAccountId([acc('a'), acc('b')], [])).toBe('');
+  it('preselects the accounts used last that are still active, else the only one', () => {
+    const t1 = trade({ accountIds: ['a', 'b'], timestamp: 2 });
+    expect(defaultAccountIds([acc('a'), acc('b')], [trade({ accountIds: ['a'], timestamp: 1 }), t1])).toEqual(['a', 'b']);
+    expect(defaultAccountIds([acc('a'), acc('b', { archivedAt: 'x' })], [t1])).toEqual(['a']);
+    expect(defaultAccountIds([acc('a'), acc('b')], [])).toEqual([]);
+    expect(defaultAccountIds([acc('a')], [])).toEqual(['a']);
   });
 });

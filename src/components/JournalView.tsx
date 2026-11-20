@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { PageTitle } from './PageTitle';
 import { AccountsCard } from './AccountsCard';
+import { tradeAccountIds } from '../utils/accounts';
 import { useTrading } from '../context/TradingContext';
 import { getAuthHeaders } from '../lib/supabaseClient';
 import {
@@ -116,8 +117,9 @@ export const JournalView: React.FC = () => {
     if (filterAsset !== 'ALL' && t.asset !== filterAsset) return false;
     if (filterProcess !== 'ALL' && t.processCategory !== filterProcess) return false;
     if (filterOutcome !== 'ALL' && t.outcome !== filterOutcome) return false;
-    if (filterAccount === 'NONE' && t.accountId && accounts.some((a) => a.id === t.accountId)) return false;
-    if (filterAccount !== 'ALL' && filterAccount !== 'NONE' && t.accountId !== filterAccount) return false;
+    const ids = tradeAccountIds(t);
+    if (filterAccount === 'NONE' && ids.some((id) => accounts.some((a) => a.id === id))) return false;
+    if (filterAccount !== 'ALL' && filterAccount !== 'NONE' && !ids.includes(filterAccount)) return false;
     return true;
   });
 
@@ -304,7 +306,10 @@ Provide an objective assessment:
                   </span>
                   {accounts.length > 0 && (
                     <span className="text-xs px-2 py-0.5 rounded border border-line text-ink-2" title="Account">
-                      {accounts.find((a) => a.id === trade.accountId)?.name ?? 'No account'}
+                      {(() => {
+                        const names = tradeAccountIds(trade).map((id) => accounts.find((a) => a.id === id)?.name).filter(Boolean);
+                        return names.length === 0 ? 'No account' : names.length <= 2 ? names.join(' + ') : `${names.length} accounts`;
+                      })()}
                     </span>
                   )}
                   {hasCharts(trade) && (

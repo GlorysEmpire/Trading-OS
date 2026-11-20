@@ -5,8 +5,8 @@ import { traderDateString, evaluateSessionCheck, minutesInZone, minutesToHhmm, S
 import { X, AlertTriangle, ShieldCheck, CheckSquare, Square, Calculator } from 'lucide-react';
 import { Trade } from '../types';
 import { MultiImageDropzone, ImageThumbGrid } from './ImageUploadDropzone';
-import { AccountSelect } from './AccountSelect';
-import { defaultAccountId, formatMoney } from '../utils/accounts';
+import { AccountPicker } from './AccountSelect';
+import { defaultAccountIds, formatMoney } from '../utils/accounts';
 
 export const QuickTradeModal: React.FC = () => {
   const {
@@ -32,7 +32,7 @@ export const QuickTradeModal: React.FC = () => {
   const [stopPrice, setStopPrice] = useState<string>('');
   const [targetPrice, setTargetPrice] = useState<string>('');
   const [riskPercent, setRiskPercent] = useState<string>('');
-  const [accountId, setAccountId] = useState('');
+  const [accountIds, setAccountIds] = useState<string[]>([]);
   const [narrative, setNarrative] = useState('');
   const [setupReasoning, setSetupReasoning] = useState('');
   const [screenshots, setScreenshots] = useState<string[]>([]);
@@ -56,19 +56,19 @@ export const QuickTradeModal: React.FC = () => {
     if (quickTradeModalOpen) {
       setEntryLocal(toLocalInput(new Date()));
       setRiskPercent(String(tradingHQ.riskRules.riskPerSetupPct));
-      setAccountId(defaultAccountId(accounts, trades));
+      setAccountIds(defaultAccountIds(accounts, trades));
       const selected = assets.find(item => item.id === selectedAssetId);
       if (selected) setAsset(selected.symbol);
     }
   }, [quickTradeModalOpen, tradingHQ.riskRules.riskPerSetupPct, selectedAssetId]);
   const activeAccounts = accounts.filter(a => !a.archivedAt);
-  const chosenAccount = accounts.find(a => a.id === accountId);
-  const riskAmountText = (() => {
+  const riskAmountFor = (id: string) => {
+    const account = accounts.find(a => a.id === id);
     const pct = Number(riskPercent);
-    if (!chosenAccount || !Number.isFinite(pct) || pct <= 0) return '';
-    const balance = accountSummaries[chosenAccount.id]?.balance ?? chosenAccount.startingBalance;
-    return `≈ ${formatMoney(balance * pct / 100, chosenAccount.currency)} of ${formatMoney(balance, chosenAccount.currency)}`;
-  })();
+    if (!account || !Number.isFinite(pct) || pct <= 0) return '';
+    const balance = accountSummaries[account.id]?.balance ?? account.startingBalance;
+    return `At risk ≈ ${formatMoney(balance * pct / 100, account.currency)}`;
+  };
   const entryDate = useMemo(() => {
     const d = new Date(entryLocal);
     return Number.isNaN(d.getTime()) ? new Date() : d;
@@ -126,8 +126,8 @@ export const QuickTradeModal: React.FC = () => {
       alert('Invalid Risk:Reward calculation. Please check your stop and target relative to entry and direction.');
       return;
     }
-    if (activeAccounts.length > 0 && !accountId) {
-      alert('Choose the account this trade is on.');
+    if (activeAccounts.length > 0 && accountIds.length === 0) {
+      alert('Tick the account(s) this trade is on.');
       return;
     }
     const enteredRisk = Number(riskPercent);
@@ -161,7 +161,7 @@ export const QuickTradeModal: React.FC = () => {
       targetPrice: numTarget,
       plannedR: calculatedR,
       riskPercentAtEntry: enteredRisk,
-      ...(accountId ? { accountId } : {}),
+      ...(accountIds.length ? { accountIds } : {}),
       status: 'OPEN',
       processScore,
       violations,
@@ -423,12 +423,8 @@ export const QuickTradeModal: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label htmlFor="qt-account" className="block text-slate-400 font-mono mb-1">Account</label>
-            <AccountSelect id="qt-account" value={accountId} onChange={setAccountId} required={activeAccounts.length > 0}
-              className="w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 focus:border-cyan-500 outline-none" />
-          </div>
+          <div className="space-y-3">
+          <AccountPicker value={accountIds} onChange={setAccountIds} detail={riskAmountFor} />
           <div>
             <label className="block text-slate-400 font-mono mb-1">Capital risked on this trade (%)</label>
             <input
@@ -437,8 +433,7 @@ export const QuickTradeModal: React.FC = () => {
               className="w-full sm:w-40 bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none"
             />
             <p className="text-[10px] text-slate-500 mt-1">
-              Defaults to Trading HQ; change it if your actual position risk differs.
-              {riskAmountText && <> At risk: <strong className="text-slate-300">{riskAmountText}</strong>.</>}
+              Defaults to Trading HQ; change it if your actual position risk differs. The same % applies on each ticked account.
             </p>
           </div>
           </div>
