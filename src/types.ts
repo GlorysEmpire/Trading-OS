@@ -303,6 +303,9 @@ export interface Trade {
   /** Actual money result per account (in that account's currency), if entered
    * at close. Accounts without one use risk % × R as an estimate. */
   pnlByAccount?: Record<string, number>;
+  /** Risk taken on each account when the trade was opened: % of that
+   * account's balance and the money amount. Used for the money estimate. */
+  riskByAccount?: Record<string, AccountRisk>;
   /** Older single-account fields (read only; new trades use the two above). */
   accountId?: string;
   pnlAmount?: number;
@@ -577,6 +580,31 @@ export interface AccountAdjustment {
   note: string;
 }
 
+export interface AccountRisk {
+  pct: number;
+  amount: number;
+}
+
+/** How a prop firm measures its loss limits. */
+export interface PropRules {
+  /** Firm name / programme, e.g. "FundingPips 2-step". */
+  programme?: string;
+  /** Max loss in one day, % (e.g. 5). */
+  dailyLossPct?: number;
+  /** What the daily % is taken from: the starting balance, or the balance at the start of each day. */
+  dailyLossBasis?: 'STARTING_BALANCE' | 'DAY_START_BALANCE';
+  /** Max total loss / drawdown, % (e.g. 10). */
+  maxLossPct?: number;
+  /** STATIC: floor = starting balance − max %. TRAILING: floor follows the highest balance reached. */
+  maxLossType?: 'STATIC' | 'TRAILING';
+  /** TRAILING only: the floor stops rising once it reaches the starting balance. */
+  trailingLocksAtStart?: boolean;
+  /** Profit target, % (e.g. 8). */
+  profitTargetPct?: number;
+  /** Minimum trading days, if the firm has one. */
+  minTradingDays?: number;
+}
+
 export interface TradingAccount {
   id: string;
   name: string;
@@ -586,6 +614,10 @@ export interface TradingAccount {
   startingBalance: number;
   adjustments: AccountAdjustment[];
   notes: string;
+  /** Risk allowed per trade on this account, % of balance (e.g. 3). Unset = Trading HQ's. */
+  riskPct?: number;
+  /** Prop firm rules; only for prop accounts. */
+  propRules?: PropRules;
   archivedAt?: string;
   createdAt: string;
 }

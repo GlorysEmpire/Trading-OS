@@ -35,7 +35,7 @@ import { importResearchQuestionsOnce, loadResearchQuestions, removeResearchQuest
 import { importBacktestSamplesOnce, loadBacktestSamples, removeBacktestSample, saveBacktestSample } from '../lib/backtestStore';
 import { loadCapitalSettings, saveCapitalSettings, type CapitalSettings } from '../lib/capitalStore';
 import { loadAccounts, saveAccount } from '../lib/accountStore';
-import { summarizeAccount, tradeAccountIds, type AccountSummary } from '../utils/accounts';
+import { propStatus, summarizeAccount, tradeAccountIds, type AccountSummary, type PropStatus } from '../utils/accounts';
 import { calculateCapital, type CapitalSummary } from '../utils/capital';
 import { archiveAndResetDeskAnalysis, type DeskAnalysisHistory, type DeskAnalysisOutcome, type DeskAnalysisScope } from '../lib/deskAnalysisHistoryStore';
 
@@ -168,6 +168,8 @@ interface TradingContextType {
   /** Trading accounts (prop, funded, personal…), archived ones included. */
   accounts: TradingAccount[];
   accountSummaries: Record<string, AccountSummary>;
+  /** Prop firm rule status per account (only accounts with rules). */
+  accountPropStatus: Record<string, PropStatus | undefined>;
   accountsLoading: boolean;
   /** 'missing' when the accounts table isn't on the database yet. */
   accountsError: string | null;
@@ -741,6 +743,9 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
   const accountSummaries = Object.fromEntries(
     accounts.map(a => [a.id, summarizeAccount(a, trades, tradingHQ.riskRules.riskPerSetupPct)]),
   ) as Record<string, AccountSummary>;
+  const accountPropStatus = Object.fromEntries(
+    accounts.map(a => [a.id, propStatus(a, accountSummaries[a.id], trades, tradingHQ.riskRules.riskPerSetupPct)]),
+  ) as Record<string, PropStatus | undefined>;
   const capitalSummary = capitalSettings
     ? calculateCapital(capitalSettings, trades, tradingHQ.riskRules.riskPerSetupPct)
     : null;
@@ -883,6 +888,7 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
         updateCapitalSettings,
         accounts,
         accountSummaries,
+        accountPropStatus,
         accountsLoading,
         accountsError,
         saveTradingAccount,

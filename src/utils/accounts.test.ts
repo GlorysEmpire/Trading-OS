@@ -97,3 +97,55 @@ describe('helpers', () => {
     expect(defaultAccountIds([acc('a')], [])).toEqual(['a']);
   });
 });
+
+import { propStatus, riskWarnings } from './accounts';
+
+describe('risk amount and prop rules', () => {
+  const day = (d: string, hh = 15) => Date.parse(`${d}T${String(hh).padStart(2, '0')}:00:00Z`);
+
+  it('uses the money risked on the account × R when no actual P/L', () => {
+    const t = trade({ accountIds: ['a'], realizedR: 2, riskByAccount: { a: { pct: 3, amount: 750 } } });
+    expect(tradePnl(t, 'a', 25_000, 1)).toEqual({ amount: 1500, estimated: true, fallbackRisk: false });
+  });
+
+  it('tracks the daily loss on the New York day and the static max loss', () => {
+    const a = acc('p', { startingBalance: 25_000, kind: 'PROP_CHALLENGE', propRules: { dailyLossPct: 5, maxLossPct: 10, profitTargetPct: 8, minTradingDays: 3 } });
+    const trades = [
+      trade({ accountIds: ['p'], realizedR: 2, pnlByAccount: { p: 500 }, closedAt: day('2026-11-19') }),
+      trade({ accountIds: ['p'], realizedR: -1, pnlByAccount: { p: -250 }, closedAt: day('2026-11-20') }),
+      trade({ accountIds: ['p'], realizedR: -1, pnlByAccount: { p: -250 }, closedAt: day('2026-11-20', 18) }),
+      trade({ accountIds: ['p'], status: 'OPEN', riskByAccount: { p: { pct: 1, amount: 250 } } }),
+    ];
+    const s = summarizeAccount(a, trades, 1);
+    const st = propStatus(a, s, trades, 1, '2026-11-20')!;
+    expect(s.balance).toBe(25_000);
+    expect(st.daily).toMatchObject({ limit: 1250, used: 500, remaining: 750, usedIfOpenStopped: 750, state: 'OK' });
+    expect(st.max).toMatchObject({ floor: 22_500, remaining: 2500, remainingIfOpenStopped: 2250, type: 'STATIC' });
+    expect(st.target).toMatchObject({ amount: 2000, progress: 0, reached: false });
+    expect(st.tradingDays).toEqual({ done: 2, required: 3 });
+  });
+
+  it('measures the daily limit from the day-start balance when the firm does', () => {
+    const a = acc('p', { startingBalance: 10_000, propRules: { dailyLossPct: 5, dailyLossBasis: 'DAY_START_BALANCE' } });
+    const trades = [trade({ accountIds: ['p'], realizedR: 2, pnlByAccount: { p: 1000 }, closedAt: day('2026-11-19') })];
+    const st = propStatus(a, summarizeAccount(a, trades, 1), trades, 1, '2026-11-20')!;
+    expect(st.daily?.limit).toBe(550);
+  });
+
+  it('trails the max loss floor from the highest balance, optionally locking at the start', () => {
+    const rules = { maxLossPct: 6, maxLossType: 'TRAILING' as const };
+    const trades = [trade({ accountIds: ['p'], realizedR: 2, pnlByAccount: { p: 1200 }, closedAt: day('2026-11-19') })];
+    const a = acc('p', { startingBalance: 10_000, propRules: rules });
+    expect(propStatus(a, summarizeAccount(a, trades, 1), trades, 1, '2026-11-20')!.max?.floor).toBe(10_600);
+    const locked = acc('p', { startingBalance: 10_000, propRules: { ...rules, trailingLocksAtStart: true } });
+    expect(propStatus(locked, summarizeAccount(locked, trades, 1), trades, 1, '2026-11-20')!.max?.floor).toBe(10_000);
+  });
+
+  it('warns when a trade is over the account risk or past the room left', () => {
+    const a = acc('p', { name: 'FP', riskPct: 1, startingBalance: 10_000, propRules: { dailyLossPct: 5 } });
+    const st = propStatus(a, summarizeAccount(a, [], 1), [], 1, '2026-11-20');
+    expect(riskWarnings(a, { pct: 1, amount: 100 }, 1, st)).toEqual([]);
+    expect(riskWarnings(a, { pct: 3, amount: 300 }, 1, st)[0]).toMatch(/above this account's 1%/);
+    expect(riskWarnings(a, { pct: 6, amount: 600 }, 1, st).some((w) => /daily loss/.test(w))).toBe(true);
+  });
+});

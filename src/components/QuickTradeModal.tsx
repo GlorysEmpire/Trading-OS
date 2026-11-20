@@ -6,6 +6,7 @@ import { X, AlertTriangle, ShieldCheck, CheckSquare, Square, Calculator } from '
 import { Trade } from '../types';
 import { MultiImageDropzone, ImageThumbGrid } from './ImageUploadDropzone';
 import { AccountPicker } from './AccountSelect';
+import { RiskInputs, parseRiskDraft, type RiskDraft } from './RiskInputs';
 import { fromZoneInput, otherZoneHint, toZoneInput, viewZone, zoneLabel } from '../utils/timeDisplay';
 import { defaultAccountIds, formatMoney } from '../utils/accounts';
 
@@ -35,6 +36,7 @@ export const QuickTradeModal: React.FC = () => {
   const [targetPrice, setTargetPrice] = useState<string>('');
   const [riskPercent, setRiskPercent] = useState<string>('');
   const [accountIds, setAccountIds] = useState<string[]>([]);
+  const [riskDraft, setRiskDraft] = useState<RiskDraft>({});
   const [narrative, setNarrative] = useState('');
   const [setupReasoning, setSetupReasoning] = useState('');
   const [screenshots, setScreenshots] = useState<string[]>([]);
@@ -56,18 +58,12 @@ export const QuickTradeModal: React.FC = () => {
       setEntryLocal(toZoneInput(new Date(), viewZone(timeView)));
       setRiskPercent(String(tradingHQ.riskRules.riskPerSetupPct));
       setAccountIds(defaultAccountIds(accounts, trades));
+      setRiskDraft({});
       const selected = assets.find(item => item.id === selectedAssetId);
       if (selected) setAsset(selected.symbol);
     }
   }, [quickTradeModalOpen, tradingHQ.riskRules.riskPerSetupPct, selectedAssetId]);
   const activeAccounts = accounts.filter(a => !a.archivedAt);
-  const riskAmountFor = (id: string) => {
-    const account = accounts.find(a => a.id === id);
-    const pct = Number(riskPercent);
-    if (!account || !Number.isFinite(pct) || pct <= 0) return '';
-    const balance = accountSummaries[account.id]?.balance ?? account.startingBalance;
-    return `At risk ≈ ${formatMoney(balance * pct / 100, account.currency)}`;
-  };
   const entryDate = useMemo(() => {
     const d = fromZoneInput(entryLocal, viewZone(timeView)) ?? new Date(NaN);
     return Number.isNaN(d.getTime()) ? new Date() : d;
@@ -129,7 +125,12 @@ export const QuickTradeModal: React.FC = () => {
       alert('Tick the account(s) this trade is on.');
       return;
     }
-    const enteredRisk = Number(riskPercent);
+    const riskByAccount = accountIds.length ? parseRiskDraft(accountIds, riskDraft) : undefined;
+    if (riskByAccount === null) {
+      alert('Enter the risk on each ticked account, as a % (0–100) or an amount.');
+      return;
+    }
+    const enteredRisk = riskByAccount ? riskByAccount[accountIds[0]].pct : Number(riskPercent);
     if (!Number.isFinite(enteredRisk) || enteredRisk <= 0 || enteredRisk > 100) {
       alert('Enter the percentage of capital actually risked on this trade (greater than 0 and at most 100).');
       return;
@@ -161,6 +162,7 @@ export const QuickTradeModal: React.FC = () => {
       plannedR: calculatedR,
       riskPercentAtEntry: enteredRisk,
       ...(accountIds.length ? { accountIds } : {}),
+      ...(riskByAccount ? { riskByAccount } : {}),
       status: 'OPEN',
       processScore,
       violations,
@@ -425,7 +427,11 @@ export const QuickTradeModal: React.FC = () => {
           </div>
 
           <div className="space-y-3">
-          <AccountPicker value={accountIds} onChange={setAccountIds} detail={riskAmountFor} />
+          <AccountPicker value={accountIds} onChange={setAccountIds} />
+          {accountIds.length > 0 ? (
+            <RiskInputs accountIds={accountIds} value={riskDraft} onChange={setRiskDraft}
+              field="w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none" />
+          ) : (
           <div>
             <label className="block text-slate-400 font-mono mb-1">Capital risked on this trade (%)</label>
             <input
@@ -434,9 +440,10 @@ export const QuickTradeModal: React.FC = () => {
               className="w-full sm:w-40 bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none"
             />
             <p className="text-[10px] text-slate-500 mt-1">
-              Defaults to Trading HQ; change it if your actual position risk differs. The same % applies on each ticked account.
+              Defaults to Trading HQ; change it if your actual position risk differs.
             </p>
           </div>
+          )}
           </div>
 
           {/* Pre-Trade Narrative & Setup Reasoning */}

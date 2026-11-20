@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { AccountPicker } from './AccountSelect';
+import { RiskInputs, parseRiskDraft, type RiskDraft } from './RiskInputs';
 import { formatTradingTime, fromZoneInput, otherZoneHint, toZoneInput, viewZone, zoneLabel } from '../utils/timeDisplay';
 import { defaultAccountIds, tradeAccountIds } from '../utils/accounts';
 import { Crosshair, Plus, Zap, Ban, Clock3, Pencil, ArrowUpRight, X, AlertTriangle, CheckSquare, Square } from 'lucide-react';
@@ -133,6 +134,7 @@ function SetupForm({ desk, initial, onDone }: { desk: AssetDeskData; initial?: P
 
 function TriggerModal({ setup, onClose }: { setup: PendingSetup; onClose: () => void }) {
   const { tradingHQ, trades, triggerPendingSetup, setActiveTab, accounts } = useTrading();
+  const [riskDraft, setRiskDraft] = useState<RiskDraft>({});
   const [accountIds, setAccountIds] = useState<string[]>(() => { const planned = tradeAccountIds(setup); return planned.length ? planned : defaultAccountIds(accounts, trades); });
   const { timeView } = useTrading();
   const [entryLocal, setEntryLocal] = useState(() => toZoneInput(new Date(), viewZone(timeView)));
@@ -151,9 +153,11 @@ function TriggerModal({ setup, onClose }: { setup: PendingSetup; onClose: () => 
 
   const confirm = async () => {
     if (accounts.some((a) => !a.archivedAt) && accountIds.length === 0) { setError('Tick the account(s) this trade is on.'); return; }
+    const riskByAccount = accountIds.length ? parseRiskDraft(accountIds, riskDraft) : undefined;
+    if (riskByAccount === null) { setError('Enter the risk on each ticked account, as a % or an amount.'); return; }
     setSaving(true); setError(null);
     try {
-      await triggerPendingSetup(setup.id, { entryAt, fillPrice: Number.isFinite(fillNum) ? fillNum : undefined, checks, ...(accountIds.length ? { accountIds } : {}) });
+      await triggerPendingSetup(setup.id, { entryAt, fillPrice: Number.isFinite(fillNum) ? fillNum : undefined, checks, ...(accountIds.length ? { accountIds } : {}), ...(riskByAccount ? { riskByAccount } : {}) });
       setDone(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not move the setup to the Journal.');
@@ -184,6 +188,7 @@ function TriggerModal({ setup, onClose }: { setup: PendingSetup; onClose: () => 
               <label className="space-y-1"><span className="text-[10px] text-slate-400 block">Fill price</span><input type="number" step="any" value={fill} onChange={(e) => setFill(e.target.value)} className={field} /></label>
               <div className="col-span-2 space-y-1">
                 <AccountPicker value={accountIds} onChange={setAccountIds} />
+                {accountIds.length > 0 && <RiskInputs accountIds={accountIds} value={riskDraft} onChange={setRiskDraft} field={field} />}
               </div>
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-[11px]">

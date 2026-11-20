@@ -16,7 +16,7 @@ export const EVIDENCE_FIELDS = [
   'narrative', 'setupReasoning', 'entryPrice', 'stopPrice', 'targetPrice', 'exitPrice',
   'plannedR', 'realizedR', 'status', 'outcome', 'processScore', 'processCategory',
   'mistakeCodes', 'violations', 'configVersionUsed', 'closedAt', 'voided',
-  'entryAt', 'breakeven', 'riskPercentAtEntry', 'accountId', 'pnlAmount', 'accountIds', 'pnlByAccount',
+  'entryAt', 'breakeven', 'riskPercentAtEntry', 'accountId', 'pnlAmount', 'accountIds', 'pnlByAccount', 'riskByAccount',
 ] as const;
 
 /** Documentation that can still be added to after a trade closes: a reflection

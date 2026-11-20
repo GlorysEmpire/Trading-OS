@@ -1,7 +1,7 @@
 import { formatTradingTime } from '../utils/timeDisplay';
 import React, { useMemo, useState } from 'react';
 import { AccountPicker } from './AccountSelect';
-import { actualPnl, formatMoney, tradeAccountIds } from '../utils/accounts';
+import { actualPnl, formatMoney, tradeAccountIds, tradeRisk } from '../utils/accounts';
 
 /** One "actual P/L" box per account the trade is on. Blank = estimate. */
 function PnlInputs({ accountIds, values, onChange, estimateFor }: {
@@ -350,6 +350,8 @@ function CloseForm({ trade }: { trade: Trade }) {
   const estimateFor = (id: string) => {
     const account = accounts.find((a) => a.id === id);
     if (!account || previewR === undefined) return undefined;
+    const recorded = tradeRisk(trade, id);
+    if (recorded) return recorded.amount * previewR;
     return (accountSummaries[id]?.balance ?? account.startingBalance) * ((trade.riskPercentAtEntry ?? 0) / 100) * previewR;
   };
   const setAccounts = (next: string[]) =>
@@ -448,6 +450,7 @@ function LockedView({ trade }: { trade: Trade }) {
           return (
             <div key={id} className="flex flex-wrap gap-x-3">
               <span className="text-slate-200">{account ? account.name : 'Unknown account'}</span>
+              {account && tradeRisk(trade, id) && <span className="text-slate-500">risked {formatMoney(tradeRisk(trade, id)!.amount, account.currency)} ({tradeRisk(trade, id)!.pct}%)</span>}
               {account && money && (
                 <span className="text-slate-400">
                   <span className={money.amount > 0 ? 'text-emerald-400 font-bold' : money.amount < 0 ? 'text-rose-400 font-bold' : 'text-slate-200'}>{money.amount > 0 ? '+' : ''}{formatMoney(money.amount, account.currency)}</span>

@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Archive, ArrowDownUp, Pencil, Plus, Trash2, Wallet, X } from 'lucide-react';
 import { useTrading } from '../context/TradingContext';
-import type { AccountAdjustment, TradingAccount, TradingAccountKind } from '../types';
-import { ACCOUNT_KIND_LABEL, formatMoney, newAccountId, unassignedTrades } from '../utils/accounts';
+import type { AccountAdjustment, PropRules, TradingAccount, TradingAccountKind } from '../types';
+import { ACCOUNT_KIND_LABEL, accountRiskPct, formatMoney, newAccountId, unassignedTrades, type LimitState } from '../utils/accounts';
 import { CapitalCard } from './CapitalCard';
 import { traderDateString } from '../utils/traderTime';
 
@@ -16,7 +16,7 @@ const blankAccount = (): TradingAccount => ({
 /** Today → Accounts: every trading account with its balance, built from its
  * starting balance, deposits/withdrawals and the trades taken on it. */
 export const AccountsCard: React.FC = () => {
-  const { accounts, accountSummaries, accountsLoading, accountsError, saveTradingAccount, trades, assignTradesToAccount, capitalSettings } = useTrading();
+  const { accounts, accountSummaries, accountsLoading, accountsError, saveTradingAccount, trades, assignTradesToAccount, capitalSettings, tradingHQ } = useTrading();
   const [editing, setEditing] = useState<TradingAccount | null>(null);
   const [moneyFor, setMoneyFor] = useState<TradingAccount | null>(null);
   const [showArchived, setShowArchived] = useState(false);
@@ -58,7 +58,9 @@ export const AccountsCard: React.FC = () => {
               <span className="rounded-full border border-line-strong px-2 py-0.5 text-[11px] text-ink-2">{ACCOUNT_KIND_LABEL[a.kind]}</span>
               {a.archivedAt && <span className="rounded-full border border-line-strong px-2 py-0.5 text-[11px] text-ink-3">Archived</span>}
             </div>
-            {a.broker && <p className="mt-0.5 text-xs text-ink-3">{a.broker}</p>}
+            <p className="mt-0.5 text-xs text-ink-3">
+              {[a.broker, `${accountRiskPct(a, tradingHQ.riskRules.riskPerSetupPct)}% risk per trade`, a.propRules?.programme].filter(Boolean).join(' · ')}
+            </p>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {!a.archivedAt && <button type="button" onClick={() => setMoneyFor(a)} className={smallBtn}><ArrowDownUp className="h-3.5 w-3.5" /> Deposit / withdraw</button>}
@@ -80,6 +82,7 @@ export const AccountsCard: React.FC = () => {
                 ? <>{s.estimatedTrades} trade(s) have no actual P/L entered, so their result is estimated from risk % × R{s.fallbackRiskTrades ? ` (${s.fallbackRiskTrades} using today's Trading HQ risk)` : ''}.</>
                 : s.closedTrades > 0 ? <>All closed trades use the actual P/L you entered.</> : <>No closed trades on this account yet.</>}
             </p>
+            <PropRulesPanel account={a} />
           </>
         )}
       </div>
@@ -192,7 +195,7 @@ const AssignBanner: React.FC<{ count: number; onAssign: (accountId: string) => P
 
 const Modal: React.FC<{ title: string; onClose: () => void; children: React.ReactNode }> = ({ title, onClose, children }) => (
   <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onClose}>
-    <div className="w-full max-w-lg space-y-4 rounded-xl border border-line-strong bg-panel p-5 shadow-2xl" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={title}>
+    <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto space-y-4 rounded-xl border border-line-strong bg-panel p-5 shadow-2xl" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={title}>
       <div className="flex items-center justify-between">
         <h4 className="text-base font-semibold text-ink">{title}</h4>
         <button type="button" aria-label="Close" onClick={onClose} className="rounded-lg p-1.5 text-ink-3 hover:bg-raised hover:text-ink"><X className="h-4 w-4" /></button>
@@ -211,7 +214,24 @@ const Field: React.FC<{ id: string; label: string; children: React.ReactNode; wi
 
 const AccountForm: React.FC<{ account: TradingAccount; isNew: boolean; onCancel: () => void; onSave: (a: TradingAccount) => Promise<void> }> = ({ account, isNew, onCancel, onSave }) => {
   const [a, setA] = useState(account);
+  const { tradingHQ } = useTrading();
   const [balance, setBalance] = useState(account.startingBalance ? String(account.startingBalance) : '');
+  const num = (v: number | undefined) => (v === undefined ? '' : String(v));
+  const [riskPct, setRiskPct] = useState(num(account.riskPct));
+  const r0 = account.propRules ?? {};
+  const [rules, setRules] = useState({
+    programme: r0.programme ?? '',
+    dailyLossPct: num(r0.dailyLossPct),
+    dailyLossBasis: r0.dailyLossBasis ?? 'STARTING_BALANCE',
+    maxLossPct: num(r0.maxLossPct),
+    maxLossType: r0.maxLossType ?? 'STATIC',
+    trailingLocksAtStart: r0.trailingLocksAtStart ?? false,
+    profitTargetPct: num(r0.profitTargetPct),
+    minTradingDays: num(r0.minTradingDays),
+  });
+  const setRule = (patch: Partial<typeof rules>) => setRules((prev) => ({ ...prev, ...patch }));
+  const isProp = a.kind === 'PROP_CHALLENGE' || a.kind === 'PROP_FUNDED';
+  const opt = (v: string) => (v.trim() === '' ? undefined : Number(v));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const set = (patch: Partial<TradingAccount>) => setA((prev) => ({ ...prev, ...patch }));
@@ -220,7 +240,17 @@ const AccountForm: React.FC<{ account: TradingAccount; isNew: boolean; onCancel:
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true); setError(null);
-    try { await onSave({ ...a, name: a.name.trim(), currency: a.currency.trim().toUpperCase(), startingBalance: Number(balance) }); }
+    const propRules: PropRules | undefined = isProp ? {
+      programme: rules.programme.trim() || undefined,
+      dailyLossPct: opt(rules.dailyLossPct),
+      dailyLossBasis: rules.dailyLossBasis as PropRules['dailyLossBasis'],
+      maxLossPct: opt(rules.maxLossPct),
+      maxLossType: rules.maxLossType as PropRules['maxLossType'],
+      trailingLocksAtStart: rules.maxLossType === 'TRAILING' ? rules.trailingLocksAtStart : undefined,
+      profitTargetPct: opt(rules.profitTargetPct),
+      minTradingDays: opt(rules.minTradingDays),
+    } : undefined;
+    try { await onSave({ ...a, name: a.name.trim(), currency: a.currency.trim().toUpperCase(), startingBalance: Number(balance), riskPct: opt(riskPct), propRules }); }
     catch (err) { setError(err instanceof Error ? err.message : 'Could not save the account'); }
     finally { setSaving(false); }
   };
@@ -246,10 +276,54 @@ const AccountForm: React.FC<{ account: TradingAccount; isNew: boolean; onCancel:
           <Field id="acc-cur" label="Currency">
             <input id="acc-cur" value={a.currency} maxLength={3} onChange={(e) => set({ currency: e.target.value.toUpperCase() })} className={`${input} uppercase`} required />
           </Field>
+          <Field id="acc-risk" label={`Risk per trade, % of balance (blank = Trading HQ's ${tradingHQ.riskRules.riskPerSetupPct}%)`} wide>
+            <input id="acc-risk" type="number" min="0.01" max="100" step="0.01" value={riskPct} onChange={(e) => setRiskPct(e.target.value)} placeholder={String(tradingHQ.riskRules.riskPerSetupPct)} className={input} />
+          </Field>
           <Field id="acc-notes" label="Notes (optional)" wide>
             <input id="acc-notes" value={a.notes} onChange={(e) => set({ notes: e.target.value })} placeholder="e.g. 8% target, 5% daily loss, 10% max loss" className={input} />
           </Field>
         </div>
+        {isProp && (
+          <fieldset className="space-y-3 rounded-lg border border-line p-3">
+            <legend className="px-1 text-xs font-semibold text-ink-2">Prop firm rules</legend>
+            <p className="text-xs text-ink-3">As % of the starting balance unless set otherwise. Leave a box blank if the firm has no such rule.</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field id="pr-prog" label="Programme (optional)" wide>
+                <input id="pr-prog" value={rules.programme} onChange={(e) => setRule({ programme: e.target.value })} placeholder="e.g. FundingPips 2-step, Phase 1" className={input} />
+              </Field>
+              <Field id="pr-daily" label="Daily loss limit %">
+                <input id="pr-daily" type="number" min="0.01" max="100" step="0.01" value={rules.dailyLossPct} onChange={(e) => setRule({ dailyLossPct: e.target.value })} placeholder="e.g. 5" className={input} />
+              </Field>
+              <Field id="pr-daily-basis" label="Daily limit measured from">
+                <select id="pr-daily-basis" value={rules.dailyLossBasis} onChange={(e) => setRule({ dailyLossBasis: e.target.value as 'STARTING_BALANCE' })} className={input}>
+                  <option value="STARTING_BALANCE">Starting balance</option>
+                  <option value="DAY_START_BALANCE">Balance at the start of each day</option>
+                </select>
+              </Field>
+              <Field id="pr-max" label="Max loss / drawdown %">
+                <input id="pr-max" type="number" min="0.01" max="100" step="0.01" value={rules.maxLossPct} onChange={(e) => setRule({ maxLossPct: e.target.value })} placeholder="e.g. 10" className={input} />
+              </Field>
+              <Field id="pr-max-type" label="Max drawdown type">
+                <select id="pr-max-type" value={rules.maxLossType} onChange={(e) => setRule({ maxLossType: e.target.value as 'STATIC' })} className={input}>
+                  <option value="STATIC">Static (fixed floor below the start)</option>
+                  <option value="TRAILING">Trailing (floor follows the highest balance)</option>
+                </select>
+              </Field>
+              {rules.maxLossType === 'TRAILING' && (
+                <label className="flex items-center gap-2 text-sm text-ink-2 sm:col-span-2">
+                  <input type="checkbox" checked={rules.trailingLocksAtStart} onChange={(e) => setRule({ trailingLocksAtStart: e.target.checked })} className="h-4 w-4 accent-sky-500" />
+                  Floor stops trailing once it reaches the starting balance
+                </label>
+              )}
+              <Field id="pr-target" label="Profit target % (optional)">
+                <input id="pr-target" type="number" min="0.01" max="100" step="0.01" value={rules.profitTargetPct} onChange={(e) => setRule({ profitTargetPct: e.target.value })} placeholder="e.g. 8" className={input} />
+              </Field>
+              <Field id="pr-days" label="Minimum trading days (optional)">
+                <input id="pr-days" type="number" min="1" step="1" value={rules.minTradingDays} onChange={(e) => setRule({ minTradingDays: e.target.value })} placeholder="e.g. 3" className={input} />
+              </Field>
+            </div>
+          </fieldset>
+        )}
         {a.adjustments.length > 0 && (
           <div className="space-y-1.5">
             <span className="block text-xs text-ink-2">Deposits and withdrawals</span>
@@ -329,5 +403,72 @@ const AdjustmentForm: React.FC<{ account: TradingAccount; onCancel: () => void; 
         </div>
       </form>
     </Modal>
+  );
+};
+
+const STATE_TEXT: Record<LimitState, { label: string; bar: string; text: string }> = {
+  OK: { label: 'OK', bar: 'bg-sky-500', text: 'text-ink-2' },
+  CLOSE: { label: 'Close to limit', bar: 'bg-amber-500', text: 'text-amber-300' },
+  BREACHED: { label: 'Limit reached', bar: 'bg-rose-500', text: 'text-rose-300' },
+};
+
+const Meter: React.FC<{ label: string; used: number; limit: number; state: LimitState; detail: string; sub?: string }> = ({ label, used, limit, state, detail, sub }) => {
+  const pct = limit > 0 ? Math.min(100, Math.max(0, (used / limit) * 100)) : 0;
+  const st = STATE_TEXT[state];
+  return (
+    <div className="space-y-1">
+      <div className="flex items-baseline justify-between gap-2 text-xs">
+        <span className="text-ink-2">{label}</span>
+        <span className={`font-semibold ${st.text}`}>{st.label}</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-well" role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}>
+        <div className={`h-full rounded-full ${st.bar}`} style={{ width: `${pct}%` }} />
+      </div>
+      <p className="text-xs text-ink-3">{detail}</p>
+      {sub && <p className="text-xs text-ink-3">{sub}</p>}
+    </div>
+  );
+};
+
+/** A prop account's standing against its firm's rules (New York trading day). */
+const PropRulesPanel: React.FC<{ account: TradingAccount }> = ({ account }) => {
+  const { accountPropStatus } = useTrading();
+  const st = accountPropStatus[account.id];
+  if (!account.propRules || !st || (!st.daily && !st.max && !st.target && !st.tradingDays)) return null;
+  const money = (n: number) => formatMoney(n, account.currency);
+  return (
+    <div className="grid grid-cols-1 gap-4 rounded-lg border border-line bg-well/60 p-3 sm:grid-cols-2">
+      {st.daily && (
+        <Meter label={`Daily loss · ${account.propRules.dailyLossPct}% of ${st.daily.basis === 'DAY_START_BALANCE' ? "today's opening balance" : 'starting balance'}`}
+          used={st.daily.used} limit={st.daily.limit} state={st.daily.state}
+          detail={`Lost today ${money(st.daily.used)} of ${money(st.daily.limit)} · ${money(st.daily.remaining)} left`}
+          sub={st.openRisk > 0 ? `If open trades stop out: ${money(st.daily.usedIfOpenStopped)} lost today` : undefined} />
+      )}
+      {st.max && (
+        <Meter label={`Max loss · ${account.propRules.maxLossPct}% ${st.max.type === 'TRAILING' ? 'trailing' : 'static'}`}
+          used={st.max.limit - st.max.remaining} limit={st.max.limit} state={st.max.state}
+          detail={`Stay above ${money(st.max.floor)} · ${money(st.max.remaining)} of room left`}
+          sub={st.openRisk > 0 ? `If open trades stop out: ${money(Math.max(0, st.max.remainingIfOpenStopped))} left` : undefined} />
+      )}
+      {st.target && (
+        <div className="space-y-1">
+          <div className="flex items-baseline justify-between gap-2 text-xs">
+            <span className="text-ink-2">Profit target · {account.propRules.profitTargetPct}%</span>
+            <span className={`font-semibold ${st.target.reached ? 'text-emerald-400' : 'text-ink-2'}`}>{st.target.reached ? 'Reached' : `${Math.max(0, Math.round((st.target.progress / st.target.amount) * 100))}%`}</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-well" role="meter" aria-label="Profit target progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(Math.max(0, Math.min(100, (st.target.progress / st.target.amount) * 100)))}>
+            <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.max(0, Math.min(100, (st.target.progress / st.target.amount) * 100))}%` }} />
+          </div>
+          <p className="text-xs text-ink-3">{money(Math.max(0, st.target.progress))} of {money(st.target.amount)}</p>
+        </div>
+      )}
+      {st.tradingDays && (
+        <div className="space-y-1 text-xs">
+          <span className="text-ink-2">Trading days</span>
+          <p className={st.tradingDays.done >= st.tradingDays.required ? 'font-semibold text-emerald-400' : 'text-ink-3'}>{st.tradingDays.done} of {st.tradingDays.required} minimum</p>
+        </div>
+      )}
+      <p className="text-[11px] text-ink-3 sm:col-span-2">From the trades and P/L recorded here (closed trades; estimates where no actual P/L was entered). Your firm's dashboard is the final word.</p>
+    </div>
   );
 };

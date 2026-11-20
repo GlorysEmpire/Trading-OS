@@ -1,4 +1,4 @@
-import type { PendingSetup, ProcessScore, Trade, TradingHQConfig } from '../types';
+import type { AccountRisk, PendingSetup, ProcessScore, Trade, TradingHQConfig } from '../types';
 import { calculatePlannedR, evaluateRiskViolations } from './tradingCalculations';
 import { evaluateSessionCheck, traderDateString } from './traderTime';
 import { scoreProcess } from './tradeIntegrity';
@@ -12,6 +12,8 @@ export interface TriggerInput {
   checks: Omit<ProcessScore, 'score'>;
   /** Accounts the trade is on (defaults to the setup's planned accounts). */
   accountIds?: string[];
+  /** Risk taken on each account (% and amount). */
+  riskByAccount?: Record<string, AccountRisk>;
 }
 
 export type NewTrade = Omit<Trade, 'id' | 'timestamp' | 'configVersionUsed'>;
@@ -58,6 +60,9 @@ export function setupToTrade(setup: PendingSetup, input: TriggerInput, hq: Tradi
       const ids = input.accountIds ?? setup.accountIds ?? (setup.accountId ? [setup.accountId] : []);
       return ids.length ? { accountIds: [...ids] } : {};
     })(),
+    ...(input.riskByAccount && Object.keys(input.riskByAccount).length
+      ? { riskByAccount: input.riskByAccount, riskPercentAtEntry: Object.values(input.riskByAccount)[0].pct }
+      : {}),
   };
 }
 
