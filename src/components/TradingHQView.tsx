@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { PageTitle } from './PageTitle';
+import { ResetAppPanel } from './ResetAppPanel';
 import { useTrading } from '../context/TradingContext';
 import { Sliders, ShieldCheck, Clock, AlertOctagon, Save, Tag, Info, Layers, History, Plus, Trash2, ListChecks, FlaskConical, CalendarDays } from 'lucide-react';
 import type { HQCategory } from '../lib/hqStore';
@@ -696,6 +697,8 @@ export const TradingHQView: React.FC = () => {
           </table>
         </div>
       </div>
+
+      <ResetAppPanel />
     </div>
   );
 };
