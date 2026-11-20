@@ -1,3 +1,4 @@
+import { formatTradingTime } from '../utils/timeDisplay';
 import React, { useMemo, useState } from 'react';
 import { AccountPicker } from './AccountSelect';
 import { actualPnl, formatMoney, tradeAccountIds } from '../utils/accounts';
@@ -492,12 +493,12 @@ export const TradeOutcomePanel: React.FC<{ trade: Trade }> = ({ trade }) => {
       {trade.voided ? (
         <div className="flex items-start gap-2 p-2.5 rounded border border-rose-900 bg-rose-950/30 text-rose-300 font-mono text-[11px]">
           <Ban className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-          <span>VOIDED {new Date(trade.voided.at).toLocaleString()}: {trade.voided.reason}. Kept for the record, left out of stats.</span>
+          <span>VOIDED {formatTradingTime(trade.voided.at)}: {trade.voided.reason}. Kept for the record, left out of stats.</span>
         </div>
       ) : locked ? (
         <div className="flex items-center gap-2 text-[11px] font-mono text-emerald-300">
           <CheckCircle2 className="w-3.5 h-3.5" />
-          LOCKED{trade.closedAt ? ` · closed ${new Date(trade.closedAt).toLocaleString()}` : ''} · evaluated against HQ {trade.configVersionUsed}
+          LOCKED{trade.closedAt ? ` · closed ${formatTradingTime(trade.closedAt)}` : ''} · evaluated against HQ {trade.configVersionUsed}
         </div>
       ) : null}
 
@@ -525,7 +526,7 @@ export const TradeOutcomePanel: React.FC<{ trade: Trade }> = ({ trade }) => {
           <span className="flex items-center gap-1.5 text-[11px] font-mono font-bold text-slate-300 uppercase"><History className="w-3.5 h-3.5" /> Amendment history ({history.length})</span>
           {history.map((a) => (
             <div key={a.id} className="border-l-2 border-slate-700 pl-2.5 space-y-1">
-              <div className="font-mono text-[10px] text-slate-500">{new Date(a.createdAt).toLocaleString()} · <span className={a.kind === 'VOID' ? 'text-rose-400' : 'text-cyan-400'}>{a.kind}</span></div>
+              <div className="font-mono text-[10px] text-slate-500">{formatTradingTime(a.createdAt)} · <span className={a.kind === 'VOID' ? 'text-rose-400' : 'text-cyan-400'}>{a.kind}</span></div>
               <p className="text-slate-300 font-sans text-[11px]">"{a.reason}"</p>
               <ChangeList changes={a.changes} />
             </div>

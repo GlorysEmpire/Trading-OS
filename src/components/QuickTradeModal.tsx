@@ -6,6 +6,7 @@ import { X, AlertTriangle, ShieldCheck, CheckSquare, Square, Calculator } from '
 import { Trade } from '../types';
 import { MultiImageDropzone, ImageThumbGrid } from './ImageUploadDropzone';
 import { AccountPicker } from './AccountSelect';
+import { fromZoneInput, otherZoneHint, toZoneInput, viewZone, zoneLabel } from '../utils/timeDisplay';
 import { defaultAccountIds, formatMoney } from '../utils/accounts';
 
 export const QuickTradeModal: React.FC = () => {
@@ -19,6 +20,7 @@ export const QuickTradeModal: React.FC = () => {
     accounts,
     accountSummaries,
     trades,
+    timeView,
     performanceStats,
   } = useTrading();
 
@@ -45,16 +47,13 @@ export const QuickTradeModal: React.FC = () => {
   const [checkManagement, setCheckManagement] = useState(true);
   const [checkStructure, setCheckStructure] = useState(true);
 
-  // Entry time (device-local in the input). The session and the Session
-  // check are derived from it in NY time, so DST and travel can't break them.
-  const toLocalInput = (d: Date) => {
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  };
-  const [entryLocal, setEntryLocal] = useState(() => toLocalInput(new Date()));
+  // Entry time is typed in the chosen view (New York by default, or the
+  // device's local time). The session and the Session check always work from
+  // the absolute instant in NY time, so DST and travel can't break them.
+  const [entryLocal, setEntryLocal] = useState(() => toZoneInput(new Date(), viewZone(timeView)));
   useEffect(() => {
     if (quickTradeModalOpen) {
-      setEntryLocal(toLocalInput(new Date()));
+      setEntryLocal(toZoneInput(new Date(), viewZone(timeView)));
       setRiskPercent(String(tradingHQ.riskRules.riskPerSetupPct));
       setAccountIds(defaultAccountIds(accounts, trades));
       const selected = assets.find(item => item.id === selectedAssetId);
@@ -70,9 +69,9 @@ export const QuickTradeModal: React.FC = () => {
     return `At risk ≈ ${formatMoney(balance * pct / 100, account.currency)}`;
   };
   const entryDate = useMemo(() => {
-    const d = new Date(entryLocal);
+    const d = fromZoneInput(entryLocal, viewZone(timeView)) ?? new Date(NaN);
     return Number.isNaN(d.getTime()) ? new Date() : d;
-  }, [entryLocal]);
+  }, [entryLocal, timeView]);
   const sessionCheck = useMemo(() => evaluateSessionCheck(tradingHQ.sessions, entryDate, timeframe), [tradingHQ.sessions, entryDate, timeframe]);
   const entryNyLabel = minutesToHhmm(minutesInZone(entryDate, SESSION_TIMEZONE));
   useEffect(() => {
@@ -311,13 +310,15 @@ export const QuickTradeModal: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-400 font-mono mb-1">Entry time (your local time)</label>
+              <label htmlFor="qt-entry" className="block text-slate-400 font-mono mb-1">Entry time ({timeView === 'NY' ? 'New York' : zoneLabel(viewZone('LOCAL'))})</label>
               <input
+                id="qt-entry"
                 type="datetime-local"
                 value={entryLocal}
                 onChange={(e) => setEntryLocal(e.target.value)}
                 className="w-full bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono focus:border-cyan-500 outline-none"
               />
+              {otherZoneHint(entryDate, timeView) && <p className="text-[10px] text-slate-500 mt-1">{otherZoneHint(entryDate, timeView)}</p>}
             </div>
             <p className="text-[10px] text-slate-500 font-mono self-end pb-1.5">
               {sessionCheck.restricted

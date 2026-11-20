@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { AccountPicker } from './AccountSelect';
+import { formatTradingTime, fromZoneInput, otherZoneHint, toZoneInput, viewZone, zoneLabel } from '../utils/timeDisplay';
 import { defaultAccountIds, tradeAccountIds } from '../utils/accounts';
 import { Crosshair, Plus, Zap, Ban, Clock3, Pencil, ArrowUpRight, X, AlertTriangle, CheckSquare, Square } from 'lucide-react';
 import { useTrading, type PendingSetupInput } from '../context/TradingContext';
@@ -21,11 +22,7 @@ const CHECKS: Array<{ key: keyof Omit<ProcessScore, 'score'>; fallback: string }
   { key: 'structure', fallback: 'Structure' },
 ];
 
-const toLocalInput = (d: Date) => {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
-const fmtDate = (iso: string) => new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const fmtDate = (iso: string) => formatTradingTime(iso);
 
 type Draft = {
   direction: 'LONG' | 'SHORT'; timeframe: string; modelId: string; setupGrade: string;
@@ -137,14 +134,15 @@ function SetupForm({ desk, initial, onDone }: { desk: AssetDeskData; initial?: P
 function TriggerModal({ setup, onClose }: { setup: PendingSetup; onClose: () => void }) {
   const { tradingHQ, trades, triggerPendingSetup, setActiveTab, accounts } = useTrading();
   const [accountIds, setAccountIds] = useState<string[]>(() => { const planned = tradeAccountIds(setup); return planned.length ? planned : defaultAccountIds(accounts, trades); });
-  const [entryLocal, setEntryLocal] = useState(() => toLocalInput(new Date()));
+  const { timeView } = useTrading();
+  const [entryLocal, setEntryLocal] = useState(() => toZoneInput(new Date(), viewZone(timeView)));
   const [fill, setFill] = useState(String(setup.entryPrice));
   const [checks, setChecks] = useState<Omit<ProcessScore, 'score'>>({ session: true, grade: true, risk: true, management: true, structure: true });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  const entryAt = useMemo(() => { const x = new Date(entryLocal); return Number.isNaN(x.getTime()) ? new Date() : x; }, [entryLocal]);
+  const entryAt = useMemo(() => fromZoneInput(entryLocal, viewZone(timeView)) ?? new Date(), [entryLocal, timeView]);
   const session = evaluateSessionCheck(tradingHQ.sessions, entryAt, setup.timeframe);
   const fillNum = Number(fill);
   const plannedR = Number.isFinite(fillNum) ? calculatePlannedR(setup.direction, fillNum, setup.stopPrice, setup.targetPrice) : setup.plannedR;
@@ -182,7 +180,7 @@ function TriggerModal({ setup, onClose }: { setup: PendingSetup; onClose: () => 
         ) : (
           <div className="p-5 space-y-4">
             <div className="grid grid-cols-2 gap-3 font-mono">
-              <label className="space-y-1"><span className="text-[10px] text-slate-400 block">Entry time (your local time)</span><input type="datetime-local" value={entryLocal} onChange={(e) => setEntryLocal(e.target.value)} className={field} /></label>
+              <label className="space-y-1"><span className="text-[10px] text-slate-400 block">Entry time ({timeView === 'NY' ? 'New York' : zoneLabel(viewZone('LOCAL'))})</span><input type="datetime-local" value={entryLocal} onChange={(e) => setEntryLocal(e.target.value)} className={field} />{otherZoneHint(entryAt, timeView) && <span className="text-[10px] text-slate-500 block">{otherZoneHint(entryAt, timeView)}</span>}</label>
               <label className="space-y-1"><span className="text-[10px] text-slate-400 block">Fill price</span><input type="number" step="any" value={fill} onChange={(e) => setFill(e.target.value)} className={field} /></label>
               <div className="col-span-2 space-y-1">
                 <AccountPicker value={accountIds} onChange={setAccountIds} />

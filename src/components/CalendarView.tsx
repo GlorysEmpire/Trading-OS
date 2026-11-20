@@ -27,7 +27,7 @@ export const CalendarView: React.FC = () => {
   // Form states
   const [eventDate, setEventDate] = useState(() => traderDateString());
   const [eventTime, setEventTime] = useState('08:30');
-  const [eventTimeZone, setEventTimeZone] = useState<NonNullable<OperationalCalendarEvent['timeZone']>>('Africa/Lagos');
+  const [eventTimeZone, setEventTimeZone] = useState<NonNullable<OperationalCalendarEvent['timeZone']>>('America/New_York');
   const [eventTitle, setEventTitle] = useState('');
   const [eventType, setEventType] = useState<OperationalCalendarEvent['type']>('NEWS');
   const [eventImpact, setEventImpact] = useState<OperationalCalendarEvent['impact']>('HIGH');

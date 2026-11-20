@@ -1,8 +1,12 @@
+import { getTimeView, viewZone, zoneLabel } from '../utils/timeDisplay';
 import React, { useMemo, useState } from 'react';
 import { GitMerge, Plus, Trash2, X } from 'lucide-react';
 import type { ActivePOI, AssetDeskData, ExternalLevel, LiquidityZone } from '../types';
 import { buildLadder, DEFAULT_BAND_PCT, kindLabel, kindOptions, parsePriceRange, type LadderRow } from '../utils/levelsLadder';
 import { contextId, fieldAge, formatAsOfNY, isoToNyInput, nyInputToIso } from '../utils/marketContext';
+
+/** The zone trading times are shown and typed in right now. */
+const zoneName = () => (getTimeView() === 'NY' ? 'New York time' : `${zoneLabel(viewZone())} time`);
 
 const input = 'w-full rounded-lg border border-line bg-well px-3 py-2 text-sm text-ink outline-none focus:border-sky-500';
 const smallBtn = 'inline-flex items-center gap-1 rounded-lg border border-line bg-raised px-2.5 py-1.5 text-xs text-ink-2 hover:text-ink';
@@ -297,7 +301,7 @@ const LevelForm: React.FC<{
               <Field id="lvl-source" label="Source">
                 <input id="lvl-source" value={d.source} onChange={(e) => set({ source: e.target.value })} className={input} />
               </Field>
-              <Field id="lvl-asof" label="As of (New York time)">
+              <Field id="lvl-asof" label={`As of (${zoneName()})`}>
                 <input id="lvl-asof" type="datetime-local" value={d.asOf} onChange={(e) => set({ asOf: e.target.value })} className={input} />
               </Field>
               <Field id="lvl-stale" label="Grey out after (hours, blank = never)">

@@ -1,11 +1,11 @@
 import type { SessionWindow } from '../types';
 
 /**
- * The trader's home timezone, used for calendar dates ("today", a trade's
- * date, debrief days). One explicit zone, so trade.date, the Dashboard's
- * "today" and the stats never land on different days around midnight.
+ * The trading day's timezone: New York. "Today", a trade's date, the daily
+ * loss limit and debrief days all follow the New York calendar day, the same
+ * clock the sessions use. (Before 2026-11-20 this was Africa/Lagos.)
  */
-export const TRADER_TIMEZONE = 'Africa/Lagos';
+export const TRADER_TIMEZONE = 'America/New_York';
 
 /** Session windows are always defined in New York time, wherever the trader
  * is (Trading HQ, confirmed 2026-11-02). Local times are derived from NY

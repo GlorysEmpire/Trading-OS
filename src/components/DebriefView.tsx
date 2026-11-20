@@ -1,3 +1,4 @@
+import { formatTradingTime } from '../utils/timeDisplay';
 import React, { useEffect, useMemo, useState } from 'react';
 import { PageTitle } from './PageTitle';
 import { ClipboardCheck, ChevronLeft, ChevronRight, Save, AlertTriangle, ShieldAlert, ArrowUpRight, RotateCcw } from 'lucide-react';
@@ -196,7 +197,7 @@ export const DebriefView: React.FC = () => {
         <section className="lg:col-span-3 bg-panel border border-slate-800 rounded-xl p-4 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">Reflection</h3>
-            {saved && <span className="text-[10px] font-mono text-emerald-400">saved {new Date(saved.updatedAt).toLocaleString()}</span>}
+            {saved && <span className="text-[10px] font-mono text-emerald-400">saved {formatTradingTime(saved.updatedAt)}</span>}
           </div>
 
           {evidenceDrift && (

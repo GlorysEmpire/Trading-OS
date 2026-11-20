@@ -1,3 +1,4 @@
+import { getTimeView, viewZone, zoneLabel } from '../utils/timeDisplay';
 import React, { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, Check, Pencil, Plus, Trash2, X } from 'lucide-react';
 import type { AssetDeskData, ContextField, ContextLane, ContextLaneState, OperationalCalendarEvent } from '../types';
@@ -28,6 +29,9 @@ const STATE_CLASS: Record<ContextLaneState, string> = {
   AGAINST: 'bg-orange-950/60 border-orange-700 text-orange-300',
   NEUTRAL: 'bg-raised border-line-strong text-ink-2',
 };
+
+/** The zone trading times are shown and typed in right now. */
+const zoneName = () => (getTimeView() === 'NY' ? 'New York time' : `${zoneLabel(viewZone())} time`);
 
 const input = 'w-full rounded-lg border border-line bg-well px-3 py-2 text-sm text-ink outline-none focus:border-sky-500';
 const smallBtn = 'inline-flex items-center gap-1 rounded-lg border border-line bg-raised px-2.5 py-1.5 text-xs text-ink-2 hover:text-ink';
@@ -233,7 +237,7 @@ export const MarketContextStrip: React.FC<Props> = ({ desk, calendarEvents, onSa
         {editingLanes && <button type="button" onClick={addLane} className={smallBtn}><Plus className="h-3.5 w-3.5" /> Lane</button>}
         <span>Your read on each lane is yours to set; AI drafts show dashed until you confirm.</span>
         <span>Dashed grey = older than its stale limit.</span>
-        <span>Times in New York time.</span>
+        <span>Times in {zoneName()}.</span>
       </div>
 
       {editing && (
@@ -311,7 +315,7 @@ const FieldEditor: React.FC<{
           <Labelled id="mc-source" label="Source">
             <input id="mc-source" value={source} onChange={(e) => setSource(e.target.value)} className={input} placeholder="Where it came from" />
           </Labelled>
-          <Labelled id="mc-asof" label="As of (New York time)">
+          <Labelled id="mc-asof" label={`As of (${zoneName()})`}>
             <div className="flex gap-2">
               <input id="mc-asof" type="datetime-local" value={asOf} onChange={(e) => setAsOf(e.target.value)} className={`${input} min-w-0 flex-1`} />
               <button type="button" onClick={() => setAsOf(isoToNyInput(new Date().toISOString()))} className={`${smallBtn} shrink-0`}>Now</button>

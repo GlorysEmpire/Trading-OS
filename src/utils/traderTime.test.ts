@@ -23,16 +23,15 @@ function makeSession(overrides: Partial<SessionWindow> & { nyStart: string; nyEn
 }
 
 describe('traderDateString', () => {
-  it('formats a known UTC instant as a YYYY-MM-DD string in the trader timezone (Africa/Lagos, UTC+1, no DST)', () => {
-    // 2026-10-21T23:30:00Z is 2026-10-22T00:30 in Africa/Lagos (UTC+1)
-    const date = new Date('2026-10-21T23:30:00Z');
-    expect(traderDateString(date)).toBe('2026-10-22');
+  it('uses the New York calendar day (the trading day)', () => {
+    // 2026-10-22T03:30:00Z is 2026-10-21T23:30 in New York (EDT, UTC-4)
+    expect(traderDateString(new Date('2026-10-22T03:30:00Z'))).toBe('2026-10-21');
+    // 04:30Z is 00:30 New York: the next trading day
+    expect(traderDateString(new Date('2026-10-22T04:30:00Z'))).toBe('2026-10-22');
   });
 
-  it('keeps the same calendar day when still before midnight Lagos time', () => {
-    // 2026-10-21T20:00:00Z is 2026-10-21T21:00 in Africa/Lagos
-    const date = new Date('2026-10-21T20:00:00Z');
-    expect(traderDateString(date)).toBe('2026-10-21');
+  it('can still give the date in another zone when asked', () => {
+    expect(traderDateString(new Date('2026-10-21T23:30:00Z'), 'Africa/Lagos')).toBe('2026-10-22');
   });
 });
 
@@ -53,9 +52,9 @@ describe('daysBetweenDateStrings', () => {
 
 describe('traderNowMinutes', () => {
   it('converts a known UTC instant to minutes-since-midnight in the trader timezone', () => {
-    // 2026-10-21T10:15:00Z -> 11:15 Africa/Lagos -> 11*60+15 = 675
+    // 2026-10-21T10:15:00Z -> 06:15 New York (EDT)
     const date = new Date('2026-10-21T10:15:00Z');
-    expect(traderNowMinutes(date)).toBe(11 * 60 + 15);
+    expect(traderNowMinutes(date)).toBe(6 * 60 + 15);
   });
 });
 

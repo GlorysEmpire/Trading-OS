@@ -1,3 +1,4 @@
+import { formatTradingTime } from '../utils/timeDisplay';
 import React, { useEffect, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
@@ -99,7 +100,7 @@ export const DeskAnalysisLifecycle: React.FC<{ desk: AssetDeskData }> = ({ desk 
             <span className="min-w-0 flex-1">
               <span className="flex flex-wrap gap-2 items-center text-sm font-semibold text-ink">
                 {LABEL[item.outcome]} · {SCOPES[item.scope]}
-                <span className="text-xs font-normal text-ink-3">{new Date(item.createdAt).toLocaleString()}</span>
+                <span className="text-xs font-normal text-ink-3">{formatTradingTime(item.createdAt)}</span>
               </span>
               <span className="block text-xs text-ink-3 mt-1 line-clamp-2">{summary(item)}</span>
             </span>

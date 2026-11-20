@@ -1,3 +1,4 @@
+import { viewZone } from '../utils/timeDisplay';
 import { contextSummary, getLanes } from '../utils/marketContext';
 import React, { useState, useEffect, useRef } from 'react';
 import { ChartImage } from './ChartImage';
@@ -120,6 +121,7 @@ export const DashboardView: React.FC = () => {
     chartMigration,
     pendingSetups,
     setDeskTabRequest,
+    timeView,
   } = useTrading();
 
   const [aiBriefLoading, setAiBriefLoading] = useState(false);
@@ -170,9 +172,10 @@ export const DashboardView: React.FC = () => {
 
   const openTrades = trades.filter((t) => t.status === 'OPEN' && !t.voided);
   const todayStr = traderDateString();
-  const hourNow = Math.floor(nowMinutes / 60);
+  // A greeting follows the trader's own clock; trading days follow New York.
+  const hourNow = new Date().getHours();
   const greeting = hourNow < 12 ? 'Good morning' : hourNow < 17 ? 'Good afternoon' : 'Good evening';
-  const greetingDate = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Africa/Lagos' });
+  const greetingDate = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', timeZone: viewZone(timeView) });
   const lossesLeft = Math.max(0, tradingHQ.riskRules.maxDailyLosses - performanceStats.lossCountToday);
   const todayEvents = calendarEvents.filter((e) => e.date === todayStr);
   // Judged in NY time (sessions are defined there); nowMinutes ticking keeps it live.

@@ -2,11 +2,12 @@ import React, { useEffect, useState } from 'react';
 import {
   Bell, BookOpen, Brain, CalendarDays, CalendarRange, ChevronDown, ClipboardCheck,
   Download, FlaskConical, Globe, HelpCircle, History, LayoutDashboard, LogOut,
-  Moon, Plus, Radar, Settings2, Sliders, Sparkles, Sun, TrendingUp, Upload,
+  Clock, Moon, Plus, Radar, Settings2, Sliders, Sparkles, Sun, TrendingUp, Upload,
 } from 'lucide-react';
 import { useTrading, type NavSection } from '../context/TradingContext';
 import { useAuth } from '../context/AuthContext';
-import { getActiveSession } from '../utils/traderTime';
+import { deviceTimeZone, getActiveSession } from '../utils/traderTime';
+import { localIsNY, zoneLabel } from '../utils/timeDisplay';
 import { GlossaryDrawer } from './GlossaryDrawer';
 
 type NavItem = { id: NavSection; label: string; mobileLabel?: string; icon: React.ElementType };
@@ -50,18 +51,23 @@ const MORE: { title: string; items: NavItem[] }[] = [
 
 export const AppNavigation: React.FC = () => {
   const {
-    theme, setTheme, activeTab, setActiveTab, setQuickTradeModalOpen,
+    theme, setTheme, activeTab, setActiveTab, setQuickTradeModalOpen, timeView, setTimeView,
     tradingHQ, performanceStats, exportDataJSON, importDataJSON,
   } = useTrading();
   const { user, signOut } = useAuth();
   const [moreOpen, setMoreOpen] = useState(false);
   const [glossaryOpen, setGlossaryOpen] = useState(false);
   const [nyTime, setNyTime] = useState('');
+  const [localTime, setLocalTime] = useState('');
+  const localZone = deviceTimeZone();
+  const sameAsNY = localIsNY();
 
   useEffect(() => {
-    const update = () => setNyTime(new Date().toLocaleTimeString('en-US', {
-      timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: false,
-    }));
+    const update = () => {
+      const now = new Date();
+      setNyTime(now.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: false }));
+      setLocalTime(now.toLocaleTimeString('en-US', { timeZone: localZone, hour: '2-digit', minute: '2-digit', hour12: false }));
+    };
     update();
     const timer = window.setInterval(update, 60_000);
     return () => window.clearInterval(timer);
@@ -116,7 +122,19 @@ export const AppNavigation: React.FC = () => {
             <span className={`rounded-full border px-3 py-1.5 ${halted ? 'border-rose-800 bg-rose-950/30 text-rose-300' : 'border-line bg-raised'}`}>
               {performanceStats.lossCountToday}/{tradingHQ.riskRules.maxDailyLosses} losses today
             </span>
-            <span className="px-1 tabular-nums">NY {nyTime || '--:--'}</span>
+            {sameAsNY ? (
+              <span className="px-1 tabular-nums">NY {nyTime || '--:--'}</span>
+            ) : (
+              <div role="group" aria-label="Show trading times in" title="Trading times are New York time. Click your local clock to see them in your time instead."
+                className="inline-flex rounded-full border border-line bg-raised p-0.5">
+                {([['NY', `NY ${nyTime || '--:--'}`], ['LOCAL', `${zoneLabel(localZone)} ${localTime || '--:--'}`]] as const).map(([view, label]) => (
+                  <button key={view} type="button" aria-pressed={timeView === view} onClick={() => setTimeView(view)}
+                    className={`rounded-full px-2.5 py-1 tabular-nums ${timeView === view ? 'bg-sky-600 text-white font-semibold' : 'text-ink-3 hover:text-ink'}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setQuickTradeModalOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-white shadow-sm">
@@ -157,6 +175,12 @@ export const AppNavigation: React.FC = () => {
             <p className="px-2 text-[10px] uppercase tracking-widest font-semibold text-ink-3 mb-1">Preferences & data</p>
             <div className="grid grid-cols-2 gap-1">
               <button onClick={() => { setTheme(theme === 'ash' ? 'dark' : 'ash'); setMoreOpen(false); }} className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-ink-2 hover:bg-raised">{theme === 'ash' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />} {theme === 'ash' ? 'Dark theme' : 'Light theme'}</button>
+              {!sameAsNY && (
+                <button onClick={() => setTimeView(timeView === 'NY' ? 'LOCAL' : 'NY')} title="Trading times are New York time by default"
+                  className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-ink-2 hover:bg-raised">
+                  <Clock className="h-4 w-4" /> Times: {timeView === 'NY' ? 'New York' : zoneLabel(localZone)} → {timeView === 'NY' ? zoneLabel(localZone) : 'New York'}
+                </button>
+              )}
               <button onClick={() => { setGlossaryOpen(true); setMoreOpen(false); }} className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-ink-2 hover:bg-raised"><HelpCircle className="h-4 w-4" /> Glossary</button>
               <button onClick={() => { exportDataJSON(); setMoreOpen(false); }} className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-ink-2 hover:bg-raised"><Download className="h-4 w-4" /> Download backup</button>
               <label className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-ink-2 hover:bg-raised cursor-pointer"><Upload className="h-4 w-4" /> Restore backup<input type="file" accept=".json" onChange={handleFileUpload} className="sr-only" /></label>

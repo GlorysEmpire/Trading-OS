@@ -13,7 +13,7 @@ import type {
   ContextLane,
   OperationalCalendarEvent,
 } from '../types';
-import { SESSION_TIMEZONE, zoneOffsetMinutes } from './traderTime';
+import { formatTradingTime, fromZoneInput, toZoneInput, viewZone } from './timeDisplay';
 
 type ExternalContext = AssetDeskData['externalContext'];
 
@@ -192,33 +192,21 @@ export function fieldAge(field: ContextField, now: Date = new Date()): string {
   return `${Math.floor(hours / 24)} d`;
 }
 
-/** "Nov 16, 03:55 NY". */
+/** "Nov 16, 03:55 NY" — in the chosen time view (New York by default). */
 export function formatAsOfNY(iso: string): string {
-  const t = Date.parse(iso);
-  if (!iso || Number.isNaN(t)) return 'no time';
-  const s = new Intl.DateTimeFormat('en-US', {
-    timeZone: SESSION_TIMEZONE, month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-  }).format(new Date(t));
-  return `${s} NY`;
+  if (!iso || Number.isNaN(Date.parse(iso))) return 'no time';
+  return formatTradingTime(iso);
 }
 
-/** ISO → "YYYY-MM-DDTHH:mm" in New York time, for a datetime-local input. */
+/** ISO → "YYYY-MM-DDTHH:mm" for a datetime-local input, in the chosen time view. */
 export function isoToNyInput(iso: string): string {
-  const t = Date.parse(iso);
-  if (!iso || Number.isNaN(t)) return '';
-  const d = new Date(t + zoneOffsetMinutes(new Date(t), SESSION_TIMEZONE) * 60_000);
-  return d.toISOString().slice(0, 16);
+  if (!iso || Number.isNaN(Date.parse(iso))) return '';
+  return toZoneInput(iso, viewZone());
 }
 
-/** "YYYY-MM-DDTHH:mm" read as New York time → ISO. Handles daylight saving. */
+/** A datetime-local value in the chosen time view → ISO. Handles daylight saving. */
 export function nyInputToIso(local: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(local);
-  if (!m) return '';
-  const asUtc = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
-  let t = asUtc - zoneOffsetMinutes(new Date(asUtc), SESSION_TIMEZONE) * 60_000;
-  // Re-check once at the guessed instant (offset can differ across a DST change).
-  t = asUtc - zoneOffsetMinutes(new Date(t), SESSION_TIMEZONE) * 60_000;
-  return new Date(t).toISOString();
+  return fromZoneInput(local, viewZone())?.toISOString() ?? '';
 }
 
 /** Saves an edit to a field. A changed value keeps the old one as `previous`. */

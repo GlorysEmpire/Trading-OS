@@ -29,6 +29,7 @@ import { setupToTrade, type TriggerInput } from '../utils/pendingSetups';
 import { computeDailyEvidence } from '../utils/debrief';
 import { calculatePlannedR } from '../utils/tradingCalculations';
 import { traderDateString as traderDay } from '../utils/traderTime';
+import { getTimeView, setTimeView as storeTimeView, type TimeView } from '../utils/timeDisplay';
 import { applyAmendment, assertFreeUpdate, buildClosedTrade, diffEvidence, isTradeLocked, type AmendablePatch, type CloseTradeInput } from '../utils/tradeIntegrity';
 import { importResearchQuestionsOnce, loadResearchQuestions, removeResearchQuestion, saveResearchQuestion } from '../lib/researchStore';
 import { importBacktestSamplesOnce, loadBacktestSamples, removeBacktestSample, saveBacktestSample } from '../lib/backtestStore';
@@ -69,6 +70,9 @@ type PersonalWorkspaceStatus = Record<PersonalWorkspace, { loading: boolean; err
 interface TradingContextType {
   theme: 'ash' | 'dark';
   setTheme: (theme: 'ash' | 'dark') => void;
+  /** Show trading times in New York time (default) or the device's local time. */
+  timeView: TimeView;
+  setTimeView: (view: TimeView) => void;
   activeTab: NavSection;
   setActiveTab: (tab: NavSection) => void;
 
@@ -186,6 +190,8 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
   const [activeTab, setActiveTab] = useState<NavSection>('dashboard');
   const [quickTradeModalOpen, setQuickTradeModalOpen] = useState(false);
 
+  const [timeView, setTimeViewState] = useState<TimeView>(() => getTimeView());
+  const setTimeView = (view: TimeView) => { storeTimeView(view); setTimeViewState(view); };
   const [theme, setTheme] = useState<'ash' | 'dark'>(() => {
     const saved = localStorage.getItem(`${STORAGE_KEY}_theme`);
     return saved === 'dark' || saved === 'ash' ? saved : 'ash';
@@ -794,6 +800,8 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
     <TradingContext.Provider
       value={{
         theme,
+        timeView,
+        setTimeView,
         setTheme,
         activeTab,
         setActiveTab,
