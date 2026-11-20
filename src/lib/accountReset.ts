@@ -18,6 +18,7 @@ export const USER_TABLES = [
   'trading_os_backtest_samples',
   'trading_os_desk_analysis_history',
   'trading_os_capital_settings',
+  'trading_os_accounts',
   'trading_os_calendar_events',
   'trading_os_psychology_entries',
   'trading_os_alert_rules',

@@ -10,6 +10,8 @@ export interface TriggerInput {
   fillPrice?: number;
   /** Process checks confirmed in the trigger dialog (Session is overridden by the rule). */
   checks: Omit<ProcessScore, 'score'>;
+  /** The account the trade is on (defaults to the setup's planned account). */
+  accountId?: string;
 }
 
 export type NewTrade = Omit<Trade, 'id' | 'timestamp' | 'configVersionUsed'>;
@@ -52,6 +54,7 @@ export function setupToTrade(setup: PendingSetup, input: TriggerInput, hq: Tradi
     notesDuring: entryPrice !== setup.entryPrice ? `Filled at ${entryPrice} (planned ${setup.entryPrice}).` : '',
     reflectionAfter: '',
     fromSetupId: setup.id,
+    ...((input.accountId ?? setup.accountId) ? { accountId: input.accountId ?? setup.accountId } : {}),
   };
 }
 

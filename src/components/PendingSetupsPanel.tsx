@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import { AccountSelect } from './AccountSelect';
+import { defaultAccountId } from '../utils/accounts';
 import { Crosshair, Plus, Zap, Ban, Clock3, Pencil, ArrowUpRight, X, AlertTriangle, CheckSquare, Square } from 'lucide-react';
 import { useTrading, type PendingSetupInput } from '../context/TradingContext';
 import type { AssetDeskData, PendingSetup, ProcessScore } from '../types';
@@ -27,11 +29,11 @@ const fmtDate = (iso: string) => new Date(iso).toLocaleString(undefined, { day: 
 
 type Draft = {
   direction: 'LONG' | 'SHORT'; timeframe: string; modelId: string; setupGrade: string;
-  entry: string; stop: string; target: string; narrative: string; reasoning: string; validUntil: string; screenshots: string[];
+  entry: string; stop: string; target: string; narrative: string; reasoning: string; validUntil: string; screenshots: string[]; accountId: string;
 };
 
 function SetupForm({ desk, initial, onDone }: { desk: AssetDeskData; initial?: PendingSetup; onDone: () => void }) {
-  const { tradingHQ, addPendingSetup, updatePendingSetup } = useTrading();
+  const { tradingHQ, addPendingSetup, updatePendingSetup, accounts, trades } = useTrading();
   const [d, setD] = useState<Draft>(() => ({
     direction: initial?.direction ?? 'LONG',
     timeframe: initial?.timeframe ?? '15M',
@@ -44,6 +46,7 @@ function SetupForm({ desk, initial, onDone }: { desk: AssetDeskData; initial?: P
     reasoning: initial?.setupReasoning ?? '',
     validUntil: initial?.validUntil ?? '',
     screenshots: initial?.screenshots ?? [],
+    accountId: initial?.accountId ?? defaultAccountId(accounts, trades),
   }));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +66,7 @@ function SetupForm({ desk, initial, onDone }: { desk: AssetDeskData; initial?: P
       entryPrice: nums.entry, stopPrice: nums.stop, targetPrice: nums.target,
       narrative: d.narrative.trim(), setupReasoning: d.reasoning.trim(), screenshots: d.screenshots,
       ...(d.validUntil ? { validUntil: d.validUntil } : {}),
+      ...(d.accountId ? { accountId: d.accountId } : {}),
     };
     try {
       if (initial) await updatePendingSetup(initial.id, input); else await addPendingSetup(input);
@@ -102,6 +106,10 @@ function SetupForm({ desk, initial, onDone }: { desk: AssetDeskData; initial?: P
         <label className="space-y-1"><span className="text-[10px] text-slate-400 block">Target</span><input type="number" step="any" value={d.target} onChange={(e) => set({ target: e.target.value })} className={field} /></label>
         <div className="space-y-1"><span className="text-[10px] text-slate-400 block">Planned R</span><div className={`px-2.5 py-1.5 rounded border border-slate-700 font-bold ${plannedR >= 3 ? 'text-emerald-400' : plannedR > 0 ? 'text-amber-400' : 'text-slate-500'}`}>{plannedR > 0 ? `${plannedR}R` : '—'}</div></div>
       </div>
+      <div className="font-mono">
+        <label htmlFor="ps-account" className="text-[10px] text-slate-400 block mb-1">Account (can be changed when it triggers)</label>
+        <AccountSelect id="ps-account" value={d.accountId} onChange={(id) => set({ accountId: id })} className={field} />
+      </div>
       {checks.length > 0 && (
         <div className="space-y-1">
           {checks.map((c) => <p key={c} className="flex items-center gap-1.5 text-[11px] font-mono text-amber-300"><AlertTriangle className="w-3 h-3 shrink-0" /> {c}</p>)}
@@ -128,7 +136,8 @@ function SetupForm({ desk, initial, onDone }: { desk: AssetDeskData; initial?: P
 }
 
 function TriggerModal({ setup, onClose }: { setup: PendingSetup; onClose: () => void }) {
-  const { tradingHQ, trades, triggerPendingSetup, setActiveTab } = useTrading();
+  const { tradingHQ, trades, triggerPendingSetup, setActiveTab, accounts } = useTrading();
+  const [accountId, setAccountId] = useState(setup.accountId ?? defaultAccountId(accounts, trades));
   const [entryLocal, setEntryLocal] = useState(() => toLocalInput(new Date()));
   const [fill, setFill] = useState(String(setup.entryPrice));
   const [checks, setChecks] = useState<Omit<ProcessScore, 'score'>>({ session: true, grade: true, risk: true, management: true, structure: true });
@@ -144,9 +153,10 @@ function TriggerModal({ setup, onClose }: { setup: PendingSetup; onClose: () => 
   const labels = CHECKS.map((c, i) => tradingHQ.processChecks?.[i] || c.fallback);
 
   const confirm = async () => {
+    if (accounts.some((a) => !a.archivedAt) && !accountId) { setError('Choose the account this trade is on.'); return; }
     setSaving(true); setError(null);
     try {
-      await triggerPendingSetup(setup.id, { entryAt, fillPrice: Number.isFinite(fillNum) ? fillNum : undefined, checks });
+      await triggerPendingSetup(setup.id, { entryAt, fillPrice: Number.isFinite(fillNum) ? fillNum : undefined, checks, ...(accountId ? { accountId } : {}) });
       setDone(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not move the setup to the Journal.');
@@ -175,6 +185,10 @@ function TriggerModal({ setup, onClose }: { setup: PendingSetup; onClose: () => 
             <div className="grid grid-cols-2 gap-3 font-mono">
               <label className="space-y-1"><span className="text-[10px] text-slate-400 block">Entry time (your local time)</span><input type="datetime-local" value={entryLocal} onChange={(e) => setEntryLocal(e.target.value)} className={field} /></label>
               <label className="space-y-1"><span className="text-[10px] text-slate-400 block">Fill price</span><input type="number" step="any" value={fill} onChange={(e) => setFill(e.target.value)} className={field} /></label>
+              <div className="col-span-2 space-y-1">
+                <label htmlFor="trig-account" className="text-[10px] text-slate-400 block">Account</label>
+                <AccountSelect id="trig-account" value={accountId} onChange={setAccountId} className={field} required={accounts.some((a) => !a.archivedAt)} />
+              </div>
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-[11px]">
               <span className={session.outWindow ? 'text-rose-300' : 'text-cyan-300'}>

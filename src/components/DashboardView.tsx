@@ -1,7 +1,6 @@
 import { contextSummary, getLanes } from '../utils/marketContext';
 import React, { useState, useEffect, useRef } from 'react';
 import { ChartImage } from './ChartImage';
-import { CapitalCard } from './CapitalCard';
 import { useTrading } from '../context/TradingContext';
 import { getAuthHeaders } from '../lib/supabaseClient';
 import { traderDateString, traderNowMinutes, isSessionActiveAt, nyTimeIn, deviceTimeZone, weekdayInZone } from '../utils/traderTime';
@@ -748,7 +747,6 @@ export const DashboardView: React.FC = () => {
           </div>
         </div>
 
-        <CapitalCard />
 
         {/* Process vs Outcome Paradigm Card */}
         {widgetPrefs.processMatrix && (

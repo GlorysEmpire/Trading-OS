@@ -13,6 +13,7 @@ import {
   AlertRule,
   PerformanceStats,
   TradingHQConfig,
+  TradingAccount,
 } from '../types';
 import { importWorkspaceRecords, loadWorkspace, readLocalWorkspace, saveWorkspaceRecord } from '../lib/personalWorkspaceStore';
 import { computePerformanceStats } from '../utils/tradingCalculations';
@@ -32,6 +33,8 @@ import { applyAmendment, assertFreeUpdate, buildClosedTrade, diffEvidence, isTra
 import { importResearchQuestionsOnce, loadResearchQuestions, removeResearchQuestion, saveResearchQuestion } from '../lib/researchStore';
 import { importBacktestSamplesOnce, loadBacktestSamples, removeBacktestSample, saveBacktestSample } from '../lib/backtestStore';
 import { loadCapitalSettings, saveCapitalSettings, type CapitalSettings } from '../lib/capitalStore';
+import { loadAccounts, saveAccount } from '../lib/accountStore';
+import { summarizeAccount, type AccountSummary } from '../utils/accounts';
 import { calculateCapital, type CapitalSummary } from '../utils/capital';
 import { archiveAndResetDeskAnalysis, type DeskAnalysisHistory, type DeskAnalysisOutcome, type DeskAnalysisScope } from '../lib/deskAnalysisHistoryStore';
 
@@ -158,6 +161,15 @@ interface TradingContextType {
   capitalLoading: boolean;
   capitalError: string | null;
   updateCapitalSettings: (settings: CapitalSettings) => Promise<void>;
+  /** Trading accounts (prop, funded, personal…), archived ones included. */
+  accounts: TradingAccount[];
+  accountSummaries: Record<string, AccountSummary>;
+  accountsLoading: boolean;
+  /** 'missing' when the accounts table isn't on the database yet. */
+  accountsError: string | null;
+  saveTradingAccount: (account: TradingAccount) => Promise<void>;
+  /** Move trades onto an account. Closed trades go through a logged amendment. */
+  assignTradesToAccount: (tradeIds: string[], accountId: string, reason: string) => Promise<{ moved: number; failed: string[] }>;
   exportDataJSON: () => void;
   importDataJSON: (jsonString: string) => Promise<boolean>;
   quickTradeModalOpen: boolean;
@@ -231,6 +243,26 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
       .finally(() => { if (active) setCapitalLoading(false); });
     return () => { active = false; };
   }, [userId]);
+  const [accounts, setAccounts] = useState<TradingAccount[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(true);
+  const [accountsError, setAccountsError] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    setAccountsLoading(true);
+    loadAccounts(supabase, userId)
+      .then(list => { if (active) { setAccounts(list); setAccountsError(null); } })
+      .catch(error => {
+        if (!active) return;
+        setAccountsError((error as { code?: string }).code === 'ACCOUNTS_TABLE_MISSING' ? 'missing' : error instanceof Error ? error.message : 'Could not load accounts');
+      })
+      .finally(() => { if (active) setAccountsLoading(false); });
+    return () => { active = false; };
+  }, [userId]);
+  const saveTradingAccount = async (account: TradingAccount) => {
+    await saveAccount(supabase, userId, account);
+    setAccounts(prev => prev.some(a => a.id === account.id) ? prev.map(a => (a.id === account.id ? account : a)) : [...prev, account]);
+  };
+
   const updateCapitalSettings = async (settings: CapitalSettings) => {
     await saveCapitalSettings(supabase, userId, settings);
     setCapitalSettings(settings);
@@ -500,6 +532,22 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
     setAmendmentList(prev => [...prev, amendment]);
     replaceTrade(next);
   };
+  const assignTradesToAccount = async (tradeIds: string[], accountId: string, reason: string) => {
+    let moved = 0;
+    const failed: string[] = [];
+    for (const id of tradeIds) {
+      const current = trades.find(t => t.id === id);
+      if (!current || current.accountId === accountId || current.voided) continue;
+      try {
+        if (isTradeLocked(current)) await amendTrade(id, { accountId }, reason);
+        else await updateTrade(id, { accountId });
+        moved++;
+      } catch (error) {
+        failed.push(`${current.asset} ${current.date}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    return { moved, failed };
+  };
   const tradeAmendments = amendmentList.reduce<Record<string, TradeAmendment[]>>((acc, a) => { (acc[a.tradeId] = acc[a.tradeId] || []).push(a); return acc; }, {});
   const importLocalTrades = async () => {
     const raw = localStorage.getItem(key('trades')); const local = raw ? JSON.parse(raw) as Trade[] : [];
@@ -681,12 +729,15 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
   }, [tradesLoading, backtestLoading, desksLoading]);
 
   const performanceStats = computePerformanceStats(trades, tradingHQ);
+  const accountSummaries = Object.fromEntries(
+    accounts.map(a => [a.id, summarizeAccount(a, trades, tradingHQ.riskRules.riskPerSetupPct)]),
+  ) as Record<string, AccountSummary>;
   const capitalSummary = capitalSettings
     ? calculateCapital(capitalSettings, trades, tradingHQ.riskRules.riskPerSetupPct)
     : null;
 
   const exportDataJSON = () => {
-    const data = { exportDate: new Date().toISOString(), tradingHQ, assets, trades, tradeAmendments: amendmentList, debriefs, weeklyReviews, pendingSetups, researchQuestions, backtestSamples, psychologyEntries, calendarEvents, alerts };
+    const data = { exportDate: new Date().toISOString(), tradingHQ, assets, trades, tradeAmendments: amendmentList, debriefs, weeklyReviews, pendingSetups, researchQuestions, backtestSamples, psychologyEntries, calendarEvents, alerts, accounts };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -819,6 +870,12 @@ export const TradingProvider: React.FC<{ userId: string; children: React.ReactNo
         capitalLoading,
         capitalError,
         updateCapitalSettings,
+        accounts,
+        accountSummaries,
+        accountsLoading,
+        accountsError,
+        saveTradingAccount,
+        assignTradesToAccount,
         exportDataJSON,
         importDataJSON,
         quickTradeModalOpen,

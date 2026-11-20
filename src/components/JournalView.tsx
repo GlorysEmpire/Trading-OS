@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { PageTitle } from './PageTitle';
+import { AccountsCard } from './AccountsCard';
 import { useTrading } from '../context/TradingContext';
 import { getAuthHeaders } from '../lib/supabaseClient';
 import {
@@ -25,11 +26,13 @@ import { ImageViewerModal, LightboxImage } from './ImageViewerModal';
 import { ImageUploadDropzone, MultiImageDropzone, ImageThumbGrid } from './ImageUploadDropzone';
 
 export const JournalView: React.FC = () => {
-  const { trades, assets, updateTrade, setQuickTradeModalOpen, tradingHQ, tradesLoading, tradesError, localTradeImportCount, importLocalTrades } = useTrading();
+  const { trades, assets, accounts, updateTrade, setQuickTradeModalOpen, tradingHQ, tradesLoading, tradesError, localTradeImportCount, importLocalTrades } = useTrading();
 
   const [filterAsset, setFilterAsset] = useState<string>('ALL');
   const [filterProcess, setFilterProcess] = useState<string>('ALL');
   const [filterOutcome, setFilterOutcome] = useState<string>('ALL');
+  const [filterAccount, setFilterAccount] = useState<string>('ALL');
+  const [view, setView] = useState<'trades' | 'accounts'>('trades');
   const [expandedTradeId, setExpandedTradeId] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -113,6 +116,8 @@ export const JournalView: React.FC = () => {
     if (filterAsset !== 'ALL' && t.asset !== filterAsset) return false;
     if (filterProcess !== 'ALL' && t.processCategory !== filterProcess) return false;
     if (filterOutcome !== 'ALL' && t.outcome !== filterOutcome) return false;
+    if (filterAccount === 'NONE' && t.accountId && accounts.some((a) => a.id === t.accountId)) return false;
+    if (filterAccount !== 'ALL' && filterAccount !== 'NONE' && t.accountId !== filterAccount) return false;
     return true;
   });
 
@@ -182,13 +187,23 @@ Provide an objective assessment:
         {localTradeImportCount > 0 && <button onClick={() => importLocalTrades().catch(error => alert(error instanceof Error ? error.message : 'Import failed'))} className="px-4 py-2 rounded border border-amber-700 text-amber-300 font-mono text-xs font-bold">IMPORT {localTradeImportCount} LOCAL TRADE{localTradeImportCount === 1 ? '' : 'S'}</button>}
       </div>
 
+      <div role="tablist" aria-label="Journal sections" className="flex gap-1 border-b border-line text-sm">
+        {([['trades', 'Trades'], ['accounts', `Accounts & capital${accounts.filter((a) => !a.archivedAt).length ? ` (${accounts.filter((a) => !a.archivedAt).length})` : ''}`]] as const).map(([id, label]) => (
+          <button key={id} type="button" role="tab" aria-selected={view === id} onClick={() => setView(id)}
+            className={`-mb-px border-b-2 px-3.5 py-2.5 font-medium ${view === id ? 'border-sky-400 text-ink font-semibold' : 'border-transparent text-ink-3 hover:text-ink'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {view === 'accounts' ? <AccountsCard /> : (<>
       {/* Filters Bar */}
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-ink-3">{filteredTrades.length} trade{filteredTrades.length === 1 ? '' : 's'}</p>
         <button onClick={() => setFiltersOpen(open => !open)} aria-expanded={filtersOpen}
           className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel hover:bg-raised px-3 py-2 text-xs text-ink-2">
           <Filter className="w-3.5 h-3.5" />
-          Filters{[filterAsset, filterProcess, filterOutcome].filter(value => value !== 'ALL').length > 0 ? ` · ${[filterAsset, filterProcess, filterOutcome].filter(value => value !== 'ALL').length} active` : ''}
+          Filters{[filterAsset, filterProcess, filterOutcome, filterAccount].filter(value => value !== 'ALL').length > 0 ? ` · ${[filterAsset, filterProcess, filterOutcome, filterAccount].filter(value => value !== 'ALL').length} active` : ''}
         </button>
       </div>
       {filtersOpen && <div className="bg-panel border border-slate-800 rounded-xl p-3 flex flex-wrap items-center gap-4 text-xs font-mono">
@@ -204,6 +219,18 @@ Provide an objective assessment:
             {assets.map(asset => <option key={asset.id} value={asset.symbol}>{asset.symbol}</option>)}
           </select>
         </div>
+
+        {accounts.length > 0 && (
+          <div className="flex items-center gap-2">
+            <label htmlFor="journal-account" className="text-slate-400">Account:</label>
+            <select id="journal-account" value={filterAccount} onChange={(e) => setFilterAccount(e.target.value)}
+              className="bg-raised border border-slate-700 rounded px-2.5 py-1 text-slate-200 outline-none">
+              <option value="ALL">All accounts</option>
+              {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{a.archivedAt ? ' (archived)' : ''}</option>)}
+              <option value="NONE">Not on an account</option>
+            </select>
+          </div>
+        )}
 
         <div className="flex items-center gap-2">
           <span className="text-slate-400">Process category:</span>
@@ -275,6 +302,11 @@ Provide an objective assessment:
                   <span className="text-xs px-2 py-0.5 rounded bg-purple-950/60 border border-purple-800 text-purple-300 font-mono">
                     {trade.setupGrade} (Planned {trade.plannedR}R)
                   </span>
+                  {accounts.length > 0 && (
+                    <span className="text-xs px-2 py-0.5 rounded border border-line text-ink-2" title="Account">
+                      {accounts.find((a) => a.id === trade.accountId)?.name ?? 'No account'}
+                    </span>
+                  )}
                   {hasCharts(trade) && (
                     <button
                       type="button"
@@ -534,6 +566,7 @@ Provide an objective assessment:
           );
         })}
       </div>
+      </>)}
 
       {/* Lightbox Modal for Fullscreen Chart Analysis */}
       <ImageViewerModal

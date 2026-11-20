@@ -297,6 +297,11 @@ export interface Trade {
   configVersionUsed: string;
   /** Risk setting captured when this trade was opened for capital estimates. */
   riskPercentAtEntry?: number;
+  /** The trading account this trade was taken on. */
+  accountId?: string;
+  /** Actual money result in the account's currency, if entered at close.
+   * Without it, the balance uses risk % × R as an estimate. */
+  pnlAmount?: number;
   /** When the trade was closed and locked (ms epoch). Closed trades without
    * this field predate locking — they're still treated as locked. */
   closedAt?: number;
@@ -547,8 +552,34 @@ export interface PendingSetup {
   validUntil?: string;
   status: 'PENDING' | 'TRIGGERED' | 'INVALIDATED' | 'EXPIRED';
   resolution?: { at: string; reason?: string; tradeId?: string };
+  /** The account the setup is planned for; can be changed when it triggers. */
+  accountId?: string;
   /** Trading HQ version when the setup was planned. */
   configVersionAtPlan: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export type TradingAccountKind = 'PROP_CHALLENGE' | 'PROP_FUNDED' | 'PERSONAL' | 'DEMO' | 'OTHER';
+
+/** A deposit (+), withdrawal or payout (−), or fee (−) on an account. */
+export interface AccountAdjustment {
+  id: string;
+  /** YYYY-MM-DD */
+  date: string;
+  amount: number;
+  note: string;
+}
+
+export interface TradingAccount {
+  id: string;
+  name: string;
+  kind: TradingAccountKind;
+  broker: string;
+  currency: string;
+  startingBalance: number;
+  adjustments: AccountAdjustment[];
+  notes: string;
+  archivedAt?: string;
+  createdAt: string;
 }
