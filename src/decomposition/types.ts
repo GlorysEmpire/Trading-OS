@@ -22,9 +22,9 @@ export interface Step<T> {
   note?: string;
 }
 
-/** Timeframe layers in order of work. The MVP covers WEEKLY and DAILY. */
-export type LayerTimeframe = 'WEEKLY' | 'DAILY';
-export const LAYER_ORDER: LayerTimeframe[] = ['WEEKLY', 'DAILY'];
+/** Structural timeframe layers, in order of work (Monthly → Weekly → Daily → 4H). */
+export type LayerTimeframe = 'MONTHLY' | 'WEEKLY' | 'DAILY' | 'H4';
+export const LAYER_ORDER: LayerTimeframe[] = ['MONTHLY', 'WEEKLY', 'DAILY', 'H4'];
 
 export type DecompositionMode = 'LIVE' | 'BACKTEST';
 
@@ -85,6 +85,9 @@ export interface WeeklyLayer {
   pois: Step<Poi[]>;
 }
 
+/** Monthly context: same questions as Weekly, one timeframe up. */
+export type MonthlyLayer = Omit<WeeklyLayer, 'timeframe'> & { timeframe: 'MONTHLY' };
+
 // ---- Layer 2: Daily read -------------------------------------------------
 
 export type Phase = 'EXPANSION' | 'RETRACEMENT' | 'RANGE';
@@ -125,7 +128,21 @@ export interface DailyLayer {
   targetInvalidation: Step<{ target: number; invalidation: number }>;
 }
 
-export type LayerData = WeeklyLayer | DailyLayer;
+// ---- Layer 3: 4H narrative --------------------------------------------------
+
+export interface H4Layer {
+  timeframe: 'H4';
+  /** Does the 4H agree with the Daily? A conflict is resolved in favour of the Daily. */
+  alignment: Step<'ALIGNED' | 'CONFLICT'>;
+  /** 4H structure: trend, last BOS, internal vs external. */
+  structure: Step<{ trend: Trend; lastBos: number; bosKind: 'INTERNAL' | 'EXTERNAL' }>;
+  /** Wyckoff development. AR is an analytical event only, never an entry trigger. */
+  wyckoff: Step<{ phase: string; events: string[] }>;
+  /** POIs refined on the 4H. */
+  pois: Step<Poi[]>;
+}
+
+export type LayerData = MonthlyLayer | WeeklyLayer | DailyLayer | H4Layer;
 
 // ---- Records ---------------------------------------------------------------
 
@@ -234,4 +251,78 @@ export interface PoiCheck {
   valid: boolean;
   /** Plain-language reasons it was rejected (empty when valid). */
   problems: string[];
+}
+
+// ---- Two-part decomposition (M0.1) ---------------------------------------------
+//
+// Structural Record: the long-term story (Monthly/Weekly/Daily/4H), built in
+// the backtesting block, versioned append-only, new version only when the
+// structure changes. Daily Record: one per asset per trading day, built in
+// the sessions, pointing at the structural version it was built on. Setups
+// and trades will link to a Daily Record + POI.
+
+/** The structural map of one asset (same shape and rules as a Decomposition). */
+export type StructuralRecord = Decomposition;
+
+/** An exact, immutable point in a structural record's history. */
+export interface StructuralVersionRef {
+  structuralRecordId: string;
+  /** Number of layer versions saved when the ref was taken (grows by one per saved layer). */
+  revision: number;
+  /** The exact layer version used for each timeframe. */
+  layerIds: Partial<Record<LayerTimeframe, string>>;
+}
+
+export type StructuralChangeReason =
+  | 'DAILY_BOS'
+  | 'DAILY_CHOCH'
+  | 'H4_BOS'
+  | 'H4_CHOCH'
+  | 'POI_MITIGATED'
+  | 'POI_INVALIDATED';
+
+/** The morning gate: did structure change overnight (body close, or a POI used up)? */
+export interface MorningCheck {
+  answeredAt: string;
+  structureChanged: boolean;
+  /** Required when structureChanged is true. */
+  reasons: StructuralChangeReason[];
+  note?: string;
+}
+
+export type MorningGateNext = 'BUILD_STRUCTURE' | 'ANSWER_MORNING_CHECK' | 'UPDATE_STRUCTURE' | 'START_DAILY';
+
+/** Today's read, built inside the structural story. */
+export interface DailyRead {
+  /** Previous daily candle: formation, close, liquidity event. */
+  priorCandle: Step<{ read: 'EXPANSION' | 'REJECTION' | 'INDECISION'; closeLocation: 'HIGH' | 'MID' | 'LOW'; liquidityEvent: boolean }>;
+  /** Liquidity swept, rejected or still outstanding today; which level is the inducement. */
+  liquidity: Step<{ levels: LiquidityLevel[]; inducementId?: string }>;
+  /** Impulse strength → retracement expectation. */
+  depth: Step<Depth>;
+  /** Will today's move be internal (inside the range) or reach external liquidity? */
+  expectation: Step<'INTERNAL' | 'EXTERNAL'>;
+  /** POI A (primary) and B (backup). */
+  pois: Step<{ primary?: Poi; backup?: Poi }>;
+  /** Today's draw (target) and invalidation. */
+  draw: Step<{ target: number; invalidation: number }>;
+  /** Entry models planned at the POIs (Trading HQ model ids). */
+  entryModels: Step<Array<{ poiId: string; modelId: string }>>;
+  /** Which session the plan is for (NY time windows from Trading HQ). */
+  session: Step<{ session: string }>;
+}
+
+export interface DailyRecord {
+  id: string;
+  deskId: string;
+  symbol: string;
+  /** New York trading day, YYYY-MM-DD. */
+  tradingDay: string;
+  mode: DecompositionMode;
+  createdAt: string;
+  /** The structural version this day was built on. Never moves after the record starts. */
+  structuralVersionRef: StructuralVersionRef;
+  morningCheck: MorningCheck;
+  definitionsVersion: string;
+  read: Partial<DailyRead>;
 }

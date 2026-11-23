@@ -1,6 +1,6 @@
 import type { LayerTimeframe } from './types';
 
-/** One question per step, in the order of work (Weekly → Daily). The stepper (M3) renders these. */
+/** One question per step. STEPS is the M0 Weekly → Daily order; STRUCTURAL_STEPS adds Monthly and 4H. */
 export interface StepDef {
   key: string;
   timeframe: LayerTimeframe;
@@ -31,5 +31,35 @@ export const STEPS: StepDef[] = [
   { key: 'targetInvalidation', timeframe: 'DAILY', gating: true, question: 'What is the target, and what invalidates the read?', help: 'Target: next external liquidity. Invalidation: a close beyond the swing that made the BOS.', ifNotIdentified: 'Observation only: no draw to measure R to.' },
 ];
 
-export const stepsFor = (timeframe: LayerTimeframe) => STEPS.filter((s) => s.timeframe === timeframe);
-export const stepDef = (timeframe: LayerTimeframe, key: string) => STEPS.find((s) => s.timeframe === timeframe && s.key === key);
+const MONTHLY_STEPS: StepDef[] = [
+  { key: 'trend', timeframe: 'MONTHLY', gating: false, question: 'What is the monthly trend from the last external BOS?', help: 'The last body close beyond an external monthly swing.', ifNotIdentified: 'Monthly neutral; the Weekly carries the context.' },
+  { key: 'dealingRange', timeframe: 'MONTHLY', gating: false, question: 'What is the monthly dealing range, and where is price in it?', help: 'High and low of the leg that made the last BOS, plus the current price.', ifNotIdentified: 'No monthly premium/discount read.' },
+  { key: 'draw', timeframe: 'MONTHLY', gating: false, question: 'Where is the monthly draw on liquidity, above and below?', help: 'The nearest external liquidity each way.', ifNotIdentified: 'No monthly draw recorded.' },
+  { key: 'pois', timeframe: 'MONTHLY', gating: false, question: 'Which monthly POIs are still unmitigated?', help: 'Zones price has not traded back into since they formed.', ifNotIdentified: 'No monthly POIs recorded.' },
+];
+
+const H4_STEPS: StepDef[] = [
+  { key: 'alignment', timeframe: 'H4', gating: false, question: 'Does the 4H agree with the Daily?', help: 'If they conflict, the Daily wins: reduce the target or wait.', ifNotIdentified: 'Alignment left open.' },
+  { key: 'structure', timeframe: 'H4', gating: false, question: 'What is the 4H structure: trend, last BOS, internal or external?', help: 'Keep internal shifts separate from external CHoCH.', ifNotIdentified: '4H structure left open.' },
+  { key: 'wyckoff', timeframe: 'H4', gating: false, question: 'What Wyckoff phase and events do you see on the 4H?', help: 'AR is an analytical event only, never an entry trigger.', ifNotIdentified: 'No Wyckoff read.' },
+  { key: 'pois', timeframe: 'H4', gating: false, question: 'Which POIs does the 4H refine?', help: 'Tighter zones inside the Daily POIs.', ifNotIdentified: 'Daily POIs stand as they are.' },
+];
+
+/** The structural flow (backtesting block): Monthly → Weekly → Daily → 4H. */
+export const STRUCTURAL_STEPS: StepDef[] = [...MONTHLY_STEPS, ...STEPS, ...H4_STEPS];
+
+/** Today's read (sessions), one question per step, after the morning gate. */
+export interface DailyReadStepDef { key: string; question: string; help: string; gating: boolean }
+export const DAILY_READ_STEPS: DailyReadStepDef[] = [
+  { key: 'priorCandle', gating: false, question: 'How did the previous daily candle form and close?', help: 'Expansion, rejection or indecision; close high, mid or low; any liquidity event.' },
+  { key: 'liquidity', gating: false, question: 'Which liquidity was swept, rejected, or is still outstanding?', help: 'Mark the inducement: the first obvious internal point in today\'s path.' },
+  { key: 'depth', gating: false, question: 'From the impulse, do you expect a shallow or deep retracement?', help: 'Intent first, then where the liquidity sits.' },
+  { key: 'expectation', gating: false, question: 'Is today about internal or external liquidity?', help: 'Inside the range, or reaching for the external draw.' },
+  { key: 'pois', gating: true, question: 'Which POI is A, and which is B, for today?', help: 'Premium for sells, discount for buys, unmitigated, beyond the inducement.' },
+  { key: 'draw', gating: true, question: "What is today's draw, and what invalidates the read?", help: 'The draw sets the R available from each POI.' },
+  { key: 'entryModels', gating: false, question: 'Which entry model will you look for at each POI?', help: 'Models from Trading HQ. An untested model is UNTESTED_MODEL.' },
+  { key: 'session', gating: false, question: 'Which session is this plan for?', help: 'Session windows are New York time.' },
+];
+
+export const stepsFor = (timeframe: LayerTimeframe) => STRUCTURAL_STEPS.filter((s) => s.timeframe === timeframe);
+export const stepDef = (timeframe: LayerTimeframe, key: string) => STRUCTURAL_STEPS.find((s) => s.timeframe === timeframe && s.key === key);

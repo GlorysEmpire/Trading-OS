@@ -46,3 +46,29 @@ export const fixtureDailyBearish = (over: Partial<DailyLayer> = {}): DailyLayer 
 export const fixtureDecomposition = (over: Partial<Decomposition> = {}): Decomposition => ({
   id: 'dec-1', deskId: 'desk-1', symbol: FIXTURE_SYMBOL, mode: 'LIVE', createdAt: '2026-11-23T10:00:00Z', layers: [], ...over,
 });
+
+// ---- M0.1 two-part fixtures (synthetic) ----------------------------------------
+import type { DailyRead, H4Layer } from './types';
+
+export const fixtureH4Aligned = (): H4Layer => ({
+  timeframe: 'H4',
+  alignment: { status: 'IDENTIFIED', value: 'ALIGNED' },
+  structure: { status: 'IDENTIFIED', value: { trend: 'BEARISH', lastBos: 104, bosKind: 'INTERNAL' } },
+  wyckoff: { status: 'NOT_APPLICABLE' },
+  pois: { status: 'IDENTIFIED', value: [fixturePoi({ id: 'h4-poi', label: '4H FVG', high: 113.5, low: 112.5 })] },
+});
+
+/** A complete day read on the fixture map: POI A/B above the inducement, draw at 78. */
+export const fixtureDailyRead = (): DailyRead => {
+  const d = fixtureDailyBearish();
+  return {
+    priorCandle: d.candles,
+    liquidity: d.liquidity,
+    depth: { status: 'IDENTIFIED', value: 'SHALLOW' },
+    expectation: { status: 'IDENTIFIED', value: 'EXTERNAL' },
+    pois: d.pois,
+    draw: d.targetInvalidation,
+    entryModels: { status: 'IDENTIFIED', value: [{ poiId: 'poi-a', modelId: 'SLP' }] },
+    session: { status: 'IDENTIFIED', value: { session: 'New York' } },
+  };
+};
