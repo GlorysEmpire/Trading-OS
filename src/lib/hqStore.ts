@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { toSupabaseError } from './supabaseErrors';
+import { PLACEHOLDER_DEFINITIONS } from '../decomposition';
 import type { ExecutionModel, FocusDay, MistakeCode, ResearchFramework, RiskRules, SessionWindow, SetupGradeRule, TradingHQConfig } from '../types';
 
 /** One row per category, versioned: editing never overwrites — it
@@ -13,7 +14,10 @@ import type { ExecutionModel, FocusDay, MistakeCode, ResearchFramework, RiskRule
  * was run. If you add another HQCategory value here, the DB constraint
  * needs a matching migration — it does not grow on its own. `focus_rotation`
  * (added 2026-11-02) is allowed by supabase/migrations/20261102000000_hq_update_nov.sql. */
-export type HQCategory = 'risk' | 'setup_quality' | 'execution_model' | 'session' | 'process_score' | 'research_framework' | 'mistake_code' | 'focus_rotation';
+export type HQCategory = 'risk' | 'setup_quality' | 'execution_model' | 'session' | 'process_score' | 'research_framework' | 'mistake_code' | 'focus_rotation' | 'decomposition_definitions';
+// 'decomposition_definitions' (M1, 2026-11-23) is deliberately NOT in HQ_CATEGORIES:
+// it is loaded and seeded on its own by decompositionDefinitionsStore.ts, so the
+// rest of Trading HQ keeps loading even before its migration is applied.
 
 export const HQ_CATEGORIES: HQCategory[] = ['risk', 'setup_quality', 'execution_model', 'session', 'process_score', 'mistake_code', 'research_framework', 'focus_rotation'];
 
@@ -159,6 +163,7 @@ const REAL_DEFAULTS: Record<HQCategory, unknown> = {
   mistake_code: REAL_MISTAKE_CODES,
   research_framework: REAL_RESEARCH_FRAMEWORK,
   focus_rotation: REAL_FOCUS_ROTATION,
+  decomposition_definitions: PLACEHOLDER_DEFINITIONS,
 };
 
 /** The shipped defaults for a category — used by Trading HQ to offer items

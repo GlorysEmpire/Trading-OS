@@ -45,3 +45,50 @@ export function validateDefinitions(d: DecompositionDefinitions): string[] {
   if (!(d.minRToDraw > 0)) problems.push('Minimum R to the draw must be above 0.');
   return problems;
 }
+
+// ---- Versioned definitions in Trading HQ (M1) -----------------------------------
+
+/** The definitions version name for a Trading HQ row version. */
+export const definitionsVersionName = (rowVersion: number) => `decomp-defs-v${rowVersion}`;
+
+/** Plain list of what differs between two definition blocks (for the "what changed" preview). */
+export function describeDefinitionChanges(before: DecompositionDefinitions, after: DecompositionDefinitions): string[] {
+  const out: string[] = [];
+  const textLabels: Record<keyof DecompositionDefinitions['text'], string> = {
+    internalSwing: 'Internal swing', externalSwing: 'External swing', bos: 'BOS', choch: 'CHoCH', mss: 'MSS', equalHighsLows: 'Equal highs/lows',
+  };
+  for (const k of Object.keys(textLabels) as Array<keyof DecompositionDefinitions['text']>) {
+    if (before.text[k].trim() !== after.text[k].trim()) out.push(`${textLabels[k]} definition reworded`);
+  }
+  const num = (label: string, a: number, b: number, unit = '') => { if (a !== b) out.push(`${label}: ${a}${unit} → ${b}${unit}`); };
+  num('Strong leg ATR multiple', before.strongLeg.atrMultiple, after.strongLeg.atrMultiple, '×');
+  num('Outer close zone', before.strongLeg.outerClosePct, after.strongLeg.outerClosePct, '%');
+  num('Max body overlap', before.strongLeg.maxBodyOverlapPct, after.strongLeg.maxBodyOverlapPct, '%');
+  num('Strong leg needs', before.strongLeg.strongMin, after.strongLeg.strongMin, ' of 4');
+  num('Weak leg at or below', before.strongLeg.weakMax, after.strongLeg.weakMax, ' of 4');
+  num('Equal highs/lows tolerance', before.equalHighsLowsAtr, after.equalHighsLowsAtr, '× ATR');
+  num('Equilibrium band', before.equilibriumBandPct, after.equilibriumBandPct, '%');
+  num('Minimum R to the draw', before.minRToDraw, after.minRToDraw, 'R');
+  if (before.rStopBasis !== after.rStopBasis) out.push(`R measured with the stop at ${after.rStopBasis === 'INVALIDATION' ? 'the invalidation' : "the POI's far edge"}`);
+  if (before.locked !== after.locked) out.push(after.locked ? 'Locked' : 'Unlocked (placeholder again)');
+  return out;
+}
+
+/**
+ * The next version of the definitions, ready to save as a new Trading HQ
+ * row. Refuses invalid values and a save with nothing changed. The version
+ * name follows the HQ row version, so every record can name exactly what it used.
+ */
+export function prepareDefinitionsRevision(current: DecompositionDefinitions, edited: DecompositionDefinitions, nextRowVersion: number): DecompositionDefinitions {
+  const next = { ...edited, version: definitionsVersionName(nextRowVersion) };
+  const problems = validateDefinitions(next);
+  if (problems.length) throw new Error(problems.join(' '));
+  if (!describeDefinitionChanges(current, next).length) throw new Error('Nothing changed, so no new version was saved.');
+  return next;
+}
+
+/** Looks up any saved version (old records keep theirs); the in-code placeholder is always known. */
+export function definitionsResolver(history: DecompositionDefinitions[]): (version: string) => DecompositionDefinitions | undefined {
+  const byVersion = new Map(history.map((d) => [d.version, d]));
+  return (version) => byVersion.get(version) ?? (version === PLACEHOLDER_DEFINITIONS.version ? PLACEHOLDER_DEFINITIONS : undefined);
+}

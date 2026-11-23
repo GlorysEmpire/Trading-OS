@@ -122,7 +122,7 @@ export const AppNavigation: React.FC = () => {
                 const Icon = item.icon;
                 const on = activeTab === item.id;
                 return <button key={item.id} onClick={() => navigate(item.id)} aria-current={on ? 'page' : undefined}
-                  className={`${item.id === 'research' ? 'hidden xl:inline-flex' : 'inline-flex'} items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] transition ${on ? 'bg-raised text-ink font-semibold shadow-[inset_0_1px_0_var(--tos-card-highlight),0_4px_12px_-6px_rgba(0,0,0,.5)] ring-1 ring-inset ring-line-strong' : 'text-ink-3 hover:text-ink'}`}>
+                  className={`${item.id === 'research' ? 'hidden xl:inline-flex' : 'inline-flex'} items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-[13px] transition ${on ? 'bg-raised text-ink font-semibold shadow-[inset_0_1px_0_var(--tos-card-highlight),0_4px_12px_-6px_rgba(0,0,0,.5)] ring-1 ring-inset ring-line-strong' : 'text-ink-3 hover:text-ink'}`}>
                   <Icon className={`h-4 w-4 ${on ? 'text-accent' : ''}`} /> {item.label}
                 </button>;
               })}
@@ -133,7 +133,7 @@ export const AppNavigation: React.FC = () => {
             </nav>
 
             <div className="flex items-center gap-1.5 text-xs text-ink-3">
-              <span className="hidden lg:inline-flex items-center gap-2 rounded-full px-2.5 py-1.5" title={session ? `${session.name} session is open` : 'No session open'}>
+              <span className="hidden xl:inline-flex items-center gap-2 whitespace-nowrap rounded-full px-2.5 py-1.5" title={session ? `${session.name} session is open` : 'No session open'}>
                 <span className={`h-1.5 w-1.5 rounded-full ${session ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,.8)]' : 'bg-ink-3'}`} />
                 {session ? session.name : 'Between sessions'}
               </span>

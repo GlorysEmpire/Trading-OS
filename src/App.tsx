@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { TradingProvider, useTrading } from './context/TradingContext';
+import { DecompositionDefinitionsProvider } from './context/DecompositionDefinitionsContext';
 import { LoginView } from './components/LoginView';
 import { AppNavigation } from './components/AppNavigation';
 import { QuickTradeModal } from './components/QuickTradeModal';
@@ -114,7 +115,9 @@ const AuthGate: React.FC = () => {
 
   return (
     <TradingProvider userId={session.user.id}>
-      <MainShell />
+      <DecompositionDefinitionsProvider userId={session.user.id}>
+        <MainShell />
+      </DecompositionDefinitionsProvider>
     </TradingProvider>
   );
 };

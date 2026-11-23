@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { PageTitle } from './PageTitle';
 import { ResetAppPanel } from './ResetAppPanel';
+import { DecompositionDefinitionsEditor } from './DecompositionDefinitionsEditor';
 import { useTrading } from '../context/TradingContext';
 import { Sliders, ShieldCheck, Clock, AlertOctagon, Save, Tag, Info, Layers, History, Plus, Trash2, ListChecks, FlaskConical, CalendarDays } from 'lucide-react';
 import type { HQCategory } from '../lib/hqStore';
@@ -235,7 +236,7 @@ export const TradingHQView: React.FC = () => {
         {([
           ['risk', 'Risk'], ['setup_quality', 'Grades'], ['execution_model', 'Models'],
           ['session', 'Sessions'], ['process_score', 'Process'], ['mistake_code', 'Mistakes'],
-          ['research_framework', 'Research'], ['focus_rotation', 'Focus'],
+          ['research_framework', 'Research'], ['focus_rotation', 'Focus'], ['decomposition_definitions', 'Decomposition'],
         ] as [HQCategory, string][]).map(([section, label]) => (
           <button key={section} onClick={() => setActiveSection(section)} aria-current={activeSection === section ? 'page' : undefined}
             className={`shrink-0 rounded-lg px-3.5 py-2.5 text-xs sm:text-sm transition ${activeSection === section ? 'bg-sky-600 text-white font-semibold shadow-sm' : 'text-ink-3 hover:bg-raised hover:text-ink'}`}>
@@ -256,6 +257,8 @@ export const TradingHQView: React.FC = () => {
           methodology's own terminology — it's not enforced on a different strategy's execution models below.
         </p>
       </div>}
+
+      {activeSection === 'decomposition_definitions' && <DecompositionDefinitionsEditor />}
 
       {/* Section 1: Risk Rules */}
       <div className={`bg-panel border border-slate-800 rounded-xl p-5 space-y-4 ${activeSection !== 'risk' ? 'hidden' : ''}`}>
