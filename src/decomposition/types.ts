@@ -312,6 +312,7 @@ export interface DailyRead {
   session: Step<{ session: string }>;
 }
 
+/** @deprecated M0.1 shape; use PeriodPlan with cadence DAY (M0.2). */
 export interface DailyRecord {
   id: string;
   deskId: string;
@@ -325,4 +326,89 @@ export interface DailyRecord {
   morningCheck: MorningCheck;
   definitionsVersion: string;
   read: Partial<DailyRead>;
+}
+
+// ---- Period plans (M0.2, plan v0.5) -------------------------------------------
+//
+// Chain: Structural Record → Monthly Plan → Weekly Plan → Daily Plan → Trade →
+// Period Review. One template (P0–P8) at every cadence. A period starts when the
+// symbol's own chart prints the new candle (not the NY trading day). Sessions
+// and OUT_WINDOW stay in NY time; this is only about which candle a plan is for.
+
+export type Cadence = 'MONTH' | 'WEEK' | 'DAY';
+
+/** The candle a plan is about, as the chart shows it. */
+export interface PeriodCandle {
+  symbol: string;
+  /** Data feed / exchange the candle comes from, e.g. "BINANCE", "OANDA". */
+  feed: string;
+  /** When the chart opened this candle (ISO, UTC). */
+  openTime: string;
+  /** When it closes (ISO, UTC), if known; the review is due from then. */
+  closeTime?: string;
+}
+
+/** P0: has structure changed since the last plan, and does the higher plan still stand? */
+export interface PeriodGateCheck extends MorningCheck {
+  /** Weekly checks the Monthly plan, Daily checks the Weekly plan. Undefined when there is no parent. */
+  higherPlanStands?: boolean;
+}
+
+/** P1–P7, the same at every cadence. */
+export interface PeriodRead {
+  /** P1 Previous candle: formation, close location, did it take the previous period's high/low and close beyond or back inside. */
+  previousCandle: Step<{
+    read: 'EXPANSION' | 'REJECTION' | 'INDECISION' | 'INSIDE';
+    closeLocation: 'HIGH' | 'MID' | 'LOW';
+    took: 'HIGH' | 'LOW' | 'BOTH' | 'NONE';
+    closedBeyond: boolean;
+  }>;
+  /** P2 Liquidity status: previous period high/low, swept / rejected / outstanding, the inducement. */
+  liquidity: Step<{ previousHigh?: number; previousLow?: number; levels: LiquidityLevel[]; inducementId?: string }>;
+  /** P3 Is this candle expected to expand toward the draw or retrace to a POI first? */
+  periodType: Step<'EXPANSION' | 'RETRACEMENT'>;
+  /** P4 Draw for the period. */
+  draw: Step<{ target: number; kind: 'INTERNAL' | 'EXTERNAL' }>;
+  /** P5 Expected formation: POI A/B where the period's high (bearish) or low (bullish) forms, and depth. */
+  formation: Step<{ primary?: Poi; backup?: Poi; depth?: Depth }>;
+  /** P6 What proves the expectation wrong. */
+  invalidation: Step<{ price: number; rule: string }>;
+  /** P7 One sentence. */
+  narrative: Step<string>;
+}
+
+/** Day-only extras: Asia/Tokyo range (D2), R and timing check (D7), entry models. */
+export interface DayExtras {
+  asiaRange: Step<PriceRange>;
+  /** The NY-time window price is likely to reach the POI in. R itself is computed, not typed. */
+  timing: Step<{ window: string }>;
+  entryModels: Step<Array<{ poiId: string; modelId: string }>>;
+}
+
+export type ReviewScore = 'CORRECT' | 'PARTLY' | 'WRONG';
+
+/** P8, at the candle close. Append-only once saved. */
+export interface PeriodReview {
+  savedAt: string;
+  /** Did price do what the plan expected (draw, high/low, behaviour)? */
+  prediction: ReviewScore;
+  /** With only what was known then, were structure, range, inducement and POIs identified correctly? */
+  process: ReviewScore;
+  lesson: string;
+}
+
+export interface PeriodPlan {
+  id: string;
+  deskId: string;
+  cadence: Cadence;
+  candle: PeriodCandle;
+  mode: DecompositionMode;
+  createdAt: string;
+  structuralVersionRef: StructuralVersionRef;
+  /** The plan one cadence up (Daily → Weekly → Monthly). Missing is allowed; it is shown, never blocking. */
+  parentPlanId?: string;
+  gate: PeriodGateCheck;
+  definitionsVersion: string;
+  read: Partial<PeriodRead & DayExtras>;
+  review?: PeriodReview;
 }

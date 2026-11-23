@@ -1,4 +1,9 @@
 /**
+ * @deprecated M0.1 shape, superseded by PeriodPlan with cadence DAY (plans.ts,
+ * M0.2). Kept so its tests keep proving the morning gate and structural pinning;
+ * new code (M2 onward) uses PeriodPlan. Its `tradingDay` (NY day) rule is
+ * replaced by the chart's own candle open.
+ *
  * Daily Record (M0.1): one per asset per trading day, built in the sessions,
  * inside the structural story. It points at the exact structural version it
  * was built on and keeps pointing there even after the structure changes.

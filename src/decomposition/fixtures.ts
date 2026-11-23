@@ -72,3 +72,23 @@ export const fixtureDailyRead = (): DailyRead => {
     session: { status: 'IDENTIFIED', value: { session: 'New York' } },
   };
 };
+
+// ---- M0.2 period plan fixtures (synthetic) --------------------------------------
+import type { DayExtras, PeriodRead } from './types';
+
+/** A complete period read on the fixture map (bearish: high forms at POI A/B, draw 78). */
+export const fixturePeriodRead = (): PeriodRead & DayExtras => {
+  const d = fixtureDailyBearish();
+  return {
+    previousCandle: { status: 'IDENTIFIED', value: { read: 'REJECTION', closeLocation: 'LOW', took: 'HIGH', closedBeyond: false } },
+    liquidity: { status: 'IDENTIFIED', value: { previousHigh: 111, previousLow: 104, levels: d.liquidity.value!.levels, inducementId: 'ind' } },
+    asiaRange: { status: 'IDENTIFIED', value: { high: 109, low: 106 } },
+    periodType: { status: 'IDENTIFIED', value: 'RETRACEMENT' },
+    draw: { status: 'IDENTIFIED', value: { target: 78, kind: 'EXTERNAL' } },
+    formation: { status: 'IDENTIFIED', value: { primary: d.pois.value!.primary, backup: d.pois.value!.backup, depth: 'SHALLOW' } },
+    invalidation: { status: 'IDENTIFIED', value: { price: 121, rule: 'Daily body close above 121' } },
+    timing: { status: 'IDENTIFIED', value: { window: 'New York' } },
+    entryModels: { status: 'IDENTIFIED', value: [{ poiId: 'poi-a', modelId: 'SLP' }] },
+    narrative: { status: 'IDENTIFIED', value: 'Retrace into POI A above the inducement, then deliver to 78.' },
+  };
+};
