@@ -2,6 +2,8 @@ import React, { useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { TradingProvider, useTrading } from './context/TradingContext';
 import { DecompositionDefinitionsProvider } from './context/DecompositionDefinitionsContext';
+import { DecompositionDataProvider } from './context/DecompositionDataContext';
+import { MarketDecompositionView } from './components/MarketDecompositionView';
 import { LoginView } from './components/LoginView';
 import { AppNavigation } from './components/AppNavigation';
 import { QuickTradeModal } from './components/QuickTradeModal';
@@ -49,6 +51,8 @@ const MainShell: React.FC = () => {
         return <TradingHQView />;
       case 'asset-desks':
         return <AssetDesksView />;
+      case 'decomposition':
+        return <MarketDecompositionView />;
       case 'discipline':
         return <DisciplineView />;
       case 'journal':
@@ -116,7 +120,9 @@ const AuthGate: React.FC = () => {
   return (
     <TradingProvider userId={session.user.id}>
       <DecompositionDefinitionsProvider userId={session.user.id}>
-        <MainShell />
+        <DecompositionDataProvider userId={session.user.id}>
+          <MainShell />
+        </DecompositionDataProvider>
       </DecompositionDefinitionsProvider>
     </TradingProvider>
   );

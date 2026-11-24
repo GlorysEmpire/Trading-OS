@@ -50,6 +50,7 @@ function genId(prefix: string): string {
 export type NavSection =
   | 'dashboard'
   | 'discipline'
+  | 'decomposition'
   | 'calendar'
   | 'alerts'
   | 'trading-hq'

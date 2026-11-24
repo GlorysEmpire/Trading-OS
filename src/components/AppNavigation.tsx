@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Bell, BookOpen, Brain, CalendarDays, CalendarRange, ChevronDown, ClipboardCheck,
   Download, FlaskConical, Globe, HelpCircle, History, LayoutDashboard, LogOut,
-  Award, Clock, Moon, Radar, Settings2, Sliders, Sparkles, Sun, TrendingUp, Upload,
+  Award, Clock, Layers, Moon, Radar, Settings2, Sliders, Sparkles, Sun, TrendingUp, Upload,
 } from 'lucide-react';
 import { useTrading, type NavSection } from '../context/TradingContext';
 import { useAuth } from '../context/AuthContext';
@@ -15,6 +15,7 @@ type NavItem = { id: NavSection; label: string; mobileLabel?: string; icon: Reac
 const PRIMARY: NavItem[] = [
   { id: 'dashboard', label: 'Today', icon: LayoutDashboard },
   { id: 'asset-desks', label: 'Asset Desks', mobileLabel: 'Desks', icon: TrendingUp },
+  { id: 'decomposition', label: 'Decompose', icon: Layers },
   { id: 'journal', label: 'Journal', icon: BookOpen },
   { id: 'discipline', label: 'Discipline', icon: Award },
   { id: 'calendar', label: 'Calendar', icon: CalendarDays },
@@ -41,6 +42,7 @@ const MORE: { title: string; items: NavItem[] }[] = [
   {
     title: 'Explore',
     items: [
+      { id: 'discipline', label: 'Discipline', icon: Award },
       { id: 'calendar', label: 'Calendar', icon: CalendarDays },
       { id: 'backtesting', label: 'Backtesting', icon: History },
       { id: 'research', label: 'Research', icon: FlaskConical },
@@ -133,11 +135,11 @@ export const AppNavigation: React.FC = () => {
             </nav>
 
             <div className="flex items-center gap-1.5 text-xs text-ink-3">
-              <span className="hidden xl:inline-flex items-center gap-2 whitespace-nowrap rounded-full px-2.5 py-1.5" title={session ? `${session.name} session is open` : 'No session open'}>
+              <span className="hidden 2xl:inline-flex items-center gap-2 whitespace-nowrap rounded-full px-2.5 py-1.5" title={session ? `${session.name} session is open` : 'No session open'}>
                 <span className={`h-1.5 w-1.5 rounded-full ${session ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,.8)]' : 'bg-ink-3'}`} />
                 {session ? session.name : 'Between sessions'}
               </span>
-              <span className={`hidden sm:inline-flex rounded-full px-2.5 py-1.5 tabular-nums ${halted ? 'bg-rose-500/15 text-rose-300 ring-1 ring-inset ring-rose-500/30' : ''}`} title="Losses today against your daily limit">
+              <span className={`hidden xl:inline-flex whitespace-nowrap rounded-full px-2.5 py-1.5 tabular-nums ${halted ? 'bg-rose-500/15 text-rose-300 ring-1 ring-inset ring-rose-500/30' : ''}`} title="Losses today against your daily limit">
                 {performanceStats.lossCountToday}/{tradingHQ.riskRules.maxDailyLosses} losses
               </span>
               {sameAsNY ? (
@@ -147,7 +149,7 @@ export const AppNavigation: React.FC = () => {
                   className="inline-flex rounded-full bg-well p-0.5 ring-1 ring-inset ring-line">
                   {([['NY', `NY ${nyTime || '--:--'}`], ['LOCAL', `${zoneLabel(localZone)} ${localTime || '--:--'}`]] as const).map(([view, label]) => (
                     <button key={view} type="button" aria-pressed={timeView === view} onClick={() => setTimeView(view)}
-                      className={`rounded-full px-2.5 py-1 tabular-nums transition ${timeView === view ? 'bg-raised text-ink font-semibold ring-1 ring-inset ring-line-strong' : 'text-ink-3 hover:text-ink'}`}>
+                      className={`whitespace-nowrap rounded-full px-2.5 py-1 tabular-nums transition ${timeView === view ? 'bg-raised text-ink font-semibold ring-1 ring-inset ring-line-strong' : 'text-ink-3 hover:text-ink'}`}>
                       {label}
                     </button>
                   ))}
@@ -164,7 +166,7 @@ export const AppNavigation: React.FC = () => {
               {group.items.map(item => {
                 const Icon = item.icon;
                 return <button key={item.id} onClick={() => navigate(item.id)}
-                  className={`w-full flex ${item.id === 'research' ? 'xl:hidden' : item.id === 'calendar' ? 'md:hidden' : ''} items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-left hover:bg-raised ${activeTab === item.id ? 'bg-raised text-accent font-semibold' : 'text-ink-2'}`}>
+                  className={`w-full flex ${item.id === 'research' ? 'xl:hidden' : item.id === 'calendar' || item.id === 'discipline' ? 'md:hidden' : ''} items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-left hover:bg-raised ${activeTab === item.id ? 'bg-raised text-accent font-semibold' : 'text-ink-2'}`}>
                   <Icon className="h-4 w-4 shrink-0" />{item.label}
                 </button>;
               })}
