@@ -14,7 +14,7 @@ import { formatMoney } from '../utils/accounts';
 import { badgeDefsFor, badgeStates, badgeValues, disciplineDays, disciplineStreak, disciplineToday, planKeptStreak, winStreak, TIER_LABEL } from '../utils/discipline';
 import type { AssetDeskData } from '../types';
 import { ChartImage } from './ChartImage';
-import { DueNowCard, ReadinessCard } from './decomposition/TodayDecomposition';
+import { DueNowCard, ReadinessCard, StarredDecomposition } from './decomposition/TodayDecomposition';
 import { BadgeCoin, LiquidBar, LiquidOrb, StreakFlame, useCountUp } from './DisciplineVisuals';
 
 // ---- Layout (a view preference, kept in this browser) ----------------------
@@ -242,7 +242,7 @@ export const TodayView: React.FC = () => {
                   </div>
                 </div>
                 <div className="p-3.5 space-y-1.5">
-                  <p className="text-xs text-ink-2 line-clamp-2 leading-relaxed">{a.currentNarrative || 'No narrative written yet.'}</p>
+                  <StarredDecomposition desk={a} fallback={<p className="text-xs text-ink-2 line-clamp-2 leading-relaxed">{a.currentNarrative || 'No narrative written yet.'}</p>} />
                   {primary && <p className="text-[11px] text-ink-3 line-clamp-1"><span className="font-semibold text-ink-2">Primary:</span> {primary.thesis}</p>}
                   {ctxLine && <p className="text-[11px] text-ink-3 line-clamp-1">{ctxLine}</p>}
                 </div>

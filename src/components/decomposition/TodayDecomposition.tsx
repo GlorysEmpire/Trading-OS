@@ -4,9 +4,12 @@ import { useTrading } from '../../context/TradingContext';
 import { useDecompositionData } from '../../context/DecompositionDataContext';
 import { useDecompositionDefinitions } from '../../context/DecompositionDefinitionsContext';
 import {
-  correlated, dueNow, highImpactAhead, readiness, readinessSettings,
+  correlated, deskStack, dueNow, highImpactAhead, latestLayer, readiness, readinessSettings, summarize,
   type DueItem, type ReadinessVerdict,
 } from '../../decomposition';
+import { useDecompositionDefinitions as useDefs } from '../../context/DecompositionDefinitionsContext';
+import { LineSummary } from './DeskDecompositionStack';
+import { VerdictPill } from './SummaryCard';
 import { fromZoneInput } from '../../utils/timeDisplay';
 import { deviceTimeZone, isSessionActiveAt, weekdayInZone } from '../../utils/traderTime';
 import { matchDesk } from '../../utils/weekly';
@@ -93,5 +96,34 @@ export const DueNowCard: React.FC = () => {
         </li>
       ))}
     </ul>
+  );
+};
+
+/**
+ * Starred analysis body: the decomposition (the map's one-line story, then the
+ * month / week / today plans) instead of the desk narrative. Returns null when
+ * the desk has no Daily map yet, the fallback (the desk narrative) is shown.
+ * Rendered inside a button, so spans and paragraphs only.
+ */
+export const StarredDecomposition: React.FC<{ desk: AssetDeskData; fallback: React.ReactNode }> = ({ desk, fallback }) => {
+  const { mapFor, plans, profileFor } = useDecompositionData();
+  const { current, definitionsFor } = useDefs();
+  const map = mapFor(desk.id);
+  const has = !!map && !!latestLayer(map, 'DAILY');
+  const summary = useMemo(() => (has ? summarize(map!, definitionsFor, current) : undefined), [has, map, definitionsFor, current]);
+  const lines = useMemo(() => (has ? deskStack({ deskId: desk.id, symbol: desk.symbol, map, plans, now: new Date().toISOString(), profile: profileFor(desk.id, desk.category), definitionsFor, current }) : []),
+    [has, desk.id, desk.symbol, desk.category, map, plans, profileFor, definitionsFor, current]);
+  if (!has || !summary) return <>{fallback}</>;
+  const plansOnly = lines.filter((l) => l.key !== 'STRUCTURE');
+  return (
+    <>
+      <p className="flex items-start gap-2 text-xs leading-relaxed text-ink-2"><span className="line-clamp-3 min-w-0 flex-1">{summary.sentence}</span><span className="shrink-0"><VerdictPill verdict={summary.verdict} /></span></p>
+      {plansOnly.map((l) => (
+        <p key={l.planId ?? l.key} className="flex items-baseline gap-2 text-[11px]">
+          <span className="w-12 shrink-0 font-semibold text-ink-2">{l.key === 'DAY' ? 'Today' : l.key === 'WEEK' ? 'Week' : 'Month'}</span>
+          <span className="min-w-0 flex-1 text-ink-3">{l.missing ? l.missing : <LineSummary l={l} />}</span>
+        </p>
+      ))}
+    </>
   );
 };

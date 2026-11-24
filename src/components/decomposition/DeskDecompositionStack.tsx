@@ -62,7 +62,7 @@ export const DeskDecompositionStack: React.FC<{ desk: AssetDeskData }> = ({ desk
   );
 };
 
-const LineSummary: React.FC<{ l: StackLine }> = ({ l }) => {
+export const LineSummary: React.FC<{ l: StackLine }> = ({ l }) => {
   const bits: string[] = [];
   if (l.draw !== undefined) bits.push(`draw ${fmtPrice(l.draw)}`);
   if (l.poiA) bits.push(`A ${fmtPrice(l.poiA.low)}–${fmtPrice(l.poiA.high)}`);
