@@ -10,6 +10,8 @@ import {
   Choice, Computed, GateNote, LevelList, PoiEditor, PoiList, PriceField, StatusChoice, StepFrame, blankPoi, fmtPrice, poiComplete,
 } from './ui';
 import { SummaryCard } from './SummaryCard';
+import { LayerGuide, layerForStep } from './LayerGuide';
+import { CandleEvidence } from './CandleEvidence';
 
 /** Structural flow (backtesting block): Monthly → Weekly → Daily. 4H stays hidden until it is built. */
 type TF = Extract<LayerTimeframe, 'MONTHLY' | 'WEEKLY' | 'DAILY'>;
@@ -141,7 +143,7 @@ export const StructuralFlow: React.FC<{ deskId: string; symbol: string; onClose:
       <StepFrame title={title} stepLabel="Summary" progress={1}
         question={backtest ? 'Lock these predictions?' : preview.changed ? 'Save the structural map?' : 'Nothing changed.'}
         why={backtest ? 'Once locked, this read cannot change. Step the replay forward only after locking, then record what price did.' : preview.changed ? 'Only the timeframes you changed become new versions; older versions are kept.' : 'The existing map stays in use. No new version is saved.'}
-        onClose={onClose} onBack={() => { setPhase('steps'); setI(steps.length - 1); }}
+        onClose={onClose} onBack={() => setPhase('steps')}
         onNext={preview.changed ? save : onClose} nextLabel={preview.changed ? (saving ? 'Saving…' : backtest ? 'Lock predictions' : 'Save new version') : 'Done'} nextDisabled={saving || !!notice && preview.changed}>
         <SummaryCard summary={s} />
         {notice && preview.changed && <GateNote title="Can't save yet">{notice}</GateNote>}
@@ -161,6 +163,8 @@ export const StructuralFlow: React.FC<{ deskId: string; symbol: string; onClose:
         <button onClick={() => { setSkipMonthly(true); setI(0); }} className="text-sm text-ink-3 underline-offset-2 hover:text-ink hover:underline">Skip Monthly for now</button>
       )}
       <StatusChoice value={step?.status} onChange={setStatus} />
+      <LayerGuide key={layerForStep(tf, def.key)} active={layerForStep(tf, def.key)} />
+      {def.key === 'candles' && <CandleEvidence />}
       {step?.status === 'IDENTIFIED' && (
         <Editor tf={tf} stepKey={def.key} value={step.value} setValue={setValue} drafts={drafts} defs={defs} />
       )}

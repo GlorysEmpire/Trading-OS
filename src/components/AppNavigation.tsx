@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Bell, BookOpen, Brain, CalendarDays, CalendarRange, ChevronDown, ClipboardCheck,
   Download, FlaskConical, Globe, HelpCircle, History, LayoutDashboard, LogOut,
-  Award, Clock, Layers, Moon, Radar, Settings2, Sliders, Sparkles, Sun, TrendingUp, Upload,
+  Award, Clock, Layers, Moon, Plus, Radar, Settings2, Sliders, Sparkles, Sun, TrendingUp, Upload,
 } from 'lucide-react';
 import { useTrading, type NavSection } from '../context/TradingContext';
 import { useAuth } from '../context/AuthContext';
@@ -17,37 +17,35 @@ const PRIMARY: NavItem[] = [
   { id: 'asset-desks', label: 'Asset Desks', mobileLabel: 'Desks', icon: TrendingUp },
   { id: 'decomposition', label: 'Decompose', icon: Layers },
   { id: 'journal', label: 'Journal', icon: BookOpen },
-  { id: 'discipline', label: 'Discipline', icon: Award },
-  { id: 'calendar', label: 'Calendar', icon: CalendarDays },
-  { id: 'research', label: 'Research', icon: FlaskConical },
+  { id: 'debrief', label: 'Debrief', icon: ClipboardCheck },
 ];
 
 const MORE: { title: string; items: NavItem[] }[] = [
   {
-    title: 'Reflect',
+    title: 'Plan & review',
     items: [
+      { id: 'calendar', label: 'Calendar', icon: CalendarDays },
       { id: 'debrief', label: 'Daily debrief', icon: ClipboardCheck },
       { id: 'weekly-review', label: 'Weekly review', icon: CalendarRange },
       { id: 'psychology', label: 'Psychology', icon: Brain },
+      { id: 'discipline', label: 'Discipline', icon: Award },
     ],
   },
   {
-    title: 'Your system',
+    title: 'Configure & track',
     items: [
       { id: 'trading-hq', label: 'Trading HQ', icon: Sliders },
       { id: 'alerts', label: 'Alerts', icon: Bell },
-      { id: 'ai-assistant', label: 'AI assistant', icon: Sparkles },
     ],
   },
   {
-    title: 'Explore',
+    title: 'Research & explore',
     items: [
-      { id: 'discipline', label: 'Discipline', icon: Award },
-      { id: 'calendar', label: 'Calendar', icon: CalendarDays },
       { id: 'backtesting', label: 'Backtesting', icon: History },
       { id: 'research', label: 'Research', icon: FlaskConical },
       { id: 'market-intelligence', label: 'Market intelligence', icon: Globe },
       { id: 'scanner', label: 'Scanner', icon: Radar },
+      { id: 'ai-assistant', label: 'AI assistant', icon: Sparkles },
     ],
   },
 ];
@@ -55,7 +53,7 @@ const MORE: { title: string; items: NavItem[] }[] = [
 export const AppNavigation: React.FC = () => {
   const {
     theme, setTheme, activeTab, setActiveTab, timeView, setTimeView,
-    tradingHQ, performanceStats, exportDataJSON, importDataJSON,
+    tradingHQ, performanceStats, exportDataJSON, importDataJSON, setQuickTradeModalOpen,
   } = useTrading();
   const { user, signOut } = useAuth();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -92,7 +90,7 @@ export const AppNavigation: React.FC = () => {
   const navigate = (section: NavSection) => { setActiveTab(section); setMoreOpen(false); };
   const session = getActiveSession(tradingHQ.sessions);
   const halted = performanceStats.lossCountToday >= tradingHQ.riskRules.maxDailyLosses;
-  const isMoreActive = !PRIMARY.some(item => item.id === activeTab) && MORE.some(group => group.items.some(item => item.id === activeTab));
+  const isMoreActive = MORE.some(group => group.items.some(item => item.id === activeTab));
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -115,7 +113,7 @@ export const AppNavigation: React.FC = () => {
         <div className="tos-glass mx-auto max-w-[1500px] rounded-2xl">
           <div className="h-14 pl-3 pr-2 sm:pl-4 flex items-center justify-between gap-3">
             <button onClick={() => navigate('dashboard')} className="flex items-center gap-2.5 shrink-0" aria-label="Trading OS home">
-              <span className="relative grid place-items-center h-8 w-8 rounded-[10px] text-[13px] font-extrabold text-[#032420] shadow-[inset_0_1px_0_rgba(255,255,255,.55),0_6px_16px_-6px_rgba(45,212,191,.6)]" style={{ background: 'var(--tos-cta)' }}>T</span>
+              <span className="tos-cta grid h-8 w-8 place-items-center rounded-lg text-sm font-bold">T</span>
               <span className="hidden sm:inline text-[15px] font-semibold tracking-tight text-ink">Trading OS</span>
             </button>
 
@@ -124,19 +122,22 @@ export const AppNavigation: React.FC = () => {
                 const Icon = item.icon;
                 const on = activeTab === item.id;
                 return <button key={item.id} onClick={() => navigate(item.id)} aria-current={on ? 'page' : undefined}
-                  className={`${item.id === 'research' ? 'hidden xl:inline-flex' : 'inline-flex'} items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-[13px] transition ${on ? 'bg-raised text-ink font-semibold shadow-[inset_0_1px_0_var(--tos-card-highlight),0_4px_12px_-6px_rgba(0,0,0,.5)] ring-1 ring-inset ring-line-strong' : 'text-ink-3 hover:text-ink'}`}>
+                  className={`${item.id === 'debrief' ? 'hidden xl:inline-flex' : 'inline-flex'} items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[13px] transition ${on ? 'bg-raised text-ink font-semibold ring-1 ring-inset ring-line-strong' : 'text-ink-3 hover:text-ink'}`}>
                   <Icon className={`h-4 w-4 ${on ? 'text-accent' : ''}`} /> {item.label}
                 </button>;
               })}
               <button data-nav-menu onClick={() => setMoreOpen(open => !open)} aria-expanded={moreOpen}
                 className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-[13px] transition ${isMoreActive || moreOpen ? 'bg-raised text-ink font-semibold ring-1 ring-inset ring-line-strong' : 'text-ink-3 hover:text-ink'}`}>
-                More <ChevronDown className={`h-3.5 w-3.5 transition ${moreOpen ? 'rotate-180' : ''}`} />
+                Workspaces <ChevronDown className={`h-3.5 w-3.5 transition ${moreOpen ? 'rotate-180' : ''}`} />
               </button>
             </nav>
 
             <div className="flex items-center gap-1.5 text-xs text-ink-3">
+              <button type="button" onClick={() => setQuickTradeModalOpen(true)} className="tos-cta inline-flex shrink-0 items-center gap-1 rounded-lg p-2 font-semibold" aria-label="Quick Trade" aria-keyshortcuts="Meta+K Control+K" title="Quick Trade · ⌘K / Ctrl+K">
+                <Plus className="h-4 w-4" aria-hidden="true" /><span className="hidden 2xl:inline">Quick Trade</span>
+              </button>
               <span className="hidden 2xl:inline-flex items-center gap-2 whitespace-nowrap rounded-full px-2.5 py-1.5" title={session ? `${session.name} session is open` : 'No session open'}>
-                <span className={`h-1.5 w-1.5 rounded-full ${session ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,.8)]' : 'bg-ink-3'}`} />
+                <span className={`h-1.5 w-1.5 rounded-full ${session ? 'bg-emerald-400' : 'bg-ink-3'}`} />
                 {session ? session.name : 'Between sessions'}
               </span>
               <span className={`hidden xl:inline-flex whitespace-nowrap rounded-full px-2.5 py-1.5 tabular-nums ${halted ? 'bg-rose-500/15 text-rose-300 ring-1 ring-inset ring-rose-500/30' : ''}`} title="Losses today against your daily limit">
@@ -165,8 +166,8 @@ export const AppNavigation: React.FC = () => {
               <p className="px-2 text-[10px] uppercase tracking-widest font-semibold text-ink-3 mb-1">{group.title}</p>
               {group.items.map(item => {
                 const Icon = item.icon;
-                return <button key={item.id} onClick={() => navigate(item.id)}
-                  className={`w-full flex ${item.id === 'research' ? 'xl:hidden' : item.id === 'calendar' || item.id === 'discipline' ? 'md:hidden' : ''} items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-left hover:bg-raised ${activeTab === item.id ? 'bg-raised text-accent font-semibold' : 'text-ink-2'}`}>
+                return <button key={item.id} onClick={() => navigate(item.id)} aria-current={activeTab === item.id ? 'page' : undefined}
+                  className={`w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-left hover:bg-raised ${activeTab === item.id ? 'bg-raised text-accent font-semibold' : 'text-ink-2'}`}>
                   <Icon className="h-4 w-4 shrink-0" />{item.label}
                 </button>;
               })}
@@ -204,7 +205,7 @@ export const AppNavigation: React.FC = () => {
         })}
         <button data-nav-menu onClick={() => setMoreOpen(open => !open)} aria-expanded={moreOpen}
           className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 py-2 text-[10px] ${moreOpen || isMoreActive ? 'text-accent font-semibold' : 'text-ink-3'}`}>
-          <Settings2 className="h-5 w-5" /><span>More</span>
+          <Settings2 className="h-5 w-5" /><span>Workspaces</span>
         </button>
       </nav>
       <GlossaryDrawer open={glossaryOpen} onClose={() => setGlossaryOpen(false)} />

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   CADENCE_LABEL, FEED_PRESETS, candleFor, candleLabel, dailyPoiChecks, depthExpectation, evaluatePeriodPlan, isIdentified, latestLayer,
-  legTypeOf, morningGate, parentCadence, parentNotice, periodAsDaily, periodStepsFor, rToDraw, startPeriodPlan,
+  legTypeOf, morningGate, parentCadence, parentNotice, periodAsDaily, periodStepsFor, previousCandle, rToDraw, startPeriodPlan,
   type Cadence, type DailyLayer, type DayExtras, type FeedProfile, type PeriodPlan, type PeriodRead, type PeriodStepKey, type Poi,
   type StepStatus, type StructuralChangeReason, type WeeklyLayer,
 } from '../../decomposition';
@@ -13,6 +13,7 @@ import type { AssetCategory } from '../../types';
 import { formatTradingTime } from '../../utils/timeDisplay';
 import { Choice, Computed, GateNote, LevelList, PickList, PriceField, StatusChoice, StepFrame, fmtPrice, levelKindLabel, poiComplete } from './ui';
 import { PoiLine, VerdictPill } from './SummaryCard';
+import { CandleEvidence } from './CandleEvidence';
 
 type Read = Partial<PeriodRead & DayExtras>;
 type Screen = 'gate' | 'candle' | PeriodStepKey | 'summary';
@@ -22,7 +23,7 @@ const REASONS: Array<[StructuralChangeReason, string]> = [
 ];
 
 /** One plan (Monthly / Weekly / Daily): gate → candle → P1–P7 (+ Day extras) → summary. */
-export const PlanFlow: React.FC<{ deskId: string; symbol: string; category?: AssetCategory; cadence: Cadence; onClose: () => void; onOpenStructure: () => void }> = ({ deskId, symbol, category, cadence, onClose, onOpenStructure }) => {
+export const PlanFlow: React.FC<{ deskId: string; symbol: string; category?: AssetCategory; cadence: Cadence; onClose: () => void; onOpenStructure: () => void; onSaved: (planId: string) => void }> = ({ deskId, symbol, category, cadence, onClose, onOpenStructure, onSaved }) => {
   const { mapFor, plans, savePlan, profileFor, setProfile, notice } = useDecompositionData();
   const { current: defs } = useDecompositionDefinitions();
   const { tradingHQ, timeView } = useTrading();
@@ -39,10 +40,11 @@ export const PlanFlow: React.FC<{ deskId: string; symbol: string; category?: Ass
   }, [map, base]);
 
   const [profile, setProfileState] = useState<FeedProfile>(() => profileFor(deskId, category));
-  const candle = useMemo(() => candleFor(cadence, new Date().toISOString(), profile, symbol), [cadence, profile, symbol]);
+  const [asOf] = useState(() => new Date().toISOString());
+  const candle = useMemo(() => candleFor(cadence, asOf, profile, symbol), [cadence, asOf, profile, symbol]);
   const existing = plans.find((p) => p.deskId === deskId && p.cadence === cadence && p.mode === 'LIVE' && p.candle.feed === candle.feed && Date.parse(p.candle.openTime) === Date.parse(candle.openTime));
   const up = parentCadence(cadence);
-  const parent = up ? plans.filter((p) => p.deskId === deskId && p.cadence === up && p.mode === 'LIVE' && Date.parse(p.candle.openTime) <= Date.parse(candle.openTime))
+  const parent = up ? plans.filter((p) => p.deskId === deskId && p.cadence === up && p.mode === 'LIVE' && p.candle.feed === candle.feed && Date.parse(p.candle.openTime) <= Date.parse(candle.openTime))
     .sort((a, b) => b.candle.openTime.localeCompare(a.candle.openTime))[0] : undefined;
 
   const [changed, setChanged] = useState<boolean>();
@@ -140,7 +142,7 @@ export const PlanFlow: React.FC<{ deskId: string; symbol: string; category?: Ass
     const save = async () => {
       if (!plan) return;
       setSaving(true); setMessage(undefined);
-      try { await savePlan(plan); onClose(); } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not save.'); } finally { setSaving(false); }
+      try { onSaved((await savePlan(plan)).id); } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not save.'); } finally { setSaving(false); }
     };
     return (
       <StepFrame title={title} stepLabel="Summary" progress={1} question="Save this plan?" why="The plan is fixed once its candle is reviewed." onClose={onClose} onBack={back}
@@ -173,6 +175,10 @@ export const PlanFlow: React.FC<{ deskId: string; symbol: string; category?: Ass
     <StepFrame title={title} stepLabel={`${def.code} · ${stepNo} of ${stepKeys.length}`} progress={progress} question={def.question} why={def.why}
       onClose={onClose} onBack={back} onNext={next} nextDisabled={!ready}>
       <StatusChoice value={step?.status} onChange={(status) => set({ ...(step ?? {}), status })} />
+      {def.key === 'previousCandle' && <>
+        <Computed label="Candle to read" value={candleLabel(cadence, previousCandle(cadence, asOf, profile, symbol), profile)} />
+        <CandleEvidence />
+      </>}
       {step?.status === 'IDENTIFIED' && (
         <StepEditor stepKey={def.key} value={step.value} setValue={setValue} read={read} base={base} htfPois={htfPois} defs={defs}
           sessions={tradingHQ.sessions.map((s) => s.name)} models={tradingHQ.executionModels.map((m) => ({ id: m.id, name: m.name }))} />

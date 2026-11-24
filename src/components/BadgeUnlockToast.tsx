@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import { useTrading } from '../context/TradingContext';
 import { traderDateString } from '../utils/traderTime';
 import { badgeDefsFor, badgeStates, badgeValues, earnedKeys, TIER_LABEL, type Tier } from '../utils/discipline';
-import { BadgeCoin } from './DisciplineVisuals';
+import { BadgeMark } from './DisciplineVisuals';
 
 const SEEN_KEY = 'trading_os_badges_seen_v1';
 
@@ -44,7 +44,7 @@ export const BadgeUnlockToast: React.FC = () => {
   return (
     <div role="status" className="fixed inset-x-3 bottom-20 z-[60] mx-auto max-w-sm md:bottom-6 md:right-6 md:left-auto md:mx-0">
       <div className="tos-glass tos-pop relative flex items-center gap-4 rounded-3xl p-4 pr-10">
-        <BadgeCoin tier={unlock.tier} mono={badge.def.mono} size={60} spin />
+        <BadgeMark tier={unlock.tier} mono={badge.def.mono} size={52} />
         <button onClick={() => { setUnlock(null); setActiveTab('discipline'); }} className="min-w-0 text-left">
           <div className="tos-label">Badge earned</div>
           <div className="text-base font-semibold text-ink">{TIER_LABEL[unlock.tier]} {badge.def.name}</div>

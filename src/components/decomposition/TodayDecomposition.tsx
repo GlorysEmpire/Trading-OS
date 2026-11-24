@@ -78,7 +78,11 @@ export const DueNowCard: React.FC = () => {
       profileFor: (id) => profileFor(id, assets.find((a) => a.id === id)?.category) });
   }, [assets, tradingHQ.focusRotation, structural, plans, profileFor]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const open = (it: DueItem) => { if (it.kind === 'REVIEW' && it.planId) requestReview(it.planId); else requestDecompose(it.deskId); setActiveTab('decomposition'); };
+  const open = (it: DueItem) => {
+    if (it.kind === 'REVIEW' && it.planId) requestReview(it.planId);
+    else requestDecompose(it.deskId, it.cadence);
+    setActiveTab('decomposition');
+  };
   if (loading) return <p className="text-sm text-ink-3">Loading…</p>;
   if (!due.length) return <p className="text-sm text-ink-2">Nothing due right now.</p>;
   return (

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useTrading } from '../context/TradingContext';
 import { calculatePlannedR, evaluateRiskViolations, determineProcessCategory } from '../utils/tradingCalculations';
 import { traderDateString, evaluateSessionCheck, minutesInZone, minutesToHhmm, SESSION_TIMEZONE } from '../utils/traderTime';
@@ -24,6 +24,16 @@ export const QuickTradeModal: React.FC = () => {
     timeView,
     performanceStats,
   } = useTrading();
+  const dialog = useRef<HTMLDialogElement>(null);
+  const close = () => {
+    dialog.current?.close();
+    setQuickTradeModalOpen(false);
+  };
+
+  useEffect(() => {
+    const element = dialog.current;
+    if (quickTradeModalOpen && element && !element.open) element.showModal();
+  }, [quickTradeModalOpen]);
 
   const [asset, setAsset] = useState('BTC');
   const [direction, setDirection] = useState<'LONG' | 'SHORT'>('LONG');
@@ -180,7 +190,7 @@ export const QuickTradeModal: React.FC = () => {
 
     try {
       await addTrade(newTrade);
-      setQuickTradeModalOpen(false);
+      close();
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Could not save the trade. Your journal has not been changed.');
       return;
@@ -197,18 +207,18 @@ export const QuickTradeModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="bg-panel border border-slate-700 rounded-lg max-w-2xl w-full text-slate-200 shadow-2xl overflow-hidden my-8">
+    <dialog ref={dialog} aria-labelledby="quick-trade-title" className="tos-dialog tos-pop" onCancel={(event) => { event.preventDefault(); close(); }}>
+      <div>
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-panel">
           <div className="flex items-center gap-2">
             <Calculator className="w-5 h-5 text-cyan-400" />
-            <h2 className="font-mono text-base font-bold tracking-wide text-slate-100 uppercase">
+            <h2 id="quick-trade-title" className="text-base font-semibold text-ink">
               New execution — discretionary trade log
             </h2>
           </div>
           <button
-            onClick={() => setQuickTradeModalOpen(false)}
+            type="button" aria-label="Close Quick Trade" onClick={close}
             className="text-slate-400 hover:text-slate-200 p-1 rounded"
           >
             <X className="w-5 h-5" />
@@ -537,7 +547,7 @@ export const QuickTradeModal: React.FC = () => {
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
             <button
               type="button"
-              onClick={() => setQuickTradeModalOpen(false)}
+              onClick={close}
               className="px-4 py-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono font-medium transition cursor-pointer"
             >
               Cancel
@@ -551,6 +561,6 @@ export const QuickTradeModal: React.FC = () => {
           </div>
         </form>
       </div>
-    </div>
+    </dialog>
   );
 };

@@ -1,32 +1,42 @@
-import React, { useEffect } from 'react';
+import React, { lazy, Suspense, useEffect, useRef } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { TradingProvider, useTrading } from './context/TradingContext';
 import { DecompositionDefinitionsProvider } from './context/DecompositionDefinitionsContext';
 import { DecompositionDataProvider } from './context/DecompositionDataContext';
-import { MarketDecompositionView } from './components/MarketDecompositionView';
 import { LoginView } from './components/LoginView';
 import { AppNavigation } from './components/AppNavigation';
 import { QuickTradeModal } from './components/QuickTradeModal';
 import { TodayView } from './components/TodayView';
-import { DisciplineView } from './components/DisciplineView';
 import { BadgeUnlockToast } from './components/BadgeUnlockToast';
 import { CloseVerdict } from './components/CloseVerdict';
-import { CalendarView } from './components/CalendarView';
-import { AlertsView } from './components/AlertsView';
-import { TradingHQView } from './components/TradingHQView';
-import { AssetDesksView } from './components/AssetDesksView';
-import { JournalView } from './components/JournalView';
-import { DebriefView } from './components/DebriefView';
-import { WeeklyReviewView } from './components/WeeklyReviewView';
-import { BacktestingView } from './components/BacktestingView';
-import { ResearchView } from './components/ResearchView';
-import { PsychologyView } from './components/PsychologyView';
-import { MarketIntelligenceView } from './components/MarketIntelligenceView';
-import { ScannerView } from './components/ScannerView';
-import { AIAssistantView } from './components/AIAssistantView';
+
+const MarketDecompositionView = lazy(() => import('./components/MarketDecompositionView').then(({ MarketDecompositionView }) => ({ default: MarketDecompositionView })));
+const DisciplineView = lazy(() => import('./components/DisciplineView').then(({ DisciplineView }) => ({ default: DisciplineView })));
+const CalendarView = lazy(() => import('./components/CalendarView').then(({ CalendarView }) => ({ default: CalendarView })));
+const AlertsView = lazy(() => import('./components/AlertsView').then(({ AlertsView }) => ({ default: AlertsView })));
+const TradingHQView = lazy(() => import('./components/TradingHQView').then(({ TradingHQView }) => ({ default: TradingHQView })));
+const AssetDesksView = lazy(() => import('./components/AssetDesksView').then(({ AssetDesksView }) => ({ default: AssetDesksView })));
+const JournalView = lazy(() => import('./components/JournalView').then(({ JournalView }) => ({ default: JournalView })));
+const DebriefView = lazy(() => import('./components/DebriefView').then(({ DebriefView }) => ({ default: DebriefView })));
+const WeeklyReviewView = lazy(() => import('./components/WeeklyReviewView').then(({ WeeklyReviewView }) => ({ default: WeeklyReviewView })));
+const BacktestingView = lazy(() => import('./components/BacktestingView').then(({ BacktestingView }) => ({ default: BacktestingView })));
+const ResearchView = lazy(() => import('./components/ResearchView').then(({ ResearchView }) => ({ default: ResearchView })));
+const PsychologyView = lazy(() => import('./components/PsychologyView').then(({ PsychologyView }) => ({ default: PsychologyView })));
+const MarketIntelligenceView = lazy(() => import('./components/MarketIntelligenceView').then(({ MarketIntelligenceView }) => ({ default: MarketIntelligenceView })));
+const ScannerView = lazy(() => import('./components/ScannerView').then(({ ScannerView }) => ({ default: ScannerView })));
+const AIAssistantView = lazy(() => import('./components/AIAssistantView').then(({ AIAssistantView }) => ({ default: AIAssistantView })));
 
 const MainShell: React.FC = () => {
   const { activeTab, setQuickTradeModalOpen, theme } = useTrading();
+  const workspace = useRef<HTMLElement>(null);
+  const previousTab = useRef(activeTab);
+
+  useEffect(() => {
+    if (previousTab.current === activeTab) return;
+    previousTab.current = activeTab;
+    window.scrollTo(0, 0);
+    workspace.current?.focus({ preventScroll: true });
+  }, [activeTab]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -88,15 +98,13 @@ const MainShell: React.FC = () => {
 
   return (
     <div className="relative isolate min-h-screen flex flex-col font-sans text-ink">
-      <div className="tos-ambient" aria-hidden="true">
-        <div className="tos-blob tos-blob-1" />
-        <div className="tos-blob tos-blob-2" />
-        <div className="tos-blob tos-blob-3" />
-        <div className="tos-floor" />
-        <div className="tos-grain" />
-      </div>
+      <a href="#workspace" className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 tos-secondary">Skip to workspace</a>
       <AppNavigation />
-      <main className="flex-1 overflow-x-hidden pb-24 md:pb-6">{renderActiveView()}</main>
+      <main ref={workspace} id="workspace" tabIndex={-1} className="flex-1 overflow-x-hidden pb-24 md:pb-6">
+        <Suspense fallback={<p className="mx-auto max-w-7xl p-6 text-sm text-ink-2" role="status">Opening workspace…</p>}>
+          <div key={activeTab} className="tos-rise">{renderActiveView()}</div>
+        </Suspense>
+      </main>
       <QuickTradeModal />
       <BadgeUnlockToast />
       <CloseVerdict />

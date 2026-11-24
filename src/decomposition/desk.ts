@@ -91,9 +91,9 @@ export function deskStack(input: {
     const mine = input.plans.filter((p) => p.deskId === input.deskId && p.cadence === cadence && p.mode === 'LIVE')
       .sort((a, b) => b.candle.openTime.localeCompare(a.candle.openTime));
     const now = candleFor(cadence, input.now, profile, input.symbol);
-    const currentPlan = mine.find((p) => Date.parse(p.candle.openTime) === Date.parse(now.openTime));
+    const currentPlan = mine.find((p) => p.candle.feed === now.feed && Date.parse(p.candle.openTime) === Date.parse(now.openTime));
     const title = cadence === 'MONTH' ? 'Month' : cadence === 'WEEK' ? 'Week' : 'Today';
-    if (currentPlan) lines.push(planLine(currentPlan, map, input.current, profile, true));
+    if (currentPlan) lines.push(planLine(currentPlan, map, input.definitionsFor(currentPlan.definitionsVersion) ?? input.current, profile, true));
     else lines.push({ key: cadence, title, when: candleLabel(cadence, now, profile), missing: `No ${cadence === 'DAY' ? 'daily' : cadence === 'WEEK' ? 'weekly' : 'monthly'} plan yet` });
   }
   return lines;

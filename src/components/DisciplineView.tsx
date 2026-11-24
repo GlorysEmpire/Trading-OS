@@ -5,7 +5,7 @@ import { traderDateString } from '../utils/traderTime';
 import {
   badgeDefsFor, badgeStates, badgeValues, debriefStreak, disciplineDays, disciplineStreak, disciplineToday, planKeptStreak, processCalendar, winStreak,
 } from '../utils/discipline';
-import { BadgeTile, LiquidOrb, ProcessHeatmap, StreakFlame, useCountUp } from './DisciplineVisuals';
+import { BadgeTile, DisciplineGauge, ProcessHeatmap, StreakFlame } from './DisciplineVisuals';
 import { PageTitle } from './PageTitle';
 
 /** Streaks, the process calendar and badges. Every reward here is for
@@ -39,7 +39,7 @@ export const DisciplineView: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-5">
         <section className="tos-card tos-rise flex flex-col items-center justify-center gap-3 p-6">
-          <div className="tos-bob"><LiquidOrb pct={d.today.pct} label="Today" sub={d.today.trades ? `${d.today.trades} trade${d.today.trades > 1 ? 's' : ''}` : 'No trades yet'} size={188} /></div>
+          <div><DisciplineGauge pct={d.today.pct} label="Today" sub={d.today.trades ? `${d.today.trades} trade${d.today.trades > 1 ? 's' : ''}` : 'No trades yet'} size={188} /></div>
           <p className="max-w-[15rem] text-center text-xs text-ink-3">Average process score of today's trades, minus a step for each rule broken.</p>
         </section>
         <section className="grid grid-cols-2 xl:grid-cols-4 gap-4">
@@ -72,11 +72,10 @@ export const DisciplineView: React.FC = () => {
 };
 
 const StreakCard: React.FC<{ label: string; value: number; best?: number; unit: string; hint: string; flame?: boolean; muted?: boolean }> = ({ label, value, best, unit, hint, flame, muted }) => {
-  const n = useCountUp(value);
   return (
     <div className={`tos-card tos-rise flex flex-col justify-between p-4 sm:p-5`}>
       <div className="flex items-center justify-between text-xs text-ink-3">{label}{flame && <StreakFlame n={value} />}</div>
-      <div className={`tos-figure mt-3 text-4xl ${muted ? 'text-ink-2' : 'text-ink'}`}>{Math.round(n)}<span className="ml-1.5 text-sm font-medium text-ink-3">{unit}</span></div>
+      <div className={`tos-figure mt-3 text-4xl ${muted ? 'text-ink-2' : 'text-ink'}`}>{Math.round(value)}<span className="ml-1.5 text-sm font-medium text-ink-3">{unit}</span></div>
       <div className="mt-2 text-[11px] leading-snug text-ink-3">{hint}{best !== undefined && <> · best {best}</>}</div>
     </div>
   );

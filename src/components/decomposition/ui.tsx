@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, ChevronDown, Plus, Trash2, X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ArrowLeft, ArrowRight, Check, Plus, Trash2, X } from 'lucide-react';
 import type { LiquidityKind, LiquidityLevel, Poi, PoiKind, StepStatus } from '../../decomposition';
 
 /** Shared building blocks for the decomposition screens: one question per screen. */
@@ -26,7 +26,13 @@ export const StepFrame: React.FC<{
   onClose: () => void;
   children: React.ReactNode;
 }> = ({ title, stepLabel, progress, question, why, more, onBack, onNext, nextLabel = 'Next', nextDisabled, onClose, children }) => {
-  const [open, setOpen] = useState(false);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const previousQuestion = useRef(question);
+  useEffect(() => {
+    if (previousQuestion.current === question) return;
+    previousQuestion.current = question;
+    heading.current?.focus();
+  }, [question]);
   return (
     <div className="mx-auto w-full max-w-2xl p-4 sm:p-6">
       <div className="tos-card tos-rise overflow-hidden">
@@ -37,15 +43,16 @@ export const StepFrame: React.FC<{
           </div>
           <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg text-ink-3 hover:bg-raised hover:text-ink" aria-label="Close"><X className="h-4 w-4" /></button>
         </div>
-        <div className="mx-5 mt-3 h-1.5 overflow-hidden rounded-full bg-well ring-1 ring-inset ring-line" role="progressbar" aria-valuenow={Math.round(progress * 100)} aria-valuemin={0} aria-valuemax={100}>
-          <div className="h-full rounded-full bg-gradient-to-r from-teal-300 to-cyan-500 transition-all duration-500" style={{ width: `${Math.max(4, progress * 100)}%` }} />
+        <div className="mx-5 mt-3">
+          <progress aria-label="Workflow progress" className="tos-progress w-full" max={100} value={Math.round(progress * 100)} />
         </div>
         <div className="px-5 pt-5 pb-2">
-          <h2 className="text-lg sm:text-xl font-semibold tracking-tight text-ink">{question}</h2>
-          <button type="button" onClick={() => more && setOpen((v) => !v)} className={`mt-1.5 flex items-start gap-1 text-left text-sm text-ink-3 ${more ? 'hover:text-ink-2' : 'cursor-default'}`}>
-            <span>{why}</span>{more && <ChevronDown className={`mt-0.5 h-3.5 w-3.5 shrink-0 transition ${open ? 'rotate-180' : ''}`} />}
-          </button>
-          {open && more && <p className="mt-2 rounded-xl bg-raised px-3 py-2 text-sm text-ink-2 ring-1 ring-inset ring-line">{more}</p>}
+          <h1 ref={heading} tabIndex={-1} className="scroll-mt-24 text-lg font-semibold tracking-tight text-ink sm:text-xl">{question}</h1>
+          <p className="mt-1.5 text-sm text-ink-2">{why}</p>
+          {more && <details key={question} className="mt-2 text-sm text-ink-3">
+            <summary className="cursor-pointer hover:text-ink">If the read is inconclusive</summary>
+            <p className="mt-2 rounded-lg bg-raised px-3 py-2 text-sm text-ink-2">{more}</p>
+          </details>}
         </div>
         <div className="px-5 py-4 space-y-4">{children}</div>
         <div className="flex items-center justify-between gap-3 border-t border-line px-5 py-3.5">

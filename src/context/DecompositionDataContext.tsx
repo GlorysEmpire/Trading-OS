@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import {
   createStructuralRecord, insertPeriodPlan, insertReview, loadPeriodPlans, loadStructuralRecords, recordBacktestOutcome, saveStructuralUpdate,
 } from '../lib/decompositionStore';
-import { FEED_PRESETS, closeBacktest, type BacktestOutcome, type FeedProfile, type LayerData, type PeriodPlan, type PeriodReview, type StructuralRecord } from '../decomposition';
+import { FEED_PRESETS, closeBacktest, type BacktestOutcome, type Cadence, type FeedProfile, type LayerData, type PeriodPlan, type PeriodReview, type StructuralRecord } from '../decomposition';
 import type { AssetCategory } from '../types';
 
 /**
@@ -34,7 +34,8 @@ interface Value {
   closeBacktestRecord: (rec: StructuralRecord, outcome: Omit<BacktestOutcome, 'recordedAt' | 'predictionLayerId'>) => Promise<StructuralRecord>;
   /** Asset Desk "Decompose" button: the desk to open next time the Decompose page shows. */
   pendingDeskId?: string;
-  requestDecompose: (deskId: string | undefined) => void;
+  pendingCadence?: Cadence;
+  requestDecompose: (deskId: string | undefined, cadence?: Cadence) => void;
   /** Today → Review: the plan to open straight into its review. */
   pendingReviewId?: string;
   requestReview: (planId: string | undefined) => void;
@@ -53,7 +54,10 @@ export const DecompositionDataProvider: React.FC<{ userId: string; children: Rea
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<string>();
   const [profiles, setProfiles] = useState<Record<string, FeedProfile>>(readProfiles);
-  const [pendingDeskId, requestDecompose] = useState<string>();
+  const [pendingDecomposition, setPendingDecomposition] = useState<{ deskId: string; cadence?: Cadence }>();
+  const requestDecompose = useCallback((deskId: string | undefined, cadence?: Cadence) => {
+    setPendingDecomposition(deskId ? { deskId, cadence } : undefined);
+  }, []);
   const [pendingReviewId, requestReview] = useState<string>();
 
   const reload = useCallback(async () => {
@@ -128,8 +132,12 @@ export const DecompositionDataProvider: React.FC<{ userId: string; children: Rea
     });
   }, []);
 
-  const value = useMemo(() => ({ structural, plans, loading, notice, reload, mapFor, saveStructure, savePlan, saveReview, profileFor, setProfile, pendingDeskId, requestDecompose, pendingReviewId, requestReview, backtests, saveBacktest, closeBacktestRecord }),
-    [structural, plans, loading, notice, reload, mapFor, saveStructure, savePlan, saveReview, profileFor, setProfile, pendingDeskId, pendingReviewId, backtests, saveBacktest, closeBacktestRecord]);
+  const value = useMemo(() => ({
+    structural, plans, loading, notice, reload, mapFor, saveStructure, savePlan, saveReview, profileFor, setProfile,
+    pendingDeskId: pendingDecomposition?.deskId, pendingCadence: pendingDecomposition?.cadence, requestDecompose,
+    pendingReviewId, requestReview, backtests, saveBacktest, closeBacktestRecord,
+  }), [structural, plans, loading, notice, reload, mapFor, saveStructure, savePlan, saveReview, profileFor, setProfile,
+    pendingDecomposition, requestDecompose, pendingReviewId, backtests, saveBacktest, closeBacktestRecord]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 };
 

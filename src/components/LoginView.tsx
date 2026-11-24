@@ -30,11 +30,9 @@ export const LoginView: React.FC = () => {
 
   return (
     <main className="min-h-screen bg-canvas text-ink flex items-center justify-center p-4 sm:p-6 relative overflow-hidden">
-      <div aria-hidden className="absolute -top-36 -right-28 h-96 w-96 rounded-full bg-cyan-500/10 blur-3xl" />
-      <div aria-hidden className="absolute -bottom-52 -left-24 h-96 w-96 rounded-full bg-emerald-500/10 blur-3xl" />
-      <form onSubmit={submit} className="relative bg-panel border border-line rounded-2xl p-6 sm:p-9 w-full max-w-md space-y-5 shadow-2xl">
+      <form onSubmit={submit} className="tos-card w-full max-w-md space-y-5 p-6 sm:p-8">
         <div className="flex items-center gap-2.5">
-          <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-sky-500 to-cyan-700 text-white"><Activity className="w-5 h-5" /></span>
+          <span className="tos-cta grid h-10 w-10 place-items-center rounded-lg"><Activity className="h-5 w-5" /></span>
           <span className="text-sm font-semibold tracking-tight text-ink">Trading OS</span>
         </div>
         <div>
@@ -67,11 +65,11 @@ export const LoginView: React.FC = () => {
           />
         </label>
 
-        {error && <p className="text-xs font-mono text-rose-400">{error}</p>}
-        {notice && <p className="text-xs font-mono text-emerald-400">{notice}</p>}
+        {error && <p role="alert" className="text-sm text-rose-400">{error}</p>}
+        {notice && <p role="status" className="text-sm text-emerald-400">{notice}</p>}
 
         <button
-          className="w-full px-4 py-3 rounded-lg bg-cyan-700 hover:bg-cyan-600 disabled:opacity-50 text-white text-sm font-semibold transition"
+          className="tos-cta w-full rounded-lg px-4 py-3 text-sm font-semibold disabled:opacity-50"
           type="submit"
           disabled={loading}
         >

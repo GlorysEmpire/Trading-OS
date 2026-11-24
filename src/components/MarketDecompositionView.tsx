@@ -4,7 +4,7 @@ import { useTrading } from '../context/TradingContext';
 import { useDecompositionData } from '../context/DecompositionDataContext';
 import { useDecompositionDefinitions } from '../context/DecompositionDefinitionsContext';
 import {
-  CADENCE_LABEL, accuracyRollup, backtestState, candleFor, dueNow, latestLayer, summarize, type Cadence, type DueItem,
+  CADENCE_LABEL, accuracyRollup, backtestState, candleClosed, candleFor, dueNow, evaluatePeriodPlan, isStructureNewer, latestLayer, summarize, type Cadence, type DueItem,
 } from '../decomposition';
 import { weekdayInZone } from '../utils/traderTime';
 import { matchDesk } from '../utils/weekly';
@@ -15,19 +15,23 @@ import { PlanFlow } from './decomposition/PlanFlow';
 import { ReviewFlow } from './decomposition/ReviewFlow';
 import { VerdictPill } from './decomposition/SummaryCard';
 import { BacktestFlow, OutcomeFlow, RESULT_LABEL } from './decomposition/BacktestFlow';
+import { LayerGuide } from './decomposition/LayerGuide';
+import { PlanDetail } from './decomposition/DeskDecompositionStack';
+import { formatTradingTime } from '../utils/timeDisplay';
 
 type Route =
   | { screen: 'home' }
-  | { screen: 'structure'; deskId: string }
+  | { screen: 'structure'; deskId: string; resume?: Cadence }
   | { screen: 'plan'; deskId: string; cadence: Cadence }
+  | { screen: 'saved-plan'; planId: string }
   | { screen: 'review'; planId: string }
   | { screen: 'backtest'; deskId: string }
   | { screen: 'outcome'; recordId: string };
 
 /** Market Decomposition: what's due, then each asset's map and plans. */
 export const MarketDecompositionView: React.FC = () => {
-  const { assets, tradingHQ, researchQuestions, backtestSamples } = useTrading();
-  const { structural, plans, loading, notice, mapFor, profileFor, pendingDeskId, requestDecompose, pendingReviewId, requestReview, backtests } = useDecompositionData();
+  const { assets, tradingHQ, researchQuestions, backtestSamples, timeView, setActiveTab, setSelectedAssetId, setDeskTabRequest } = useTrading();
+  const { structural, plans, loading, notice, mapFor, profileFor, pendingDeskId, pendingCadence, requestDecompose, pendingReviewId, requestReview, backtests } = useDecompositionData();
   const { current: defs, definitionsFor } = useDecompositionDefinitions();
   const [route, setRoute] = useState<Route>({ screen: 'home' });
   const [showAll, setShowAll] = useState(false);
@@ -49,8 +53,9 @@ export const MarketDecompositionView: React.FC = () => {
     if (!pendingReviewId || loading) return;
     const id = pendingReviewId;
     requestReview(undefined);
-    if (plans.some((p) => p.id === id)) setRoute({ screen: 'review', planId: id });
-  }, [pendingReviewId, loading]); // eslint-disable-line react-hooks/exhaustive-deps
+    const plan = plans.find((p) => p.id === id);
+    if (plan) setRoute({ screen: plan.review ? 'saved-plan' : 'review', planId: id });
+  }, [pendingReviewId, loading, plans, requestReview]);
 
   // Asset Desk → "Decompose": open the next step for that desk (map first, then the first plan missing for the current candles).
   useEffect(() => {
@@ -59,21 +64,73 @@ export const MarketDecompositionView: React.FC = () => {
     requestDecompose(undefined);
     if (!d) return;
     const map = mapFor(d.id);
-    if (!map || !latestLayer(map, 'DAILY')) { setRoute({ screen: 'structure', deskId: d.id }); return; }
+    if (!map || !latestLayer(map, 'DAILY')) { setRoute({ screen: 'structure', deskId: d.id, resume: pendingCadence }); return; }
+    if (pendingCadence) {
+      const candle = candleFor(pendingCadence, new Date().toISOString(), profile(d.id), d.symbol);
+      const plan = plans.find((x) => x.deskId === d.id && x.cadence === pendingCadence && x.mode === 'LIVE'
+        && x.candle.feed === candle.feed && Date.parse(x.candle.openTime) === Date.parse(candle.openTime));
+      setRoute(plan ? { screen: 'saved-plan', planId: plan.id } : { screen: 'plan', deskId: d.id, cadence: pendingCadence });
+      return;
+    }
     const missing = (['MONTH', 'WEEK', 'DAY'] as Cadence[]).find((c) => {
       const candle = candleFor(c, new Date().toISOString(), profile(d.id), d.symbol);
       return !plans.some((x) => x.deskId === d.id && x.cadence === c && x.mode === 'LIVE' && x.candle.feed === candle.feed && Date.parse(x.candle.openTime) === Date.parse(candle.openTime));
     });
     setRoute(missing ? { screen: 'plan', deskId: d.id, cadence: missing } : { screen: 'structure', deskId: d.id });
-  }, [pendingDeskId, loading]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pendingDeskId, pendingCadence, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (route.screen === 'structure') {
     const d = desk(route.deskId);
-    return d ? <StructuralFlow deskId={d.id} symbol={d.symbol} onClose={close} /> : null;
+    const resume = route.resume;
+    return d ? <StructuralFlow deskId={d.id} symbol={d.symbol} onClose={resume ? () => setRoute({ screen: 'plan', deskId: d.id, cadence: resume }) : close} /> : null;
   }
   if (route.screen === 'plan') {
     const d = desk(route.deskId);
-    return d ? <PlanFlow deskId={d.id} symbol={d.symbol} category={d.category} cadence={route.cadence} onClose={close} onOpenStructure={() => setRoute({ screen: 'structure', deskId: d.id })} /> : null;
+    const cadence = route.cadence;
+    return d ? <PlanFlow deskId={d.id} symbol={d.symbol} category={d.category} cadence={cadence} onClose={close}
+      onSaved={(planId) => setRoute({ screen: 'saved-plan', planId })}
+      onOpenStructure={() => setRoute({ screen: 'structure', deskId: d.id, resume: cadence })} /> : null;
+  }
+  if (route.screen === 'saved-plan') {
+    const plan = plans.find((entry) => entry.id === route.planId);
+    const asset = plan && desk(plan.deskId);
+    if (!plan) return <div className="p-6"><p role="status">This plan is unavailable.</p><button className="tos-secondary mt-3" onClick={close}>Back to Decomposition</button></div>;
+    const closed = candleClosed(plan.candle, now);
+    const map = structural.find((record) => record.id === plan.structuralVersionRef.structuralRecordId);
+    const definitions = definitionsFor(plan.definitionsVersion) ?? defs;
+    let gate: ReturnType<typeof evaluatePeriodPlan> | undefined;
+    if (map) {
+      try { gate = evaluatePeriodPlan(map, plan, definitions); }
+      catch { /* A historical plan remains readable if its structural versions are unavailable. */ }
+    }
+    const currentCandle = asset && candleFor(plan.cadence, now, profile(asset.id), asset.symbol);
+    const currentMap = mapFor(plan.deskId);
+    const canMonitor = !closed && gate?.verdict === 'WATCH_POI' && currentCandle?.feed === plan.candle.feed
+      && Date.parse(currentCandle.openTime) === Date.parse(plan.candle.openTime)
+      && currentMap?.id === map?.id && !!currentMap && !isStructureNewer(currentMap, plan.structuralVersionRef);
+    return (
+      <div className="mx-auto max-w-3xl space-y-4 p-4 sm:p-6">
+        <button className="tos-secondary" onClick={close}>Back to Decomposition</button>
+        <PageTitle icon={Layers} title={`${plan.candle.symbol} · ${CADENCE_LABEL[plan.cadence]} plan`} description={plan.candle.feed} />
+        <section className="tos-card space-y-4 p-4 sm:p-5" aria-label="Saved plan">
+          <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+            <div><dt className="tos-label">Opens</dt><dd>{formatTradingTime(plan.candle.openTime, { view: timeView })}</dd></div>
+            {plan.candle.closeTime && <div><dt className="tos-label">Closes</dt><dd>{formatTradingTime(plan.candle.closeTime, { view: timeView })}</dd></div>}
+          </dl>
+          {gate && <div className="space-y-1"><VerdictPill verdict={gate.verdict} /><p className="text-sm text-ink-2">{gate.reason}</p></div>}
+          {!gate && <p className="text-sm text-ink-2">The saved plan is available. Its structural verdict cannot be reconstructed.</p>}
+          <PlanDetail planId={plan.id} />
+          <div className="flex flex-wrap gap-2 border-t border-line pt-3">
+            {closed && !plan.review && <button className="tos-cta rounded-lg px-3 py-2 text-sm" onClick={() => setRoute({ screen: 'review', planId: plan.id })}>Review closed candle</button>}
+            {asset && <button className="tos-secondary" onClick={() => {
+              setSelectedAssetId(asset.id);
+              setDeskTabRequest(canMonitor ? 'setups' : 'overview');
+              setActiveTab('asset-desks');
+            }}>{canMonitor ? 'Open setup workspace' : 'Open asset desk'}</button>}
+          </div>
+        </section>
+      </div>
+    );
   }
   if (route.screen === 'backtest') {
     const d = desk(route.deskId);
@@ -85,7 +142,7 @@ export const MarketDecompositionView: React.FC = () => {
   }
   if (route.screen === 'review') {
     const p = plans.find((x) => x.id === route.planId);
-    return p ? <ReviewFlow plan={p} onClose={close} /> : null;
+    return p ? <ReviewFlow plan={p} onClose={() => setRoute({ screen: 'saved-plan', planId: p.id })} /> : null;
   }
 
   const open = (item: DueItem) => {
@@ -123,18 +180,36 @@ export const MarketDecompositionView: React.FC = () => {
         )}
       </section>
 
+      <LayerGuide />
+
       <section className="space-y-3">
         <h2 className="tos-label">{focusDesks.length ? "Today's focus" : 'Assets'}</h2>
-        {(focusDesks.length ? focusDesks : assets).map((a) => <AssetRow key={a.id} desk={a} />)}
+        {(focusDesks.length ? focusDesks : assets).map(renderAsset)}
         {focusDesks.length > 0 && others.length > 0 && (
           <>
             <button onClick={() => setShowAll((v) => !v)} className="inline-flex items-center gap-1 text-sm text-ink-3 hover:text-ink">
               Other assets ({others.length}) <ChevronDown className={`h-4 w-4 transition ${showAll ? 'rotate-180' : ''}`} />
             </button>
-            {showAll && others.map((a) => <AssetRow key={a.id} desk={a} />)}
+            {showAll && others.map(renderAsset)}
           </>
         )}
       </section>
+
+      {plans.some((plan) => plan.mode === 'LIVE') && (
+        <section className="tos-card p-5">
+          <h2 className="tos-label mb-3">Plan history</h2>
+          <ul className="divide-y divide-line">
+            {plans.filter((plan) => plan.mode === 'LIVE').sort((a, b) => Date.parse(b.candle.openTime) - Date.parse(a.candle.openTime)).slice(0, 12).map((plan) => (
+              <li key={plan.id}>
+                <button className="flex w-full flex-wrap items-center justify-between gap-2 py-2 text-left text-sm hover:text-accent" onClick={() => setRoute({ screen: 'saved-plan', planId: plan.id })}>
+                  <span>{plan.candle.symbol} · {CADENCE_LABEL[plan.cadence]} · {formatTradingTime(plan.candle.openTime, { view: timeView })}</span>
+                  <span className="text-xs text-ink-2">{plan.review ? 'Reviewed' : candleClosed(plan.candle, now) ? 'Review due' : 'Current candle'}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {backtests.length > 0 && (
         <section className="tos-card p-5">
@@ -189,7 +264,7 @@ export const MarketDecompositionView: React.FC = () => {
     </div>
   );
 
-  function AssetRow({ desk: a }: { desk: AssetDeskData }) {
+  function renderAsset(a: AssetDeskData) {
     const map = mapFor(a.id);
     const s = map && latestLayer(map, 'DAILY') ? summarize(map, definitionsFor, defs) : undefined;
     const p = profile(a.id);
@@ -198,7 +273,7 @@ export const MarketDecompositionView: React.FC = () => {
       return plans.find((x) => x.deskId === a.id && x.cadence === c && x.mode === 'LIVE' && x.candle.feed === candle.feed && Date.parse(x.candle.openTime) === Date.parse(candle.openTime));
     };
     return (
-      <div className="tos-card p-4">
+      <div className="tos-card p-4" key={a.id}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2"><span className="text-base font-semibold text-ink">{a.symbol}</span>{s && <VerdictPill verdict={s.verdict} />}</div>
@@ -215,9 +290,9 @@ export const MarketDecompositionView: React.FC = () => {
             {(['MONTH', 'WEEK', 'DAY'] as Cadence[]).map((c) => {
               const plan = planFor(c);
               return (
-                <button key={c} onClick={() => !plan && setRoute({ screen: 'plan', deskId: a.id, cadence: c })} disabled={!!plan}
+                <button key={c} onClick={() => setRoute(plan ? { screen: 'saved-plan', planId: plan.id } : { screen: 'plan', deskId: a.id, cadence: c })}
                   className={`rounded-xl px-3 py-1.5 text-xs ring-1 ring-inset ${plan ? 'bg-emerald-500/10 text-emerald-300 ring-emerald-400/25' : 'bg-raised text-ink-2 ring-line hover:text-ink hover:ring-accent/50'}`}>
-                  {CADENCE_LABEL[c][0].toUpperCase() + CADENCE_LABEL[c].slice(1)} {plan ? '✓' : 'plan'}
+                  {plan ? 'View' : 'Build'} {CADENCE_LABEL[c]} plan
                 </button>
               );
             })}

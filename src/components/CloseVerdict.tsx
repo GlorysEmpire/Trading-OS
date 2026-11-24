@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { useTrading } from '../context/TradingContext';
 import { breaksRule } from '../utils/discipline';
-import { LiquidOrb } from './DisciplineVisuals';
+import { DisciplineGauge } from './DisciplineVisuals';
 
 const VERDICT = {
   GOOD_PROCESS_WIN: { title: 'Good process win.', body: 'You followed the plan and it paid. That is the edge doing its job.', tone: 'aqua' as const },
@@ -39,7 +39,7 @@ export const CloseVerdict: React.FC = () => {
     <div className="fixed inset-0 z-[70] grid place-items-center bg-black/70 p-4 backdrop-blur-md" onClick={() => setTradeId(null)}>
       <div className="tos-card tos-pop relative w-full max-w-sm p-7 text-center" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Trade closed">
         <button onClick={() => setTradeId(null)} className="absolute right-4 top-4 text-ink-3 hover:text-ink" aria-label="Close"><X className="h-4 w-4" /></button>
-        <div className="mx-auto w-fit"><LiquidOrb pct={(score / 5) * 100} tone={v.tone} label="Process" sub={`${score}/5`} size={132} /></div>
+        <div className="mx-auto w-fit"><DisciplineGauge pct={(score / 5) * 100} tone={v.tone} label="Process" sub={`${score}/5`} size={132} /></div>
         <div className="tos-label mt-5">{trade.asset} {trade.direction.toLowerCase()} · {r > 0 ? '+' : ''}{Math.round(r * 100) / 100}R</div>
         <h2 className="mt-1.5 text-xl font-semibold tracking-tight text-ink">{v.title}</h2>
         <p className="mt-2 text-sm leading-relaxed text-ink-2">{v.body}</p>

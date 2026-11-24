@@ -15,15 +15,16 @@ import { badgeDefsFor, badgeStates, badgeValues, disciplineDays, disciplineStrea
 import type { AssetDeskData } from '../types';
 import { ChartImage } from './ChartImage';
 import { DueNowCard, ReadinessCard, StarredDecomposition } from './decomposition/TodayDecomposition';
-import { BadgeCoin, LiquidBar, LiquidOrb, StreakFlame, useCountUp } from './DisciplineVisuals';
+import { BadgeMark, ProgressBar, DisciplineGauge, StreakFlame } from './DisciplineVisuals';
 
 // ---- Layout (a view preference, kept in this browser) ----------------------
 
-type CardId = 'readiness' | 'due' | 'plan' | 'setups' | 'starred' | 'open' | 'accounts' | 'progress' | 'calendar' | 'research';
+type CardId = 'readiness' | 'due' | 'plan' | 'setups' | 'starred' | 'open' | 'accounts' | 'progress' | 'calendar' | 'research' | 'routine';
 
 const CARD_META: Record<CardId, { title: string; icon: React.ElementType; wide?: boolean }> = {
   readiness: { title: 'Can I trade now?', icon: ShieldAlert },
   due: { title: 'Due now', icon: Layers },
+  routine: { title: 'Daily routine', icon: ClipboardCheck, wide: true },
   plan: { title: "Today's plan", icon: ClipboardCheck },
   setups: { title: "Today's setups", icon: Crosshair },
   starred: { title: 'Starred analysis', icon: Star, wide: true },
@@ -34,7 +35,7 @@ const CARD_META: Record<CardId, { title: string; icon: React.ElementType; wide?:
   research: { title: 'Research', icon: FlaskConical },
 };
 
-const DEFAULT_ORDER: CardId[] = ['readiness', 'due', 'plan', 'setups', 'starred', 'open', 'accounts', 'progress', 'calendar', 'research'];
+const DEFAULT_ORDER: CardId[] = ['readiness', 'due', 'routine', 'plan', 'setups', 'starred', 'open', 'accounts', 'progress', 'calendar', 'research'];
 const DEFAULT_HIDDEN: CardId[] = ['calendar', 'research'];
 const LAYOUT_KEY = 'trading_os_today_layout_v1';
 
@@ -48,6 +49,10 @@ function loadLayout(): Layout {
       const known = (p.order ?? []).filter((id): id is CardId => id in CARD_META);
       const fresh = DEFAULT_ORDER.filter((id) => !known.includes(id));
       const order = [...fresh.filter((id) => id === 'readiness' || id === 'due'), ...known, ...fresh.filter((id) => id !== 'readiness' && id !== 'due')];
+      if (fresh.includes('routine')) {
+        order.splice(order.indexOf('routine'), 1);
+        order.splice(order.indexOf('due') + 1, 0, 'routine');
+      }
       return { order, hidden: (p.hidden ?? []).filter((id): id is CardId => id in CARD_META) };
     }
   } catch { /* fall through */ }
@@ -130,6 +135,15 @@ export const TodayView: React.FC = () => {
 
   const openDesk = (deskId: string, tab?: 'setups') => { setSelectedAssetId(deskId); if (tab) setDeskTabRequest(tab); setActiveTab('asset-desks'); };
   const openDebrief = () => { setDebriefDate(todayStr); setActiveTab('debrief'); };
+  const openJournal = () => { requestJournalView('trades'); setActiveTab('journal'); };
+  const nextSetup = livePending.find((setup) => assets.some((asset) => asset.id === setup.deskId));
+  const nextAction = halted || debriefDue
+    ? { label: 'Open daily debrief', run: openDebrief }
+    : openTrades.length
+      ? { label: 'Open trade journal', run: openJournal }
+      : activeSession && nextSetup
+        ? { label: `Monitor ${nextSetup.asset} setup`, run: () => openDesk(nextSetup.deskId, 'setups') }
+        : { label: 'Open market analysis', run: () => setActiveTab('decomposition') };
 
   const generateBrief = async () => {
     setBriefLoading(true);
@@ -184,6 +198,14 @@ export const TodayView: React.FC = () => {
     switch (id) {
       case 'readiness': return <ReadinessCard />;
       case 'due': return <DueNowCard />;
+      case 'routine': return (
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+          <button className="tos-secondary text-left" onClick={() => setActiveTab('calendar')}>Prepare · Calendar</button>
+          <button className="tos-secondary text-left" onClick={() => setActiveTab('decomposition')}>Analyse · Decomposition</button>
+          <button className="tos-secondary text-left" onClick={openJournal}>Record · Journal</button>
+          <button className="tos-secondary text-left" onClick={openDebrief}>Reflect · Daily debrief</button>
+        </div>
+      );
       case 'plan': return (
         <div className="space-y-4">
           <SessionTimeline sessions={tradingHQ.sessions} nowMinutes={nowMinutes} activeId={activeSession?.id} />
@@ -265,7 +287,7 @@ export const TodayView: React.FC = () => {
           ) : <p className="text-sm text-ink-3">No open trades. Capital fully preserved.</p>}
           <div>
             <div className="flex justify-between text-xs text-ink-3 mb-1.5"><span>Losses today</span><span className="tabular-nums">{performanceStats.lossCountToday} of {rules.maxDailyLosses}</span></div>
-            <LiquidBar pct={(performanceStats.lossCountToday / Math.max(1, rules.maxDailyLosses)) * 100} tone={halted ? 'rose' : performanceStats.lossCountToday ? 'amber' : 'emerald'} />
+            <ProgressBar pct={(performanceStats.lossCountToday / Math.max(1, rules.maxDailyLosses)) * 100} tone={halted ? 'rose' : performanceStats.lossCountToday ? 'amber' : 'emerald'} />
           </div>
         </div>
       );
@@ -286,7 +308,7 @@ export const TodayView: React.FC = () => {
                     <span>{daily ? `Daily loss ${formatMoney(daily.used, a.currency)} of ${formatMoney(daily.limit, a.currency)}` : `${s?.closedTrades ?? 0} closed trades`}</span>
                     <span className={toneR(s?.returnPct ?? 0)}>{(s?.returnPct ?? 0) > 0 ? '+' : ''}{s?.returnPct ?? 0}%</span>
                   </div>
-                  {daily && <LiquidBar className="mt-1.5" pct={(daily.used / Math.max(1, daily.limit)) * 100} tone={daily.state === 'OK' ? 'aqua' : daily.state === 'BREACHED' ? 'rose' : 'amber'} />}
+                  {daily && <ProgressBar className="mt-1.5" pct={(daily.used / Math.max(1, daily.limit)) * 100} tone={daily.state === 'OK' ? 'aqua' : daily.state === 'BREACHED' ? 'rose' : 'amber'} />}
                 </button>
               </li>
             );
@@ -301,11 +323,11 @@ export const TodayView: React.FC = () => {
           </div>
           {nextBadge && (
             <div className="flex items-center gap-3 rounded-2xl bg-raised p-3 ring-1 ring-inset ring-line">
-              <BadgeCoin tier={nextBadge.tier} mono={nextBadge.def.mono} size={46} />
+              <BadgeMark tier={nextBadge.tier} mono={nextBadge.def.mono} size={46} />
               <div className="min-w-0 flex-1">
                 <div className="text-xs text-ink-3">Next: {TIER_LABEL[nextBadge.next!.tier]} {nextBadge.def.name}</div>
                 <div className="text-sm font-semibold text-ink">{nextBadge.next!.target - nextBadge.value} {nextBadge.def.unit} to go</div>
-                <LiquidBar className="mt-1.5" pct={(nextBadge.value / nextBadge.next!.target) * 100} />
+                <ProgressBar className="mt-1.5" pct={(nextBadge.value / nextBadge.next!.target) * 100} />
               </div>
             </div>
           )}
@@ -329,7 +351,7 @@ export const TodayView: React.FC = () => {
         <button onClick={() => setActiveTab('research')} className="w-full text-left space-y-2">
           <div className="flex items-center justify-between text-xs"><span className="font-semibold text-accent">{activeRQ.code}</span><span className="text-ink-3">{activeRQ.status.replace('_', ' ').toLowerCase()}</span></div>
           <p className="text-sm font-medium text-ink line-clamp-2">{activeRQ.title}</p>
-          <LiquidBar pct={(activeRQ.sampleCount / Math.max(1, activeRQ.targetSamples)) * 100} />
+          <ProgressBar pct={(activeRQ.sampleCount / Math.max(1, activeRQ.targetSamples)) * 100} />
           <p className="text-[11px] tabular-nums text-ink-3">{activeRQ.sampleCount} of {activeRQ.targetSamples} samples</p>
         </button>
       ) : <Empty text="No research question yet." action="Open Research" onAction={() => setActiveTab('research')} />;
@@ -337,14 +359,13 @@ export const TodayView: React.FC = () => {
   };
 
   const orbTone = halted ? 'rose' : discipline.today.pct < 60 ? 'amber' : 'aqua';
-  const todayR = useCountUp(performanceStats.todayR);
-  const weekR = useCountUp(performanceStats.weeklyR);
+  const todayR = performanceStats.todayR;
+  const weekR = performanceStats.weeklyR;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Hero */}
       <section className={`tos-card tos-rise relative overflow-hidden p-5 sm:p-7 ${halted ? 'ring-1 ring-rose-500/30' : ''}`}>
-        <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full opacity-40 blur-3xl" style={{ background: halted ? 'radial-gradient(circle, #e11d48, transparent 70%)' : 'radial-gradient(circle, var(--tos-blob-1), transparent 70%)' }} />
         <div className="relative flex flex-col-reverse gap-6 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0 flex-1">
             <p className="text-sm text-ink-3">{greetingDate}</p>
@@ -359,11 +380,8 @@ export const TodayView: React.FC = () => {
                   {openTrades.length > 0 && <> · {openTrades.length} open</>}.</>}
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-2.5">
-              {halted ? (
-                <button onClick={openDebrief} className="tos-cta inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"><ClipboardCheck className="h-4 w-4" /> Write the debrief</button>
-              ) : (
-                <button onClick={() => setQuickTradeModalOpen(true)} className="tos-cta inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold" title="Shortcut: ⌘K / Ctrl+K"><Plus className="h-4 w-4" /> Log a trade</button>
-              )}
+              <button onClick={nextAction.run} className="tos-cta inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold">{nextAction.label}</button>
+              {!halted && <button onClick={() => setQuickTradeModalOpen(true)} className="tos-secondary" title="Shortcut: ⌘K / Ctrl+K">Log a trade</button>}
               <button onClick={generateBrief} disabled={briefLoading} className="tos-glass inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-ink-2 hover:text-ink transition">
                 <Sparkles className="h-4 w-4 text-accent" /> {briefLoading ? 'Writing your brief…' : 'Daily brief'}
               </button>
@@ -375,8 +393,8 @@ export const TodayView: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center justify-center md:pr-2">
-            <div className="tos-bob">
-              <LiquidOrb pct={discipline.today.pct} tone={orbTone} label="Discipline" sub={discipline.today.trades ? `${discipline.today.trades} trade${discipline.today.trades > 1 ? 's' : ''} today` : 'No trades yet'} size={176} />
+            <div>
+              <DisciplineGauge pct={discipline.today.pct} tone={orbTone} label="Discipline" sub={discipline.today.trades ? `${discipline.today.trades} trade${discipline.today.trades > 1 ? 's' : ''} today` : 'No trades yet'} size={176} />
             </div>
           </div>
         </div>
@@ -434,7 +452,7 @@ export const TodayView: React.FC = () => {
               onDragOver={(e) => { if (arranging) e.preventDefault(); }}
               onDrop={(e) => { e.preventDefault(); dropOn(id); setDragId(null); }}
               className={`tos-card tos-rise p-5 ${meta.wide ? 'lg:col-span-2' : ''} ${arranging ? 'cursor-grab ring-1 ring-dashed ring-accent/30' : ''} ${dragId === id ? 'opacity-50' : ''}`}
-              style={{ animationDelay: `${60 + i * 50}ms` }}>
+              style={{ animationDelay: `${Math.min(i, 4) * 18}ms` }}>
               <header className="mb-4 flex items-center justify-between gap-2">
                 <h3 className="flex items-center gap-2 text-sm font-semibold text-ink">
                   {arranging && <GripVertical className="h-4 w-4 text-ink-3" />}
@@ -489,11 +507,10 @@ const HeroFigure: React.FC<{ label: string; value: React.ReactNode; hint?: strin
 );
 
 const MiniStat: React.FC<{ label: string; value: number; suffix?: string; hint: string; muted?: boolean }> = ({ label, value, suffix, hint, muted }) => {
-  const n = useCountUp(value);
   return (
     <div className="rounded-2xl bg-raised p-3 ring-1 ring-inset ring-line" title={hint}>
       <div className="text-[11px] text-ink-3">{label}</div>
-      <div className={`tos-figure mt-0.5 text-2xl ${muted ? 'text-ink-2' : 'text-ink'}`}>{Math.round(n)}{suffix && <span className="ml-1 text-xs font-medium text-ink-3">{suffix}</span>}</div>
+      <div className={`tos-figure mt-0.5 text-2xl ${muted ? 'text-ink-2' : 'text-ink'}`}>{Math.round(value)}{suffix && <span className="ml-1 text-xs font-medium text-ink-3">{suffix}</span>}</div>
       <div className="text-[10px] leading-snug text-ink-3">{hint}</div>
     </div>
   );
@@ -512,13 +529,13 @@ const SessionTimeline: React.FC<{ sessions: Array<{ id: string; name: string; ny
           if (b <= a) b = 1440;
           const live = s.id === activeId;
           return (
-            <div key={s.id} className={`absolute inset-y-1 rounded-lg px-2 flex items-center overflow-hidden text-[10px] font-semibold whitespace-nowrap ${live ? 'bg-gradient-to-r from-teal-300/90 to-cyan-500/90 text-[#032420] shadow-[0_0_16px_rgba(45,212,191,.4)]' : 'bg-white/[.06] text-ink-2 ring-1 ring-inset ring-line'}`}
+            <div key={s.id} className={`absolute inset-y-1 rounded-lg px-2 flex items-center overflow-hidden text-[10px] font-semibold whitespace-nowrap ${live ? 'bg-accent/20 text-ink ring-1 ring-inset ring-accent/50' : 'bg-raised text-ink-2 ring-1 ring-inset ring-line'}`}
               style={{ left: pct(a), width: pct(b - a) }} title={`${s.name} · ${s.nyStart}–${s.nyEnd} NY`}>
               {s.name}
             </div>
           );
         })}
-        <div className="absolute -inset-y-1 w-0.5 rounded-full bg-ink shadow-[0_0_8px_rgba(255,255,255,.6)]" style={{ left: pct(nowMinutes) }} aria-label="Now" />
+        <div className="absolute -inset-y-1 w-0.5 rounded-full bg-ink" style={{ left: pct(nowMinutes) }} aria-label="Now" />
       </div>
       <div className="mt-1.5 flex justify-between text-[10px] tabular-nums text-ink-3"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00 NY</span></div>
     </div>

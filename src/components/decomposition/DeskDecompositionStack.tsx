@@ -18,7 +18,10 @@ export const DeskDecompositionStack: React.FC<{ desk: AssetDeskData }> = ({ desk
   const map = mapFor(desk.id);
   const lines = useMemo(() => deskStack({ deskId: desk.id, symbol: desk.symbol, map, plans, now: new Date().toISOString(), profile: profileFor(desk.id, desk.category), definitionsFor, current }),
     [desk.id, desk.symbol, desk.category, map, plans, profileFor, definitionsFor, current]);
-  const decompose = () => { requestDecompose(desk.id); setActiveTab('decomposition'); };
+  const decompose = (key: StackLine['key']) => {
+    requestDecompose(desk.id, key === 'STRUCTURE' ? undefined : key);
+    setActiveTab('decomposition');
+  };
 
   return (
     <section className="tos-card overflow-hidden">
@@ -35,7 +38,8 @@ export const DeskDecompositionStack: React.FC<{ desk: AssetDeskData }> = ({ desk
           const expanded = open === key && !l.missing;
           return (
             <li key={key}>
-              <button onClick={() => (l.missing ? decompose() : setOpen(expanded ? undefined : key))} className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-raised">
+              <button onClick={() => (l.missing ? decompose(l.key) : setOpen(expanded ? undefined : key))} aria-expanded={l.missing ? undefined : expanded}
+                className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-raised">
                 <span className="w-28 shrink-0">
                   <span className="block text-sm font-semibold text-ink">{l.title}</span>
                   {l.when && <span className="block text-[11px] text-ink-3">{l.when}</span>}
@@ -78,7 +82,7 @@ export const LineSummary: React.FC<{ l: StackLine }> = ({ l }) => {
 };
 
 /** The full plan, answers in process order (read-only here). */
-const PlanDetail: React.FC<{ planId: string }> = ({ planId }) => {
+export const PlanDetail: React.FC<{ planId: string }> = ({ planId }) => {
   const { plans } = useDecompositionData();
   const plan = plans.find((p) => p.id === planId);
   if (!plan) return null;
@@ -100,8 +104,8 @@ const PlanDetail: React.FC<{ planId: string }> = ({ planId }) => {
         const step = r[s.key];
         return (
           <div key={s.key} className="flex gap-3">
-            <dt className="w-8 shrink-0 text-xs text-ink-3">{s.code}</dt>
-            <dd className="text-ink-2">{!step ? <span className="text-ink-3">—</span> : step.status !== 'IDENTIFIED' ? <span className="text-ink-3">{step.status.toLowerCase().replace('_', ' ')}</span> : show(s.key, step.value)}</dd>
+            <dt className="w-2/5 shrink-0 text-sm text-ink-3">{s.question}</dt>
+            <dd className="min-w-0 break-words text-ink-2">{!step ? <span className="text-ink-3">—</span> : step.status !== 'IDENTIFIED' ? <span className="text-ink-3">{step.status.toLowerCase().replace('_', ' ')}</span> : show(s.key, step.value)}</dd>
           </div>
         );
       })}

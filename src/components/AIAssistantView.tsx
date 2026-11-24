@@ -129,7 +129,7 @@ export const AIAssistantView: React.FC = () => {
           <div>
             <h2 className="font-mono text-base font-bold text-slate-100 flex items-center gap-2">
               <span>Trading os cognitive assistant</span>
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
             </h2>
             <p className="text-xs text-slate-400 font-sans">
               Anchored to your Trading HQ configuration, active asset desks, and historical process journal.
