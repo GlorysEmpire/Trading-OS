@@ -12,6 +12,9 @@
  * - Every layer records the definitions version it was read with.
  */
 
+import type { Analysis } from './analysis';
+import type { compareCandles, RecordedCandle } from './candleEvidence';
+
 export type StepStatus = 'IDENTIFIED' | 'INCONCLUSIVE' | 'NOT_APPLICABLE';
 
 /** One answered step. `value` is only meaningful when status is IDENTIFIED. */
@@ -75,6 +78,7 @@ export interface LiquidityLevel {
 
 export interface WeeklyLayer {
   timeframe: 'WEEKLY';
+  analysis?: Analysis;
   /** Trend from the last external BOS. Gating: inconclusive → HTF neutral, Daily carries the read. */
   trend: Step<{ trend: Trend; lastExternalBos: number }>;
   /** HTF dealing range and where price sits in it. */
@@ -108,6 +112,7 @@ export interface LegCriteria {
 
 export interface DailyLayer {
   timeframe: 'DAILY';
+  analysis?: Analysis;
   /** 1. Trend, last BOS, internal vs external. Gating (with dealing range). */
   structure: Step<{ trend: Trend; lastBos: number; bosKind: 'INTERNAL' | 'EXTERNAL' }>;
   /** 2. Dealing range: BOS leg high/low, and the current price for location. Gating (with structure). */
@@ -424,6 +429,14 @@ export interface PeriodPlan {
   parentPlanId?: string;
   gate: PeriodGateCheck;
   definitionsVersion: string;
-  read: Partial<PeriodRead & DayExtras>;
+  read: Partial<PeriodRead & DayExtras> & PeriodEvidence;
   review?: PeriodReview;
+}
+
+export interface PeriodEvidence {
+  completedCandle?: RecordedCandle;
+  comparisonCandle?: RecordedCandle;
+  comparison?: NonNullable<ReturnType<typeof compareCandles>>;
+  alternativeScenario?: string;
+  retracementHypothesis?: 'SHALLOW' | 'DEEP' | 'INCONCLUSIVE';
 }

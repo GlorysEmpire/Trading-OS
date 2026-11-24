@@ -9,10 +9,11 @@ import type {
   Cadence, DailyLayer, DayExtras, DecompositionDefinitions, GateResult, PeriodCandle, PeriodGateCheck, PeriodPlan, PeriodRead, PeriodReview,
   ReviewScore, StructuralRecord,
 } from './types';
-import { evaluateDaily, type DraftDaily } from './logic';
+import { evaluateDaily, latestLayer, type DraftDaily } from './logic';
 import { currentStructuralRef, morningGate, resolveStructural } from './structural';
 
 export const CADENCE_LABEL: Record<Cadence, string> = { MONTH: 'monthly', WEEK: 'weekly', DAY: 'daily' };
+export const CADENCE_TIMEFRAME = { MONTH: 'MONTHLY', WEEK: 'WEEKLY', DAY: 'DAILY' } as const;
 
 /** The cadence one level up: Day → Week → Month → none. */
 export function parentCadence(c: Cadence): Cadence | undefined {
@@ -81,6 +82,13 @@ export function answerPeriodStep<K extends PeriodStepKey>(plan: PeriodPlan, key:
 
 /** P0, structure part: reuses the M0.1 morning gate. */
 export function periodGate(structural: StructuralRecord | undefined, check: PeriodGateCheck | undefined, cadence: Cadence): { ok: boolean; reason: string } {
+  const native = structural && latestLayer(structural, CADENCE_TIMEFRAME[cadence]);
+  if (cadence !== 'DAY' && native) {
+    if (!check) return { ok: false, reason: 'Has structure changed since the last plan?' };
+    if (!check.structureChanged) return { ok: true, reason: `Use the existing ${CADENCE_LABEL[cadence]} map.` };
+    if (!check.reasons.length || Date.parse(native.createdAt) < Date.parse(check.answeredAt)) return { ok: false, reason: `Update the ${CADENCE_LABEL[cadence]} structural map first.` };
+    return { ok: true, reason: 'Structural map updated.' };
+  }
   const g = morningGate(structural, check);
   if (g.next === 'START_DAILY') return { ok: true, reason: check?.structureChanged ? 'Structural map updated.' : 'No structural change since the last plan. Use the existing map.' };
   if (g.next === 'ANSWER_MORNING_CHECK' && !check) return { ok: false, reason: 'Has structure changed since the last plan? A body-close BOS or CHoCH, or a POI mitigated or invalidated.' };
@@ -113,6 +121,7 @@ export function startPeriodPlan(input: {
   if (p) {
     if (p.cadence !== parentCadence(input.cadence)) throw new Error(`A ${CADENCE_LABEL[input.cadence]} plan's parent must be a ${CADENCE_LABEL[parentCadence(input.cadence) ?? input.cadence]} plan.`);
     if (p.deskId !== rec.deskId) throw new Error('The parent plan is for another asset.');
+    if (p.candle.feed !== input.candle.feed || p.mode !== rec.mode) throw new Error('The parent plan must use the same feed and mode.');
     if (Date.parse(p.candle.openTime) > Date.parse(input.candle.openTime)) throw new Error('The parent plan is for a later period.');
   }
   if (!input.candle.symbol.trim() || !input.candle.feed.trim() || !Number.isFinite(Date.parse(input.candle.openTime))) {

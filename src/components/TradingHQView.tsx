@@ -223,7 +223,7 @@ export const TradingHQView: React.FC = () => {
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="tos-workspace p-4 sm:p-6 max-w-7xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <PageTitle icon={Sliders} title="Trading HQ" description="Edit one part of your trading system at a time. Every save creates a new version." />
         <CategoryVersionBadge label={tradingHQ.version.replace(/^v/, '')} />

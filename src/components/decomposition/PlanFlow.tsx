@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
-  CADENCE_LABEL, FEED_PRESETS, candleFor, candleLabel, dailyPoiChecks, depthExpectation, evaluatePeriodPlan, isIdentified, latestLayer,
-  legTypeOf, morningGate, parentCadence, parentNotice, periodAsDaily, periodStepsFor, previousCandle, rToDraw, startPeriodPlan,
+  CADENCE_LABEL, CADENCE_TIMEFRAME, FEED_PRESETS, candleFor, candleLabel, dailyPoiChecks, depthExpectation, evaluatePeriodPlan, isIdentified, latestLayer,
+  legTypeOf, parentCadence, parentNotice, periodAsDaily, periodGate, periodStepsFor, previousCandle, rToDraw, startPeriodPlan,
   type Cadence, type DailyLayer, type DayExtras, type FeedProfile, type PeriodPlan, type PeriodRead, type PeriodStepKey, type Poi,
   type StepStatus, type StructuralChangeReason, type WeeklyLayer,
 } from '../../decomposition';
@@ -14,9 +14,17 @@ import { formatTradingTime } from '../../utils/timeDisplay';
 import { Choice, Computed, GateNote, LevelList, PickList, PriceField, StatusChoice, StepFrame, fmtPrice, levelKindLabel, poiComplete } from './ui';
 import { PoiLine, VerdictPill } from './SummaryCard';
 import { CandleEvidence } from './CandleEvidence';
+import { AnalysisText } from './AnalysisInputs';
+import { compareCandles, recordCompletedCandle, type Ohlc } from '../../decomposition/candleEvidence';
+import { useAuth } from '../../context/AuthContext';
+import { useLocalDraft } from '../../utils/useLocalDraft';
 
-type Read = Partial<PeriodRead & DayExtras>;
+type Read = PeriodPlan['read'];
 type Screen = 'gate' | 'candle' | PeriodStepKey | 'summary';
+type PlanDraft = {
+  idx: number; profile: FeedProfile; read: Read; previous: Partial<Ohlc>; comparison: Partial<Ohlc>;
+  changed?: boolean; reasons: StructuralChangeReason[]; answeredAt?: string; stands?: boolean;
+};
 
 const REASONS: Array<[StructuralChangeReason, string]> = [
   ['DAILY_BOS', 'Daily BOS'], ['DAILY_CHOCH', 'Daily CHoCH'], ['H4_BOS', '4H BOS'], ['H4_CHOCH', '4H CHoCH'], ['POI_MITIGATED', 'POI mitigated'], ['POI_INVALIDATED', 'POI invalidated'],
@@ -25,10 +33,13 @@ const REASONS: Array<[StructuralChangeReason, string]> = [
 /** One plan (Monthly / Weekly / Daily): gate → candle → P1–P7 (+ Day extras) → summary. */
 export const PlanFlow: React.FC<{ deskId: string; symbol: string; category?: AssetCategory; cadence: Cadence; onClose: () => void; onOpenStructure: () => void; onSaved: (planId: string) => void }> = ({ deskId, symbol, category, cadence, onClose, onOpenStructure, onSaved }) => {
   const { mapFor, plans, savePlan, profileFor, setProfile, notice } = useDecompositionData();
+  const { user } = useAuth();
   const { current: defs } = useDecompositionDefinitions();
   const { tradingHQ, timeView } = useTrading();
   const map = mapFor(deskId);
-  const base = map ? latestLayer(map, 'DAILY')?.data as DailyLayer | undefined : undefined;
+  const daily = map && latestLayer(map, 'DAILY')?.data;
+  const native = map && latestLayer(map, CADENCE_TIMEFRAME[cadence])?.data;
+  const base = cadence === 'DAY' ? daily : undefined;
   const htfPois = useMemo(() => {
     const out: Poi[] = [];
     if (base && isIdentified(base.pois)) { if (base.pois.value.primary) out.push(base.pois.value.primary); if (base.pois.value.backup) out.push(base.pois.value.backup); }
@@ -39,20 +50,27 @@ export const PlanFlow: React.FC<{ deskId: string; symbol: string; category?: Ass
     return out.filter(poiComplete);
   }, [map, base]);
 
-  const [profile, setProfileState] = useState<FeedProfile>(() => profileFor(deskId, category));
   const [asOf] = useState(() => new Date().toISOString());
+  const originalProfile = profileFor(deskId, category);
+  const originalCandle = candleFor(cadence, asOf, originalProfile, symbol);
+  const key = JSON.stringify(['tos-plan-v1', user?.id, deskId, cadence, originalCandle.openTime]);
+  const { draft, update, clear, localError } = useLocalDraft<PlanDraft>(key, () => ({
+    idx: 0, profile: originalProfile, read: prefill(base), previous: {}, comparison: {}, reasons: [],
+  }));
+  const { profile, changed, reasons, answeredAt, stands, read, idx } = draft;
+  const patchDraft = (patch: Partial<PlanDraft>) => update((current) => ({ ...current, ...patch }));
+  const setIdx = (value: number) => patchDraft({ idx: value });
+  const setProfileState = (value: FeedProfile) => patchDraft({
+    profile: value, previous: {}, comparison: {}, stands: undefined,
+    read: { ...read, previousCandle: undefined, completedCandle: undefined, comparisonCandle: undefined, comparison: undefined },
+  });
+  const setRead = (edit: (current: Read) => Read) => update((current) => ({ ...current, read: edit(current.read) }));
   const candle = useMemo(() => candleFor(cadence, asOf, profile, symbol), [cadence, asOf, profile, symbol]);
   const existing = plans.find((p) => p.deskId === deskId && p.cadence === cadence && p.mode === 'LIVE' && p.candle.feed === candle.feed && Date.parse(p.candle.openTime) === Date.parse(candle.openTime));
   const up = parentCadence(cadence);
   const parent = up ? plans.filter((p) => p.deskId === deskId && p.cadence === up && p.mode === 'LIVE' && p.candle.feed === candle.feed && Date.parse(p.candle.openTime) <= Date.parse(candle.openTime))
     .sort((a, b) => b.candle.openTime.localeCompare(a.candle.openTime))[0] : undefined;
 
-  const [changed, setChanged] = useState<boolean>();
-  const [reasons, setReasons] = useState<StructuralChangeReason[]>([]);
-  const [answeredAt, setAnsweredAt] = useState<string>();
-  const [stands, setStands] = useState<boolean>();
-  const [read, setRead] = useState<Read>(() => prefill(base));
-  const [idx, setIdx] = useState(0);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string>();
 
@@ -63,35 +81,46 @@ export const PlanFlow: React.FC<{ deskId: string; symbol: string; category?: Ass
   const progress = (idx + 1) / screens.length;
   const back = idx > 0 ? () => setIdx(idx - 1) : undefined;
   const next = () => setIdx(Math.min(idx + 1, screens.length - 1));
+  const last = previousCandle(cadence, asOf, profile, symbol);
+  const prior = previousCandle(cadence, last.openTime, profile, symbol);
+  const completedCandle = recordCompletedCandle(last, draft.previous, candle.openTime);
+  const comparisonCandle = recordCompletedCandle(prior, draft.comparison, candle.openTime);
+  const comparing = Object.values(draft.comparison).some((value) => value !== undefined);
+  const recording = Object.values(draft.previous).some((value) => value !== undefined);
+  const invalidEvidence = recording && !completedCandle || comparing && (!completedCandle || !comparisonCandle);
+  const comparison = completedCandle && comparisonCandle ? compareCandles(completedCandle, comparisonCandle) : undefined;
+  const draftStatus = <p className="text-xs text-ink-3" role="status">{localError ? 'Local autosave is unavailable.' : 'Draft saved in this browser for this candle.'}</p>;
 
-  if (!map || !base) {
+  if (!map || !native && !daily) {
     return (
       <StepFrame title={title} stepLabel="Before you plan" progress={0} question="Build the structural map first." why="Every plan is read inside the structural story (at least its Daily layer)." onClose={onClose} onNext={onOpenStructure} nextLabel="Build the map">
-        <GateNote title="No structural map yet">Map the Monthly, Weekly and Daily structure in your backtesting block, then come back to plan.</GateNote>
+        <GateNote title="No structural map yet">Publish a {CADENCE_LABEL[cadence]} structural read, then come back to plan.</GateNote>
       </StepFrame>
     );
   }
 
   const gateCheck = changed === undefined || !answeredAt ? undefined : { answeredAt, structureChanged: changed, reasons: changed ? reasons : [], ...(parent ? { higherPlanStands: stands } : {}) };
-  const structural = morningGate(map, gateCheck);
+  const structural = periodGate(map, gateCheck, cadence);
 
   // ---- P0 gate -----------------------------------------------------------------
   if (screen === 'gate') {
     return (
       <StepFrame title={title} stepLabel="P0 · Gate" progress={progress} question="Has structure changed since the last plan?"
         why="A body-close BOS or CHoCH on the Daily or 4H, or a POI mitigated or invalidated, means the map needs updating first."
-        onClose={onClose} onNext={next} nextDisabled={structural.next !== 'START_DAILY' || (!!parent && stands === undefined)}>
-        <Choice value={changed === undefined ? undefined : changed ? 'yes' : 'no'} onChange={(v) => { setChanged(v === 'yes'); setAnsweredAt(new Date().toISOString()); }} options={[['no', 'No, the map stands'], ['yes', 'Yes, it changed']]} />
+        onClose={onClose} onNext={next} nextDisabled={!structural.ok || (!!parent && stands === undefined)}>
+        {draftStatus}
+        {native && <Computed label="Structural anchor" value={`${native.timeframe.toLowerCase()} map · ${map.layers.length} saved revisions`} />}
+        <Choice value={changed === undefined ? undefined : changed ? 'yes' : 'no'} onChange={(v) => patchDraft({ changed: v === 'yes', answeredAt: new Date().toISOString() })} options={[['no', 'No, the map stands'], ['yes', 'Yes, it changed']]} />
         {changed && (
           <div className="space-y-2">
             <div className="text-xs text-ink-3">What changed? (tap all that apply)</div>
             <div className="flex flex-wrap gap-2">{REASONS.map(([r, label]) => (
-              <button key={r} onClick={() => setReasons((x) => (x.includes(r) ? x.filter((y) => y !== r) : [...x, r]))} aria-pressed={reasons.includes(r)}
+              <button key={r} onClick={() => patchDraft({ reasons: reasons.includes(r) ? reasons.filter((value) => value !== r) : [...reasons, r] })} aria-pressed={reasons.includes(r)}
                 className={`rounded-xl px-3 py-1.5 text-xs font-medium ring-1 ring-inset ${reasons.includes(r) ? 'bg-accent/15 text-ink ring-accent/60' : 'bg-raised text-ink-2 ring-line'}`}>{label}</button>
             ))}</div>
           </div>
         )}
-        {structural.next === 'UPDATE_STRUCTURE' && (
+        {changed && reasons.length > 0 && !structural.ok && (
           <GateNote title="Update the structural map first.">
             Then come back here; the plan continues on the new version.
             <div className="mt-3"><button onClick={onOpenStructure} className="tos-cta rounded-xl px-4 py-2 text-sm font-semibold">Update the map</button></div>
@@ -101,7 +130,7 @@ export const PlanFlow: React.FC<{ deskId: string; symbol: string; category?: Ass
           <div className="space-y-2 pt-1">
             <div className="text-sm font-medium text-ink">Does the {CADENCE_LABEL[up]} plan still stand?</div>
             <p className="text-sm text-ink-3">{parent.read.narrative?.value || 'No narrative written.'}</p>
-            <Choice value={stands === undefined ? undefined : stands ? 'yes' : 'no'} onChange={(v) => setStands(v === 'yes')} options={[['yes', 'Yes'], ['no', 'No, it no longer stands']]} />
+            <Choice value={stands === undefined ? undefined : stands ? 'yes' : 'no'} onChange={(v) => patchDraft({ stands: v === 'yes' })} options={[['yes', 'Yes'], ['no', 'No, it no longer stands']]} />
           </div>
         ) : <p className="text-sm text-ink-3">No {CADENCE_LABEL[up]} plan yet. This plan is read on the structural map alone.</p>)}
       </StepFrame>
@@ -113,10 +142,11 @@ export const PlanFlow: React.FC<{ deskId: string; symbol: string; category?: Ass
     return (
       <StepFrame title={title} stepLabel="Which candle" progress={progress} question={`Is this the ${CADENCE_LABEL[cadence]} candle on your chart?`}
         why="A plan belongs to the candle your chart prints for this symbol and feed." more="Session windows still use New York time; this only decides which candle the plan is about."
-        onClose={onClose} onBack={back} onNext={() => { setProfile(deskId, profile); next(); }} nextDisabled={!!existing || !profile.feed.trim()} nextLabel="Yes, this candle">
+        onClose={onClose} onBack={back} onNext={next} nextDisabled={!!existing || !profile.feed.trim() || !!parent && stands === undefined || Date.now() >= Date.parse(candle.closeTime ?? '')} nextLabel="Yes, this candle">
+        {draftStatus}
         <div className="flex flex-wrap gap-2">{FEED_PRESETS.map((p) => (
-          <button key={p.label} onClick={() => setProfileState({ feed: p.feed, zone: p.zone, time: p.time })} aria-pressed={profile.zone === p.zone && profile.time === p.time}
-            className={`rounded-xl px-3 py-2 text-sm ring-1 ring-inset ${profile.zone === p.zone && profile.time === p.time ? 'bg-accent/15 text-ink ring-accent/60' : 'bg-raised text-ink-2 ring-line'}`}>{p.label}</button>
+          <button key={p.label} onClick={() => setProfileState({ feed: p.feed, zone: p.zone, time: p.time, calendar: p.calendar })} aria-pressed={profile.zone === p.zone && profile.time === p.time && profile.calendar === p.calendar}
+            className={`rounded-xl px-3 py-2 text-sm ring-1 ring-inset ${profile.zone === p.zone && profile.time === p.time && profile.calendar === p.calendar ? 'bg-accent/15 text-ink ring-accent/60' : 'bg-raised text-ink-2 ring-line'}`}>{p.label}</button>
         ))}</div>
         <label className="block"><span className="text-sm text-ink-2">Data feed / exchange</span>
           <input value={profile.feed} onChange={(e) => setProfileState({ ...profile, feed: e.target.value.toUpperCase() })} className="mt-1 w-full rounded-xl bg-raised px-3 py-2.5 text-ink ring-1 ring-inset ring-line focus:outline-none focus:ring-accent/60" />
@@ -125,6 +155,8 @@ export const PlanFlow: React.FC<{ deskId: string; symbol: string; category?: Ass
         <Computed label="Opens" value={formatTradingTime(candle.openTime, { view: timeView })} />
         <Computed label="Closes (review due)" value={formatTradingTime(candle.closeTime!, { view: timeView })} />
         {existing && <GateNote title={`There is already a ${CADENCE_LABEL[cadence]} plan for this candle.`}>One plan per candle; it is listed on the Decomposition page.</GateNote>}
+        {Date.now() >= Date.parse(candle.closeTime ?? '') && <GateNote title="There is no open candle for this feed">Resume after the next candle opens, or select the feed your chart uses.</GateNote>}
+        {parent && stands === undefined && <GateNote title="Confirm the parent plan">Go back to check the higher plan for the selected feed.</GateNote>}
       </StepFrame>
     );
   }
@@ -134,19 +166,29 @@ export const PlanFlow: React.FC<{ deskId: string; symbol: string; category?: Ass
     let plan: PeriodPlan | undefined;
     let error: string | undefined;
     try {
-      plan = { ...startPeriodPlan({ id: newPlanId(), cadence, candle, createdAt: new Date().toISOString(), structural: map, gate: gateCheck, parent, definitionsVersion: defs.version }), read };
+      const savedRead = { ...read, completedCandle, comparisonCandle, comparison };
+      plan = { ...startPeriodPlan({ id: newPlanId(), cadence, candle, createdAt: new Date().toISOString(), structural: map, gate: gateCheck, parent, definitionsVersion: defs.version }), read: savedRead };
     } catch (e) { error = e instanceof Error ? e.message : String(e); }
     const gate = plan ? evaluatePeriodPlan(map, plan, defs) : undefined;
     const checks = plan && cadence === 'DAY' ? dailyPoiChecks(periodAsDaily(map, plan), defs) : [];
     const note = plan ? parentNotice(plan, parent) : undefined;
     const save = async () => {
-      if (!plan) return;
+      if (!plan || saving || invalidEvidence || existing || Date.now() >= Date.parse(candle.closeTime ?? '')) return;
       setSaving(true); setMessage(undefined);
-      try { onSaved((await savePlan(plan)).id); } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not save.'); } finally { setSaving(false); }
+      try {
+        const saved = await savePlan(plan);
+        clear();
+        setProfile(deskId, profile);
+        onSaved(saved.id);
+      } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not save.'); } finally { setSaving(false); }
     };
     return (
       <StepFrame title={title} stepLabel="Summary" progress={1} question="Save this plan?" why="The plan is fixed once its candle is reviewed." onClose={onClose} onBack={back}
-        onNext={save} nextLabel={saving ? 'Saving…' : 'Save plan'} nextDisabled={!plan || saving || !!notice}>
+        onNext={save} nextLabel={saving ? 'Saving…' : 'Save plan'} nextDisabled={!plan || saving || !!notice || !!existing || invalidEvidence || Date.now() >= Date.parse(candle.closeTime ?? '')}>
+        {draftStatus}
+        {completedCandle && <Computed label="Previous candle evidence" value={`Range ${fmtPrice(completedCandle.metrics.range)} · body ${completedCandle.metrics.bodyPercent.toFixed(0)}% · closed ${completedCandle.metrics.closeLocation.toLowerCase()}`} />}
+        {read.alternativeScenario && <p className="text-sm text-ink-2">Alternative · {read.alternativeScenario}</p>}
+        {Date.now() >= Date.parse(candle.closeTime ?? '') && <GateNote title="The planned candle has closed">Reopen planning to use the current candle. A past candle cannot receive a new forward plan.</GateNote>}
         {gate && (
           <div className="rounded-2xl bg-raised p-4 ring-1 ring-inset ring-line-strong">
             <div className="mb-2"><VerdictPill verdict={gate.verdict} /></div>
@@ -173,16 +215,26 @@ export const PlanFlow: React.FC<{ deskId: string; symbol: string; category?: Ass
   const stepNo = stepKeys.findIndex((s) => s.key === def.key) + 1;
   return (
     <StepFrame title={title} stepLabel={`${def.code} · ${stepNo} of ${stepKeys.length}`} progress={progress} question={def.question} why={def.why}
-      onClose={onClose} onBack={back} onNext={next} nextDisabled={!ready}>
-      <StatusChoice value={step?.status} onChange={(status) => set({ ...(step ?? {}), status })} />
+      onClose={onClose} onBack={back} onNext={next} nextDisabled={!ready || def.key === 'previousCandle' && invalidEvidence}>
+      {draftStatus}
       {def.key === 'previousCandle' && <>
-        <Computed label="Candle to read" value={candleLabel(cadence, previousCandle(cadence, asOf, profile, symbol), profile)} />
-        <CandleEvidence />
+        <p className="text-sm text-ink-2">Enter prices from {profile.feed} for the completed candles shown. Leave the fields empty if your chart does not have that candle.</p>
+        <CandleEvidence label={`Previous completed candle · ${candleLabel(cadence, last, profile)}`} prices={draft.previous} change={(previous) => patchDraft({ previous })} />
+        <details><summary className="cursor-pointer text-sm text-ink-2">Compare with an earlier completed candle</summary>
+          <CandleEvidence label={`Comparison candle · ${candleLabel(cadence, prior, profile)}`} prices={draft.comparison} change={(value) => patchDraft({ comparison: value })} />
+        </details>
+        {comparison && <Computed label="Comparative evidence" value={`${comparison.formation} · close change ${fmtPrice(comparison.closeChange)}${comparison.rangeRatio === undefined ? '' : ` · range ${comparison.rangeRatio.toFixed(2)}×`}${comparison.rejectedHigh || comparison.rejectedLow ? ' · rejected prior extreme' : ''}`} />}
+        {invalidEvidence && <p role="alert" className="text-sm text-rose-300">Complete all four valid prices for each candle entered, or clear its inputs.</p>}
       </>}
+      <StatusChoice value={step?.status} onChange={(status) => set({ ...(step ?? {}), status })} />
       {step?.status === 'IDENTIFIED' && (
         <StepEditor stepKey={def.key} value={step.value} setValue={setValue} read={read} base={base} htfPois={htfPois} defs={defs}
           sessions={tradingHQ.sessions.map((s) => s.name)} models={tradingHQ.executionModels.map((m) => ({ id: m.id, name: m.name }))} />
       )}
+      {def.key === 'formation' && <Choice value={read.retracementHypothesis} onChange={(retracementHypothesis) => setRead((value) => ({ ...value, retracementHypothesis }))}
+        options={[['SHALLOW', 'Expect shallow'], ['DEEP', 'Expect deep'], ['INCONCLUSIVE', 'Depth inconclusive']]} />}
+      {def.key === 'narrative' && <AnalysisText label="Alternative scenario" area value={read.alternativeScenario}
+        change={(alternativeScenario) => setRead((value) => ({ ...value, alternativeScenario }))} />}
     </StepFrame>
   );
 };
@@ -219,7 +271,7 @@ function readyValue(key: PeriodStepKey, v: any): boolean { // eslint-disable-lin
 }
 
 const StepEditor: React.FC<{
-  stepKey: PeriodStepKey; value: any; setValue: (v: unknown) => void; read: Read; base: DailyLayer; htfPois: Poi[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+  stepKey: PeriodStepKey; value: any; setValue: (v: unknown) => void; read: Read; base?: DailyLayer; htfPois: Poi[]; // eslint-disable-line @typescript-eslint/no-explicit-any
   defs: ReturnType<typeof useDecompositionDefinitions>['current']; sessions: string[]; models: Array<{ id: string; name: string }>;
 }> = ({ stepKey, value, setValue, read, base, htfPois, defs, sessions, models }) => {
   const v = value ?? {};
@@ -263,7 +315,7 @@ const StepEditor: React.FC<{
     case 'formation': {
       const target = isIdentified(read.draw) ? read.draw.value.target : undefined;
       const inv = isIdentified(read.invalidation) ? read.invalidation.value.price : undefined;
-      const legType = isIdentified(base.leg) ? legTypeOf(base.leg.value, defs) : undefined;
+      const legType = isIdentified(base?.leg) ? legTypeOf(base.leg.value, defs) : undefined;
       const levels = isIdentified(read.liquidity) ? read.liquidity.value.levels : [];
       const suggestion = depthExpectation(legType, v.primary?.side, levels, v.primary);
       const rLabel = (p: Poi) => { const r = target === undefined ? undefined : rToDraw(p, target, inv, defs); return r === undefined ? '' : ` · ${r}R`; };

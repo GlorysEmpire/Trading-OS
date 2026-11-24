@@ -509,6 +509,21 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   border-radius: .75rem;
 }
 .tos-dialog::backdrop { background: rgb(9 11 14 / .65); }
+.tos-ticket { width: min(72rem, calc(100% - 1.5rem)); }
+.tos-primary { background: var(--tos-cta); color: var(--tos-cta-ink); border-radius: .5rem; padding: .625rem 1rem; font-size: .875rem; font-weight: 650; }
+.tos-primary:disabled { opacity: .48; }
+.tos-primary:hover:not(:disabled) { filter: brightness(.92); }
+.ash-theme .tos-primary:hover:not(:disabled) { filter: brightness(1.22); }
+.tos-input { display: block; width: 100%; min-width: 0; border: 1px solid var(--tos-line-strong); border-radius: .5rem; background: var(--tos-well); color: var(--tos-ink); padding: .5rem .625rem; font-size: .875rem; }
+.tos-step { padding: .45rem .55rem; border: 1px solid var(--tos-line); border-radius: .5rem; text-align: left; color: var(--tos-ink-2); font-size: .78rem; }
+.tos-step:hover, .tos-step[aria-current] { background: var(--tos-raised); border-color: var(--tos-line-strong); color: var(--tos-ink); }
+.tos-step[aria-current] { box-shadow: inset 2px 0 var(--tos-accent); }
+.tos-shell { --tos-workspace-space: 1.5rem; --tos-ledger-pad: 1rem; }
+.tos-shell.tos-compact { --tos-workspace-space: 1rem; --tos-ledger-pad: .625rem; }
+.tos-workspace { display: flex; flex-direction: column; gap: var(--tos-workspace-space); }
+.tos-ledger-row { padding: var(--tos-ledger-pad, 1rem); }
+.tos-compact #workspace .tos-card:is(.p-5, .p-6, .p-7) { padding: .875rem; }
+.tos-page-title { padding-bottom: .75rem; border-bottom: 1px solid var(--tos-line); }
 
 .tos-figure { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.035em; font-weight: 650; }
 

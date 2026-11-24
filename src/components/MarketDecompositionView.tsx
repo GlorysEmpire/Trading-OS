@@ -4,7 +4,7 @@ import { useTrading } from '../context/TradingContext';
 import { useDecompositionData } from '../context/DecompositionDataContext';
 import { useDecompositionDefinitions } from '../context/DecompositionDefinitionsContext';
 import {
-  CADENCE_LABEL, accuracyRollup, backtestState, candleClosed, candleFor, dueNow, evaluatePeriodPlan, isStructureNewer, latestLayer, summarize, type Cadence, type DueItem,
+  CADENCE_LABEL, CADENCE_TIMEFRAME, accuracyRollup, backtestState, candleClosed, candleFor, dueNow, evaluatePeriodPlan, isStructureNewer, latestLayer, summarize, type Cadence, type DueItem,
 } from '../decomposition';
 import { weekdayInZone } from '../utils/traderTime';
 import { matchDesk } from '../utils/weekly';
@@ -18,6 +18,7 @@ import { BacktestFlow, OutcomeFlow, RESULT_LABEL } from './decomposition/Backtes
 import { LayerGuide } from './decomposition/LayerGuide';
 import { PlanDetail } from './decomposition/DeskDecompositionStack';
 import { formatTradingTime } from '../utils/timeDisplay';
+import { queuePlanResearch } from '../utils/planResearchDraft';
 
 type Route =
   | { screen: 'home' }
@@ -31,10 +32,11 @@ type Route =
 /** Market Decomposition: what's due, then each asset's map and plans. */
 export const MarketDecompositionView: React.FC = () => {
   const { assets, tradingHQ, researchQuestions, backtestSamples, timeView, setActiveTab, setSelectedAssetId, setDeskTabRequest } = useTrading();
-  const { structural, plans, loading, notice, mapFor, profileFor, pendingDeskId, pendingCadence, requestDecompose, pendingReviewId, requestReview, backtests } = useDecompositionData();
+  const { structural, plans, loading, notice, mapFor, profileFor, pendingDeskId, pendingCadence, requestDecompose, pendingReviewId, requestReview, pendingPlanId, requestPlanView, backtests } = useDecompositionData();
   const { current: defs, definitionsFor } = useDecompositionDefinitions();
   const [route, setRoute] = useState<Route>({ screen: 'home' });
   const [showAll, setShowAll] = useState(false);
+  const [researchError, setResearchError] = useState(false);
 
   const now = new Date().toISOString();
   const today = weekdayInZone(new Date());
@@ -47,6 +49,12 @@ export const MarketDecompositionView: React.FC = () => {
 
   const desk = (id: string) => assets.find((a) => a.id === id);
   const close = () => setRoute({ screen: 'home' });
+
+  useEffect(() => {
+    if (!pendingPlanId || loading) return;
+    setRoute({ screen: 'saved-plan', planId: pendingPlanId });
+    requestPlanView(undefined);
+  }, [pendingPlanId, loading, requestPlanView]);
 
   // Today → Review: open that plan's review.
   useEffect(() => {
@@ -64,7 +72,10 @@ export const MarketDecompositionView: React.FC = () => {
     requestDecompose(undefined);
     if (!d) return;
     const map = mapFor(d.id);
-    if (!map || !latestLayer(map, 'DAILY')) { setRoute({ screen: 'structure', deskId: d.id, resume: pendingCadence }); return; }
+    if (!map || !latestLayer(map, pendingCadence ? CADENCE_TIMEFRAME[pendingCadence] : 'DAILY') && !latestLayer(map, 'DAILY')) {
+      setRoute({ screen: 'structure', deskId: d.id, resume: pendingCadence });
+      return;
+    }
     if (pendingCadence) {
       const candle = candleFor(pendingCadence, new Date().toISOString(), profile(d.id), d.symbol);
       const plan = plans.find((x) => x.deskId === d.id && x.cadence === pendingCadence && x.mode === 'LIVE'
@@ -127,7 +138,13 @@ export const MarketDecompositionView: React.FC = () => {
               setDeskTabRequest(canMonitor ? 'setups' : 'overview');
               setActiveTab('asset-desks');
             }}>{canMonitor ? 'Open setup workspace' : 'Open asset desk'}</button>}
+            {plan.review && plan.review.prediction !== 'CORRECT' && <button className="tos-secondary" onClick={() => {
+              const ok = queuePlanResearch({ planId: plan.id, asset: plan.candle.symbol, title: `Investigate ${plan.candle.symbol} ${CADENCE_LABEL[plan.cadence]} delivery`, observation: plan.review!.lesson });
+              if (ok) setActiveTab('research');
+              else setResearchError(true);
+            }}>Investigate missed expectation</button>}
           </div>
+          {researchError && <p role="alert" className="text-sm text-rose-300">Could not pass the observation to Research. The review is still saved here.</p>}
         </section>
       </div>
     );
@@ -154,7 +171,7 @@ export const MarketDecompositionView: React.FC = () => {
   const others = assets.filter((a) => !focusDesks.some((f) => f.id === a.id));
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-5xl mx-auto">
+    <div className="tos-workspace p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
       <PageTitle icon={Layers} title="Decomposition" description="Understand the market, then plan the month, week and day inside that story." />
       {notice && <div className="rounded-2xl bg-raised px-4 py-3 text-sm text-ink-2 ring-1 ring-inset ring-line-strong">{notice}</div>}
 
@@ -285,7 +302,7 @@ export const MarketDecompositionView: React.FC = () => {
             <button onClick={() => setRoute({ screen: 'structure', deskId: a.id })} className="rounded-xl bg-raised px-3 py-1.5 text-xs font-medium text-ink-2 ring-1 ring-inset ring-line hover:text-ink">{map ? 'Update map' : 'Build map'}</button>
           </div>
         </div>
-        {map && latestLayer(map, 'DAILY') && (
+        {map && map.layers.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
             {(['MONTH', 'WEEK', 'DAY'] as Cadence[]).map((c) => {
               const plan = planFor(c);

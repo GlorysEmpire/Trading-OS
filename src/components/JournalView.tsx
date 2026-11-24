@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { Trade } from '../types';
 import { TradeOutcomePanel } from './TradeOutcomePanel';
+import { PlanLinkButton } from './PlanLinkPicker';
 import { ChartLink } from './ChartImage';
 import { ImageViewerModal, LightboxImage } from './ImageViewerModal';
 import { ImageUploadDropzone, MultiImageDropzone, ImageThumbGrid } from './ImageUploadDropzone';
@@ -182,7 +183,7 @@ Provide an objective assessment:
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-5 max-w-7xl mx-auto">
+    <div className="tos-workspace p-4 sm:p-6 max-w-7xl mx-auto">
       {/* Header & Controls */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <PageTitle icon={BookOpen} title="Journal" description="Every trade you've taken: the plan, how it played out, and how well you followed your rules." />
@@ -292,7 +293,7 @@ Provide an objective assessment:
               {/* Summary Row */}
               <div
                 onClick={() => setExpandedTradeId(isExpanded ? null : trade.id)}
-                className="p-4 flex flex-wrap items-center justify-between gap-3 cursor-pointer select-none"
+                className="tos-ledger-row flex flex-wrap items-center justify-between gap-3 cursor-pointer select-none"
               >
                 <div className="flex items-center gap-3">
                   <span className="font-mono text-xs font-bold text-slate-400">{trade.date}</span>
@@ -377,11 +378,10 @@ Provide an objective assessment:
                     )}
                   </div>
 
-                  {isExpanded ? (
-                    <ChevronUp className="w-4 h-4 text-slate-400" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-slate-400" />
-                  )}
+                  <button type="button" className="tos-secondary" aria-label={`${isExpanded ? 'Hide' : 'Show'} ${trade.asset} trade details`} aria-expanded={isExpanded}
+                    onClick={(event) => { event.stopPropagation(); setExpandedTradeId(isExpanded ? null : trade.id); }}>
+                    {isExpanded ? <ChevronUp className="h-4 w-4" aria-hidden="true" /> : <ChevronDown className="h-4 w-4" aria-hidden="true" />}
+                  </button>
                 </div>
               </div>
 
@@ -410,6 +410,7 @@ Provide an objective assessment:
                     <div className="p-3 rounded bg-raised border border-slate-800 font-sans space-y-1">
                       <strong className="text-slate-400 font-mono text-[11px] uppercase block">Pre-trade narrative:</strong>
                       <p className="text-slate-200 leading-relaxed">{trade.narrative}</p>
+                      {trade.planLink && <PlanLinkButton link={trade.planLink} />}
                     </div>
                     {trade.setupReasoning && (
                       <div className="text-slate-300 font-sans">

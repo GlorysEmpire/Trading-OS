@@ -4,6 +4,7 @@ import { useDecompositionData } from '../../context/DecompositionDataContext';
 import { Choice, GateNote, StepFrame, fmtPrice } from './ui';
 import { useTrading } from '../../context/TradingContext';
 import { formatTradingTime } from '../../utils/timeDisplay';
+import { AnalysisText } from './AnalysisInputs';
 
 /** Review at the candle close, in under a minute: the plan beside three taps. */
 export const ReviewFlow: React.FC<{ plan: PeriodPlan; onClose: () => void }> = ({ plan, onClose }) => {
@@ -12,6 +13,7 @@ export const ReviewFlow: React.FC<{ plan: PeriodPlan; onClose: () => void }> = (
   const [prediction, setPrediction] = useState<ReviewScore>();
   const [process, setProcess] = useState<ReviewScore>();
   const [lesson, setLesson] = useState('');
+  const [actual, setActual] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string>();
   const r = plan.read;
@@ -19,10 +21,10 @@ export const ReviewFlow: React.FC<{ plan: PeriodPlan; onClose: () => void }> = (
   const label = CADENCE_LABEL[plan.cadence];
 
   const save = async () => {
-    if (!closed || plan.review || !prediction || !process || !lesson.trim() || saving) return;
+    if (!closed || plan.review || !prediction || !process || !lesson.trim() || !actual.trim() || saving) return;
     setSaving(true); setMessage(undefined);
     try {
-      await saveReview(plan, { savedAt: new Date().toISOString(), prediction, process, lesson });
+      await saveReview(plan, { savedAt: new Date().toISOString(), prediction, process, lesson: `Observed delivery: ${actual.trim()}\n\nLesson: ${lesson.trim()}` });
       onClose();
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not save.'); } finally { setSaving(false); }
   };
@@ -31,10 +33,11 @@ export const ReviewFlow: React.FC<{ plan: PeriodPlan; onClose: () => void }> = (
   return (
     <StepFrame title={`${plan.candle.symbol} · ${label} plan review`} stepLabel="At the candle close" progress={1}
       question="How did the plan do?" why="Prediction and process are scored apart: a wrong forecast with the right process is not a failed analysis."
-      onClose={onClose} onNext={save} nextLabel={saving ? 'Saving…' : 'Save review'} nextDisabled={!closed || !!plan.review || !prediction || !process || !lesson.trim() || saving || !!notice}>
+      onClose={onClose} onNext={save} nextLabel={saving ? 'Saving…' : 'Save review'} nextDisabled={!closed || !!plan.review || !prediction || !process || !lesson.trim() || !actual.trim() || saving || !!notice}>
       <div className="rounded-2xl bg-well p-4 ring-1 ring-inset ring-line space-y-2 text-sm">
         <div className="tos-label">The plan</div>
         <p className="text-base text-ink">{r.narrative?.value || 'No narrative written.'}</p>
+        {r.alternativeScenario && <p className="text-ink-2">Alternative · {r.alternativeScenario}</p>}
         <div className="grid grid-cols-2 gap-2 text-ink-2">
           {isIdentified(r.draw) && <span>Draw: <b className="text-ink">{fmtPrice(r.draw.value.target)}</b> ({r.draw.value.kind.toLowerCase()})</span>}
           {isIdentified(r.invalidation) && <span>Wrong if: <b className="text-ink">{r.invalidation.value.rule}</b></span>}
@@ -50,6 +53,7 @@ export const ReviewFlow: React.FC<{ plan: PeriodPlan; onClose: () => void }> = (
       ) : !closed ? (
         <GateNote title="Not yet.">The review opens when this candle closes{plan.candle.closeTime ? ` (${formatTradingTime(plan.candle.closeTime, { view: timeView })})` : ''}.</GateNote>
       ) : <>
+        <AnalysisText label="Observed delivery at close" area value={actual} change={setActual} />
         <div className="space-y-1.5"><div className="text-sm font-semibold text-ink">1. Prediction</div><p className="text-xs text-ink-3">Did price reach the draw, form the expected high/low, behave as expected?</p>
           <Choice value={prediction} onChange={setPrediction} options={scores} /></div>
         <div className="space-y-1.5"><div className="text-sm font-semibold text-ink">2. Process</div><p className="text-xs text-ink-3">With only what you knew then: structure, range, inducement and POIs read correctly?</p>

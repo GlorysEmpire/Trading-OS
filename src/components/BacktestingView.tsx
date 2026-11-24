@@ -145,7 +145,7 @@ export const BacktestingView: React.FC = () => {
   const avgBtR = totalSamples > 0 ? Number((totalBtR / totalSamples).toFixed(2)) : 0;
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="tos-workspace p-4 sm:p-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <PageTitle icon={Search} title="Backtesting" description="Test ideas on past charts. Each example you record counts toward this month's research question." />

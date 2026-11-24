@@ -3,6 +3,14 @@ build/
 dist/
 coverage/
 supabase/.temp/
+.vercel/
+/backups/
+/.preview-*.tgz
+/trading_os_backup_*.json
+/trading_os_full_backup_*.json
+/IMPLEMENTATION_ROADMAP.md
+/MASTER_AUDIT_AND_4_WEEK_IMPLEMENTATION_PLAN.md
+/metadata.json
 .DS_Store
 *.log
 .env*

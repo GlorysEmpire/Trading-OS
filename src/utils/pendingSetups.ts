@@ -56,6 +56,7 @@ export function setupToTrade(setup: PendingSetup, input: TriggerInput, hq: Tradi
     notesDuring: entryPrice !== setup.entryPrice ? `Filled at ${entryPrice} (planned ${setup.entryPrice}).` : '',
     reflectionAfter: '',
     fromSetupId: setup.id,
+    ...(setup.planLink ? { planLink: setup.planLink } : {}),
     ...(() => {
       const ids = input.accountIds ?? setup.accountIds ?? (setup.accountId ? [setup.accountId] : []);
       return ids.length ? { accountIds: [...ids] } : {};

@@ -1,133 +1,31 @@
-# Data, Export/Backup, and Privacy
+# Data, backups, and privacy
 
-This document explains what Trading OS stores, where it stores it, who can
-access it, and how to back up or restore your data. It reflects the app as
-it actually works today, not an aspirational target — anything listed as
-"not yet migrated" is a known, intentional gap.
+## Storage and access
 
-## Where your data lives
+Supabase Auth identifies the signed-in user. Supabase Postgres stores the account's Trading HQ, asset desks, structural analyses, period plans and reviews, trades and amendments, setups, accounts, research, backtests, debriefs, calendar, psychology, and alerts. Account data is scoped through database permissions and row-level security. Uploaded charts use Supabase Storage.
 
-Trading OS stores data in two places:
+Appearance, Today layout, chart-feed preferences, and unpublished analysis and plan drafts are stored in the browser. These preferences and drafts stay with that browser. The app also detects legacy browser-only records in supported workspaces and offers a one-time import where available.
 
-| Store | What's in it | Scope |
-|---|---|---|
-| **Supabase (cloud database)** | Trading HQ config (risk rules, setup grades, execution models, sessions, process checks, mistake codes), Asset Desks (including the Market Watch star flag), Trades + the trade amendment log, Daily Debriefs, Research Questions, Backtest Samples | Synced across devices/browsers, owner-scoped |
-| **Browser `localStorage`** | Psychology entries, Calendar events, Alerts, UI theme (light/dark), Dashboard widget visibility preferences | This browser only — not synced, not backed up by Supabase |
+## Exports and restore
 
-**Why the split exists:** Trading HQ, Asset Desks, Trades, Research
-Questions, and Backtest Samples were migrated to Supabase across Weeks 1–3
-of the implementation plan. Psychology, Calendar, and Alerts are still
-Context + `localStorage` and have not been migrated yet — this is tracked,
-known scope, not a bug. Dashboard widget visibility is intentionally
-`localStorage`-only even going forward: it's a per-browser view preference,
-not trading data, so it doesn't belong in the shared database.
+| Action | What it covers |
+| --- | --- |
+| **Workspaces → Download backup** | A JSON snapshot of the active workspace records in the app, including trades, trade amendments, Trading HQ, desks, accounts, pending setups, reviews from the daily and weekly journals, research, backtests, calendar, psychology, and alerts. |
+| **Workspaces → Restore backup** | Adds trades that do not already exist and imports supported research, backtest, calendar, psychology, and alert records. It does not restore Trading HQ, desks, accounts, pending setups, debriefs, weekly reviews, or trade amendments. |
+| **Trading HQ → Reset app → Download backup** | Reads the account tables supported by the reset backup and lists chart file paths. The JSON does not contain the chart file bytes and is not a one-click restore. |
 
-**Practical consequence:** if you log in from a different browser or device,
-your Trading HQ, Asset Desks, Trades, Research, and Backtest data will be
-there, but your Psychology entries, Calendar, and Alerts will not — those
-are tied to the specific browser you created them in. Clearing that
-browser's site data (or using a private/incognito window) will also erase
-them, since nothing else has a copy. The JSON backup described below is the
-only way to move that local-only data between browsers, or to keep it safe
-from being cleared.
+The current app export and reset backup omit versioned structural analyses, period plans, and their close reviews. Include the corresponding database tables in a separate database backup when preserving those records. Keep browser-only drafts separately if you need them on another device.
 
-## Who can access your data
+Backups are unencrypted. Keep them in private storage and out of Git. Restore writes one category at a time, so an interrupted restore may leave earlier records imported. Review the affected workspaces before retrying. Existing trades are preserved when IDs match.
 
-- All Supabase tables are protected by Row Level Security (RLS), scoped to
-  `auth.uid()` — the authenticated Supabase user. You can only read or write
-  your own rows; the anonymous/public key has no standing access.
-- The AI assistant routes (`/api/ai/chat`, `/api/ai/analyze-trade`) require a
-  valid Supabase session (a signed, non-expired access token) and are
-  rate-limited per authenticated user. No AI route accepts unauthenticated
-  requests.
-- Nothing in this app sends your trading data to a third party other than:
-  - **Supabase**, to store it (this is also where your login/auth lives).
-  - **Google's Gemini API**, only when you use the AI Assistant or the AI
-    trade-critique feature, and only the specific prompt/context you send
-    for that request (not your whole trade history) — and only if a
-    `GEMINI_API_KEY` is configured. Without a key, those features fall back
-    to a canned, rule-based response and nothing leaves the app.
-- Server logs for the AI routes intentionally log only the error message on
-  failure (`logServerError`), never the request body, your prompt, or your
-  trade data — so a failed AI call does not leak trade details into logs.
+## Trade history
 
-## Exporting a backup
+Closing a trade locks its execution evidence. Corrections go through an amendment with a reason. Notes, reflections, and screenshots can still be added. Voided trades remain visible in the Journal and are excluded from performance statistics.
 
-Click **Export** in the header. This downloads a file named
-`trading_os_backup_<YYYY-MM-DD>.json` containing a single JSON snapshot of:
+## Optional AI features
 
-- `exportDate`
-- `tradingHQ`
-- `assets` (Asset Desks)
-- `trades`
-- `tradeAmendments` (export only; not re-imported)
-- `debriefs` (export only; not re-imported yet)
-- `researchQuestions`
-- `backtestSamples`
-- `psychologyEntries`
-- `calendarEvents`
-- `alerts`
+The AI endpoints require a valid Supabase session and apply per-user rate limits. When a Gemini API key is configured, using an AI feature sends the relevant prompt and context for that request to Google's Gemini API. Keep API keys in server configuration. Use a Supabase publishable or legacy anon key for the browser.
 
-This is the **only** mechanism that captures the `localStorage`-only data
-(Psychology, Calendar, Alerts) in a portable file — back up regularly if you
-rely on those sections, since they have no other persistence.
+## Account reset
 
-The export is a plain, unencrypted JSON file written to your own downloads
-folder. Treat it like any other file containing your trading history: it is
-not encrypted at rest by the app, and anyone with the file can read its
-contents.
-
-## Restoring from a backup
-
-Click **Import** in the header and select a previously exported JSON file.
-On import:
-
-- `trades` are restored **add-only**: a trade in the file is inserted only if
-  no trade with that id exists yet. An existing trade is never overwritten by
-  a backup — otherwise a hand-edited JSON file would be a way around the
-  trade lock (see "Trade lock & amendments" below).
-- `researchQuestions` and `backtestSamples` are written through to Supabase
-  (one `save` call per record). After any restore the in-app lists are
-  reloaded from Supabase, so a restore actually persists.
-- `tradeAmendments` is included in exports for your records, but is not
-  re-imported — the amendment log is append-only and only the app writes it.
-- `psychologyEntries`, `calendarEvents`, and `alerts` are restored directly
-  into local state (and therefore into this browser's `localStorage`) since
-  they have no Supabase table yet.
-- Trading HQ and Asset Desks are **not** touched by import — those are
-  live, versioned Supabase config and are edited through their own screens
-  (Trading HQ, Asset Desks), not overwritten wholesale by a backup file.
-- Import is additive, not a wipe-and-replace: it writes/updates the records
-  found in the file but does not delete anything not present in it.
-- If the file is not valid JSON, or doesn't parse, the import fails cleanly
-  and reports failure without partially corrupting existing data (wrapped in
-  try/catch; a thrown error is caught and `false` is returned before any
-  writes happen for the fields that failed to parse).
-
-## Trade lock & amendments
-
-- When you close a trade it's locked. From then on, its evidence (prices, R,
-  outcome, process score, mistake codes, grade, date, narrative) only changes
-  through **Amend**, which needs a reason. Every amendment is saved in
-  `trading_os_trade_amendments` with the old value, the new value and a
-  timestamp. The database grants insert + select only on that table, so log
-  rows can't be edited or deleted.
-- Reflection, during-trade notes, screenshots and links stay freely editable
-  after close. They add to the record without changing the trade's numbers.
-- Trades can't be deleted. **Void** (with a reason) is for duplicates or
-  entries logged by mistake. A voided trade stays visible in the Journal and is
-  left out of stats.
-- Enforcement is in the database, not just the UI: a trigger
-  (`trading_os_guard_locked_trade`) refuses any change to a locked trade's
-  evidence unless an amendment for that trade was logged in the previous 2
-  minutes.
-
-## Known gaps (tracked, not hidden)
-
-- Psychology, Calendar, and Alerts are not yet Supabase-backed — they are
-  single-browser and only portable via the JSON export above.
-- The JSON backup file itself is not encrypted — treat it as sensitive.
-- There is no automatic/scheduled backup; export is manual, on demand.
-- Deleting your account does not yet have a dedicated "delete all my data"
-  flow in-app; your data is scoped to your Supabase user row via RLS, but a
-  full self-service erasure flow has not been built.
+Trading HQ offers an account data reset with typed confirmation. The reset attempts to remove the account's application records and chart files. Download and verify the database and file backups you need before resetting.

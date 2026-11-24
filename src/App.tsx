@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useEffect, useRef } from 'react';
+import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { TradingProvider, useTrading } from './context/TradingContext';
 import { DecompositionDefinitionsProvider } from './context/DecompositionDefinitionsContext';
@@ -28,6 +28,13 @@ const AIAssistantView = lazy(() => import('./components/AIAssistantView').then((
 
 const MainShell: React.FC = () => {
   const { activeTab, setQuickTradeModalOpen, theme } = useTrading();
+  const [compact, setCompact] = useState(() => {
+    try { return localStorage.getItem('tos-workspace-density') === 'compact'; } catch { return false; }
+  });
+  const toggleDensity = () => setCompact((current) => {
+    try { localStorage.setItem('tos-workspace-density', current ? 'comfortable' : 'compact'); } catch { /* Preference is optional. */ }
+    return !current;
+  });
   const workspace = useRef<HTMLElement>(null);
   const previousTab = useRef(activeTab);
 
@@ -97,9 +104,9 @@ const MainShell: React.FC = () => {
   }, [theme]);
 
   return (
-    <div className="relative isolate min-h-screen flex flex-col font-sans text-ink">
+    <div className={`tos-shell relative isolate min-h-screen flex flex-col font-sans text-ink ${compact ? 'tos-compact' : ''}`}>
       <a href="#workspace" className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 tos-secondary">Skip to workspace</a>
-      <AppNavigation />
+      <AppNavigation compact={compact} toggleDensity={toggleDensity} />
       <main ref={workspace} id="workspace" tabIndex={-1} className="flex-1 overflow-x-hidden pb-24 md:pb-6">
         <Suspense fallback={<p className="mx-auto max-w-7xl p-6 text-sm text-ink-2" role="status">Opening workspace…</p>}>
           <div key={activeTab} className="tos-rise">{renderActiveView()}</div>

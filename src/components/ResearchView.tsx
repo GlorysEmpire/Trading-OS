@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { PageTitle } from './PageTitle';
 import { useTrading } from '../context/TradingContext';
 import {
@@ -14,6 +14,8 @@ import {
   Lock,
 } from 'lucide-react';
 import { ResearchQuestion } from '../types';
+import { consumePlanResearch, type PlanResearchDraft } from '../utils/planResearchDraft';
+import { useDecompositionData } from '../context/DecompositionDataContext';
 
 export const ResearchView: React.FC = () => {
   const { tradingHQ, researchQuestions, addResearchQuestion, backtestSamples, setActiveTab, researchLoading, researchError, localResearchImportCount, importLocalResearchQuestions } = useTrading();
@@ -26,6 +28,16 @@ export const ResearchView: React.FC = () => {
   const [targetSamples, setTargetSamples] = useState(50);
   const [initialAsset, setInitialAsset] = useState('ETH');
   const [scheduledDay, setScheduledDay] = useState('Tuesday');
+  const [source, setSource] = useState<PlanResearchDraft>();
+  const { requestPlanView } = useDecompositionData();
+  useEffect(() => {
+    const draft = consumePlanResearch();
+    if (!draft) return;
+    setSource(draft);
+    setTitle(draft.title);
+    setInitialAsset(draft.asset);
+    setShowAddModal(true);
+  }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +53,8 @@ export const ResearchView: React.FC = () => {
         initialAsset,
         scheduledDay,
         status: 'HYPOTHESIS',
-        findings: 'Hypothesis registered. Commencing empirical sample collection.',
+        findings: source?.observation ?? 'Hypothesis registered. Commencing empirical sample collection.',
+        ...(source ? { sourcePlanId: source.planId } : {}),
       });
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Could not save the research question. It has not been registered.');
@@ -50,17 +63,18 @@ export const ResearchView: React.FC = () => {
 
     setTitle('');
     setHypothesis('');
+    setSource(undefined);
     setShowAddModal(false);
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="tos-workspace p-4 sm:p-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <PageTitle icon={Radar} title="Research" description="Turn observations into rules step by step: observation, hypothesis, backtest, validation, locked rule." />
 
         <button
-          onClick={() => setShowAddModal(true)}
+          onClick={() => { setSource(undefined); setShowAddModal(true); }}
           className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition shadow-sm cursor-pointer"
         >
           <Plus className="w-4 h-4" />
@@ -164,7 +178,8 @@ export const ResearchView: React.FC = () => {
               {openQuestionId === rq.id && <>
               <div className="space-y-1 text-xs">
                 <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Preliminary findings & evidence:</span>
-                <p className="text-slate-300 font-sans leading-relaxed">{rq.findings}</p>
+                <p className="whitespace-pre-wrap text-slate-300 font-sans leading-relaxed">{rq.findings}</p>
+                {rq.sourcePlanId && <button className="tos-secondary mt-2" onClick={() => { requestPlanView(rq.sourcePlanId); setActiveTab('decomposition'); }}>Open source plan</button>}
               </div>
               </>}
 

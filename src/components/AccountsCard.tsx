@@ -6,8 +6,8 @@ import { ACCOUNT_KIND_LABEL, accountRiskPct, formatMoney, newAccountId, unassign
 import { CapitalCard } from './CapitalCard';
 import { traderDateString } from '../utils/traderTime';
 
-const input = 'w-full rounded-lg border border-line bg-well px-3 py-2 text-sm text-ink outline-none focus:border-sky-500';
-const smallBtn = 'inline-flex items-center gap-1 rounded-lg border border-line bg-raised px-2.5 py-1.5 text-xs text-ink-2 hover:text-ink';
+const input = 'tos-input';
+const smallBtn = 'tos-secondary inline-flex items-center gap-1';
 
 const blankAccount = (): TradingAccount => ({
   id: newAccountId(), name: '', kind: 'PERSONAL', broker: '', currency: 'USD', startingBalance: 0, adjustments: [], notes: '', createdAt: new Date().toISOString(),
@@ -50,7 +50,7 @@ export const AccountsCard: React.FC = () => {
     const s = accountSummaries[a.id];
     const money = (n: number) => formatMoney(n, a.currency);
     return (
-      <div key={a.id} className={`rounded-xl border border-line bg-raised p-4 space-y-3 ${a.archivedAt ? 'opacity-70' : ''}`}>
+      <div key={a.id} className={`tos-ledger-row space-y-3 rounded-xl border border-line bg-raised ${a.archivedAt ? 'opacity-70' : ''}`}>
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">

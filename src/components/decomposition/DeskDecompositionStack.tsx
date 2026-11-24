@@ -8,6 +8,7 @@ import type { AssetDeskData } from '../../types';
 import { formatTradingTime } from '../../utils/timeDisplay';
 import { SummaryCard, VerdictPill } from './SummaryCard';
 import { fmtPrice } from './ui';
+import { AnalysisSummary } from './AnalysisSummary';
 
 /** Asset Desk: structure → month → week → today, one line each; tap a line for the full record (UX rule 7). */
 export const DeskDecompositionStack: React.FC<{ desk: AssetDeskData }> = ({ desk }) => {
@@ -52,6 +53,13 @@ export const DeskDecompositionStack: React.FC<{ desk: AssetDeskData }> = ({ desk
                   {l.key === 'STRUCTURE' && map ? (
                     <div className="space-y-3">
                       <SummaryCard summary={summarize(map, definitionsFor, current)} />
+                      {(['MONTHLY', 'WEEKLY', 'DAILY'] as const).map((tf) => {
+                        const analysis = latestLayer(map, tf)?.data.analysis;
+                        return analysis ? <details className="rounded-lg border border-line p-3" key={tf}>
+                          <summary className="cursor-pointer text-sm font-medium capitalize">{tf.toLowerCase()} observations</summary>
+                          <div className="mt-2"><AnalysisSummary analysis={analysis} /></div>
+                        </details> : null;
+                      })}
                       {l.asOf && <p className="text-xs text-ink-3">Read: {(['MONTHLY', 'WEEKLY', 'DAILY'] as const).filter((tf) => l.asOf?.[tf]).map((tf) => `${tf.toLowerCase()} ${formatTradingTime(l.asOf![tf]!, { view: timeView })}`).join(' · ')}</p>}
                     </div>
                   ) : <PlanDetail planId={l.planId!} />}
@@ -100,6 +108,16 @@ export const PlanDetail: React.FC<{ planId: string }> = ({ planId }) => {
   };
   return (
     <dl className="space-y-1.5 text-sm">
+      {plan.read.completedCandle && <div className="rounded-lg border border-line bg-raised p-3">
+        <dt className="font-semibold">Previous completed candle · {plan.read.completedCandle.candle.feed}</dt>
+        <dd className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-xs text-ink-2 sm:grid-cols-4">
+          {Object.entries(plan.read.completedCandle.prices).map(([label, price]) => <span key={label}>{label.toUpperCase()} {fmtPrice(price)}</span>)}
+        </dd>
+        <dd className="mt-2 text-ink-2">Body {fmtPrice(plan.read.completedCandle.metrics.body)} · upper wick {fmtPrice(plan.read.completedCandle.metrics.upperWick)} · lower wick {fmtPrice(plan.read.completedCandle.metrics.lowerWick)} · {plan.read.completedCandle.metrics.closeLocation.toLowerCase()} close</dd>
+        {plan.read.comparison && <dd className="mt-2 text-ink-2">{plan.read.comparison.formation} · close change {fmtPrice(plan.read.comparison.closeChange)}{plan.read.comparison.rejectedHigh || plan.read.comparison.rejectedLow ? ' · rejected prior extreme' : ''}</dd>}
+      </div>}
+      {plan.read.alternativeScenario && <div className="grid gap-1 sm:grid-cols-[2fr_3fr]"><dt className="text-ink-3">Alternative scenario</dt><dd>{plan.read.alternativeScenario}</dd></div>}
+      {plan.read.retracementHypothesis && <div className="grid gap-1 sm:grid-cols-[2fr_3fr]"><dt className="text-ink-3">Retracement hypothesis</dt><dd className="capitalize">{plan.read.retracementHypothesis.toLowerCase()}</dd></div>}
       {periodStepsFor(plan.cadence).map((s) => {
         const step = r[s.key];
         return (

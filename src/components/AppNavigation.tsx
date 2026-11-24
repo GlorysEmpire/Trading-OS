@@ -50,7 +50,7 @@ const MORE: { title: string; items: NavItem[] }[] = [
   },
 ];
 
-export const AppNavigation: React.FC = () => {
+export const AppNavigation: React.FC<{ compact: boolean; toggleDensity: () => void }> = ({ compact, toggleDensity }) => {
   const {
     theme, setTheme, activeTab, setActiveTab, timeView, setTimeView,
     tradingHQ, performanceStats, exportDataJSON, importDataJSON, setQuickTradeModalOpen,
@@ -177,6 +177,7 @@ export const AppNavigation: React.FC = () => {
             <p className="px-2 text-[10px] uppercase tracking-widest font-semibold text-ink-3 mb-1">Preferences & data</p>
             <div className="grid grid-cols-2 gap-1">
               <button onClick={() => { setTheme(theme === 'ash' ? 'dark' : 'ash'); setMoreOpen(false); }} className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-ink-2 hover:bg-raised">{theme === 'ash' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />} {theme === 'ash' ? 'Dark theme' : 'Light theme'}</button>
+              <button type="button" aria-pressed={compact} onClick={toggleDensity} className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-ink-2 hover:bg-raised"><Settings2 className="h-4 w-4" aria-hidden="true" /> Compact density</button>
               {!sameAsNY && (
                 <button onClick={() => setTimeView(timeView === 'NY' ? 'LOCAL' : 'NY')} title="Trading times are New York time by default"
                   className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-ink-2 hover:bg-raised">

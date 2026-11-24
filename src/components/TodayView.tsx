@@ -363,7 +363,7 @@ export const TodayView: React.FC = () => {
   const weekR = performanceStats.weeklyR;
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="tos-workspace p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       {/* Hero */}
       <section className={`tos-card tos-rise relative overflow-hidden p-5 sm:p-7 ${halted ? 'ring-1 ring-rose-500/30' : ''}`}>
         <div className="relative flex flex-col-reverse gap-6 md:flex-row md:items-center md:justify-between">

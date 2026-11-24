@@ -320,6 +320,7 @@ export interface Trade {
   breakeven?: BreakevenRecord;
   /** The pending setup this trade was converted from, if any. */
   fromSetupId?: string;
+  planLink?: PlanLink;
   /** Set when a trade is voided instead of deleted (duplicate entry, logged by
    * mistake). A voided trade stays visible in the Journal with its reason,
    * but is excluded from performance stats. */
@@ -355,6 +356,7 @@ export interface ResearchQuestion {
   targetSamples: number;
   findings: string;
   lockedRuleText?: string;
+  sourcePlanId?: string;
   createdAt: string;
 }
 
@@ -544,7 +546,14 @@ export interface WeeklyReview {
  * When it triggers it converts into a Journal trade with all its details;
  * if it never does, it's marked invalidated or expired (never deleted), which
  * keeps a record of the setups that didn't happen. */
+export interface PlanLink {
+  planId: string;
+  poiId: string;
+  poiLabel: string;
+}
+
 export interface PendingSetup {
+  planLink?: PlanLink;
   id: string;
   deskId: string;
   asset: string;

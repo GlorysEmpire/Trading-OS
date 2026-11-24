@@ -249,7 +249,7 @@ export const AssetDesksView: React.FC = () => {
   const toggleWatchlist = (assetId: string, next: boolean) => { updateAssetDesk(assetId, { watchlisted: next }); };
 
   return (
-    <div className="p-4 sm:p-6 space-y-5 max-w-7xl mx-auto">
+    <div className="tos-workspace p-4 sm:p-6 max-w-7xl mx-auto">
       {/* Top Asset Desk Selector Tabs */}
       <div className="flex items-center justify-between border-b border-slate-800 pb-3 flex-wrap gap-3">
         <div className="flex items-center gap-1.5 overflow-x-auto">

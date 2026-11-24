@@ -15,12 +15,14 @@ export interface FeedProfile {
   /** Daily reset: IANA zone and HH:MM in that zone. */
   zone: string;
   time: string;
+  calendar?: 'FX_WEEKDAYS';
 }
 
 /** Common presets. Always editable: the chart is the source of truth. */
 export const FEED_PRESETS: Array<FeedProfile & { label: string }> = [
   { label: 'Crypto exchange (00:00 UTC)', feed: 'BINANCE', zone: 'UTC', time: '00:00' },
   { label: 'Forex / CFD broker (17:00 New York)', feed: 'OANDA', zone: 'America/New_York', time: '17:00' },
+  { label: 'FX weekdays (Friday close)', feed: 'OANDA', zone: 'America/New_York', time: '17:00', calendar: 'FX_WEEKDAYS' },
 ];
 
 const DAY = 86_400_000;
@@ -72,11 +74,18 @@ function tradingDate(t: number, p: FeedProfile): number {
 }
 
 const openOfDate = (date: number, p: FeedProfile) => { const d = new Date(date); return dayOpen(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate(), p); };
+const isWeekend = (instant: number) => [0, 6].includes(new Date(instant).getUTCDay());
+function weekday(instant: number, direction: 1 | -1) {
+  while (isWeekend(instant)) instant += direction * DAY;
+  return instant;
+}
 
 /** The candle (open and close) of a cadence that contains instant `at`, on this feed. */
 export function candleFor(cadence: Cadence, at: string, profile: FeedProfile, symbol: string): PeriodCandle {
   const t = Date.parse(at);
-  const td = tradingDate(t, profile);
+  const date = tradingDate(t, profile);
+  const weekdays = profile.calendar === 'FX_WEEKDAYS';
+  const td = weekdays ? weekday(date, -1) : date;
   const d = new Date(td);
   let start: number;
   let next: number;
@@ -94,8 +103,8 @@ export function candleFor(cadence: Cadence, at: string, profile: FeedProfile, sy
   return {
     symbol,
     feed: profile.feed,
-    openTime: new Date(openOfDate(start, profile)).toISOString(),
-    closeTime: new Date(openOfDate(next, profile)).toISOString(),
+    openTime: new Date(openOfDate(weekdays ? weekday(start, 1) : start, profile)).toISOString(),
+    closeTime: new Date(openOfDate(weekdays ? weekday(next - DAY, -1) + DAY : next, profile)).toISOString(),
   };
 }
 

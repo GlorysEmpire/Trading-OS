@@ -5,7 +5,8 @@ import { formatTradingTime, fromZoneInput, otherZoneHint, toZoneInput, viewZone,
 import { defaultAccountIds, tradeAccountIds } from '../utils/accounts';
 import { Crosshair, Plus, Zap, Ban, Clock3, Pencil, ArrowUpRight, X, AlertTriangle, CheckSquare, Square } from 'lucide-react';
 import { useTrading, type PendingSetupInput } from '../context/TradingContext';
-import type { AssetDeskData, PendingSetup, ProcessScore } from '../types';
+import type { AssetDeskData, PendingSetup, PlanLink, ProcessScore } from '../types';
+import { PlanLinkButton, PlanLinkPicker } from './PlanLinkPicker';
 import { calculatePlannedR, evaluateRiskViolations } from '../utils/tradingCalculations';
 import { evaluateSessionCheck, minutesInZone, minutesToHhmm, SESSION_TIMEZONE, traderDateString } from '../utils/traderTime';
 import { computeDailyEvidence } from '../utils/debrief';
@@ -47,22 +48,26 @@ function SetupForm({ desk, initial, onDone }: { desk: AssetDeskData; initial?: P
     accountIds: initial ? tradeAccountIds(initial) : defaultAccountIds(accounts, trades),
   }));
   const [saving, setSaving] = useState(false);
+  const [planLink, setPlanLink] = useState<PlanLink | undefined>(initial?.planLink);
   const [error, setError] = useState<string | null>(null);
   const set = (patch: Partial<Draft>) => setD((prev) => ({ ...prev, ...patch }));
 
   const nums = { entry: Number(d.entry), stop: Number(d.stop), target: Number(d.target) };
   const pricesOk = [d.entry, d.stop, d.target].every((v) => v.trim() !== '') && Object.values(nums).every(Number.isFinite);
   const plannedR = pricesOk ? calculatePlannedR(d.direction, nums.entry, nums.stop, nums.target) : 0;
-  const checks = pricesOk ? evaluateRiskViolations({ plannedR, setupGrade: d.setupGrade }, tradingHQ, 0) : [];
+  const losses = computeDailyEvidence(trades, traderDateString(), tradingHQ).lossCount;
+  const checks = pricesOk ? evaluateRiskViolations({ plannedR, setupGrade: d.setupGrade }, tradingHQ, losses) : [];
 
   const submit = async () => {
     if (!pricesOk) { setError('Entry, stop and target are needed.'); return; }
     if (plannedR <= 0) { setError('Check the stop and target against the direction: the planned R is not positive.'); return; }
+    if (checks.length) { setError(checks.join(' ')); return; }
     setSaving(true); setError(null);
     const input: PendingSetupInput = {
       deskId: desk.id, asset: desk.symbol, direction: d.direction, timeframe: d.timeframe, modelId: d.modelId, setupGrade: d.setupGrade,
       entryPrice: nums.entry, stopPrice: nums.stop, targetPrice: nums.target,
       narrative: d.narrative.trim(), setupReasoning: d.reasoning.trim(), screenshots: d.screenshots,
+      planLink,
       ...(d.validUntil ? { validUntil: d.validUntil } : {}),
       ...(d.accountIds.length ? { accountIds: d.accountIds } : {}),
     };
@@ -107,6 +112,10 @@ function SetupForm({ desk, initial, onDone }: { desk: AssetDeskData; initial?: P
       <div className="font-mono">
         <AccountPicker label="Accounts (can be changed when it triggers)" value={d.accountIds} onChange={(ids) => set({ accountIds: ids })} />
       </div>
+      <PlanLinkPicker desk={desk} at={new Date().toISOString()} value={planLink} change={(link, narrative) => {
+        setPlanLink(link);
+        if (narrative && !d.narrative.trim()) set({ narrative });
+      }} />
       {checks.length > 0 && (
         <div className="space-y-1">
           {checks.map((c) => <p key={c} className="flex items-center gap-1.5 text-[11px] font-mono text-amber-300"><AlertTriangle className="w-3 h-3 shrink-0" /> {c}</p>)}
@@ -299,6 +308,7 @@ export const PendingSetupsPanel: React.FC<{ desk: AssetDeskData }> = ({ desk }) 
               {isPastValidity(p, today) && (
                 <p className="flex items-center gap-1.5 text-[11px] font-mono text-amber-300"><Clock3 className="w-3 h-3" /> Past its valid-until date. Mark it expired if it no longer applies.</p>
               )}
+              {p.planLink && <PlanLinkButton link={p.planLink} />}
               {p.narrative && <p className="text-xs text-slate-200 font-sans">{p.narrative}</p>}
               {p.setupReasoning && <p className="text-[11px] text-slate-400 font-sans"><span className="font-mono text-slate-500">Trigger: </span>{p.setupReasoning}</p>}
               <ImageThumbGrid

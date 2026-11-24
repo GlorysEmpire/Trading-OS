@@ -39,6 +39,8 @@ interface Value {
   /** Today → Review: the plan to open straight into its review. */
   pendingReviewId?: string;
   requestReview: (planId: string | undefined) => void;
+  pendingPlanId?: string;
+  requestPlanView: (planId: string | undefined) => void;
 }
 
 const Ctx = createContext<Value | null>(null);
@@ -59,6 +61,7 @@ export const DecompositionDataProvider: React.FC<{ userId: string; children: Rea
     setPendingDecomposition(deskId ? { deskId, cadence } : undefined);
   }, []);
   const [pendingReviewId, requestReview] = useState<string>();
+  const [pendingPlanId, requestPlanView] = useState<string>();
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -135,9 +138,9 @@ export const DecompositionDataProvider: React.FC<{ userId: string; children: Rea
   const value = useMemo(() => ({
     structural, plans, loading, notice, reload, mapFor, saveStructure, savePlan, saveReview, profileFor, setProfile,
     pendingDeskId: pendingDecomposition?.deskId, pendingCadence: pendingDecomposition?.cadence, requestDecompose,
-    pendingReviewId, requestReview, backtests, saveBacktest, closeBacktestRecord,
+    pendingReviewId, requestReview, pendingPlanId, requestPlanView, backtests, saveBacktest, closeBacktestRecord,
   }), [structural, plans, loading, notice, reload, mapFor, saveStructure, savePlan, saveReview, profileFor, setProfile,
-    pendingDecomposition, requestDecompose, pendingReviewId, backtests, saveBacktest, closeBacktestRecord]);
+    pendingDecomposition, requestDecompose, pendingReviewId, pendingPlanId, backtests, saveBacktest, closeBacktestRecord]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 };
 

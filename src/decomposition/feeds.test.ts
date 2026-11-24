@@ -20,6 +20,14 @@ describe('crypto feed (00:00 UTC reset)', () => {
 });
 
 describe('FX feed (17:00 New York reset, opens the evening before)', () => {
+  it('handles Friday close and the Sunday reopen on the weekday schedule', () => {
+    const weekdays = FEED_PRESETS[2];
+    expect(candleFor('DAY', '2026-11-28T12:00:00Z', weekdays, 'EURUSD')).toMatchObject({
+      openTime: '2026-11-26T22:00:00.000Z', closeTime: '2026-11-27T22:00:00.000Z',
+    });
+    expect(previousCandle('DAY', '2026-11-29T23:00:00Z', weekdays, 'EURUSD').closeTime).toBe('2026-11-27T22:00:00.000Z');
+    expect(candleFor('MONTH', '2026-11-10T12:00:00Z', weekdays, 'EURUSD').openTime).toBe('2026-11-01T22:00:00.000Z');
+  });
   it('a 17:00 NY reset opens tomorrow\'s candle the evening before (EST = 22:00 UTC)', () => {
     expect(candleFor('DAY', '2026-11-23T23:00:00Z', FX, 'EURUSD')).toMatchObject({ openTime: '2026-11-23T22:00:00.000Z', closeTime: '2026-11-24T22:00:00.000Z' });
     expect(candleFor('DAY', '2026-11-23T21:00:00Z', FX, 'EURUSD')).toMatchObject({ openTime: '2026-11-22T22:00:00.000Z' });

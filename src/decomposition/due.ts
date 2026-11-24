@@ -71,6 +71,7 @@ export function dueNow(input: DueInput): DueGroup[] {
     const profile = input.profileFor(desk.id);
     for (const cadence of ['MONTH', 'WEEK', 'DAY'] as Cadence[]) {
       const candle = candleFor(cadence, input.now, profile, desk.symbol);
+      if (candle.closeTime && Date.parse(candle.closeTime) <= Date.parse(input.now)) continue;
       const has = live.some((p) => p.deskId === desk.id && p.cadence === cadence && p.candle.feed === candle.feed && Date.parse(p.candle.openTime) === Date.parse(candle.openTime));
       if (!has) add(`PLAN:${cadence}`, (names) => `${WORD[cadence]} plan due: ${names}`, { kind: 'PLAN', deskId: desk.id, symbol: desk.symbol, cadence, candle }, short(desk.symbol));
     }
