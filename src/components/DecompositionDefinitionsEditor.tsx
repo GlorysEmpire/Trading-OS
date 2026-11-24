@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, History, Lock, Save, Unlock } from 'lucide-react';
 import { useDecompositionDefinitions } from '../context/DecompositionDefinitionsContext';
-import { describeDefinitionChanges, validateDefinitions, type DecompositionDefinitions } from '../decomposition';
+import { describeDefinitionChanges, groupsToText, readinessSettings, textToGroups, validateDefinitions, type DecompositionDefinitions } from '../decomposition';
 
 /**
  * Trading HQ → Decomposition: the definitions every structural record and
@@ -132,6 +132,28 @@ export const DecompositionDefinitionsEditor: React.FC = () => {
           </label>
         </div>
         <p className="text-[11px] text-ink-3">The minimum R here is for decomposition gates. Your live grade rules (A+ 5R, B+ 3R) stay in Grades.</p>
+      </div>
+
+      <div className="tos-card p-5 space-y-3">
+        <div>
+          <h4 className="tos-label">Can I trade now? (Today)</h4>
+          <p className="text-[11px] text-ink-3 mt-1">Used by the readiness card on Today. Placeholders until you set them.</p>
+        </div>
+        <label className="flex items-center justify-between gap-3 rounded-xl bg-raised px-3 py-2 ring-1 ring-inset ring-line">
+          <span className="text-sm text-ink-2">Wait this long before a high-impact event</span>
+          <span className="flex items-center gap-1.5">
+            <input type="number" step={5} min={0} max={240} className="w-20 rounded-md bg-well px-2 py-1 text-right text-sm tabular-nums text-ink ring-1 ring-inset ring-line focus:outline-none focus:ring-accent/60"
+              value={readinessSettings(draft).eventBufferMinutes}
+              onChange={(e) => setDraft((d) => ({ ...d, readiness: { ...readinessSettings(d), eventBufferMinutes: Number(e.target.value) } }))} />
+            <span className="text-xs text-ink-3">min</span>
+          </span>
+        </label>
+        <label className="block">
+          <span className="text-sm font-medium text-ink">Assets that move together</span>
+          <span className="block text-[11px] text-ink-3 mb-1.5">One group per line, assets separated by commas. A new trade in a group you already hold shows Caution.</span>
+          <textarea rows={5} className={`${field} font-mono`} defaultValue={groupsToText(readinessSettings(current).correlationGroups)} key={`${current.version}-${changes.length === 0}`}
+            onChange={(e) => setDraft((d) => ({ ...d, readiness: { ...readinessSettings(d), correlationGroups: textToGroups(e.target.value) } }))} />
+        </label>
       </div>
 
       <div className="tos-card p-5 space-y-3">

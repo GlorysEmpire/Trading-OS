@@ -27,7 +27,7 @@ type Route =
 /** Market Decomposition: what's due, then each asset's map and plans. */
 export const MarketDecompositionView: React.FC = () => {
   const { assets, tradingHQ, researchQuestions, backtestSamples } = useTrading();
-  const { structural, plans, loading, notice, mapFor, profileFor, pendingDeskId, requestDecompose, backtests } = useDecompositionData();
+  const { structural, plans, loading, notice, mapFor, profileFor, pendingDeskId, requestDecompose, pendingReviewId, requestReview, backtests } = useDecompositionData();
   const { current: defs, definitionsFor } = useDecompositionDefinitions();
   const [route, setRoute] = useState<Route>({ screen: 'home' });
   const [showAll, setShowAll] = useState(false);
@@ -43,6 +43,14 @@ export const MarketDecompositionView: React.FC = () => {
 
   const desk = (id: string) => assets.find((a) => a.id === id);
   const close = () => setRoute({ screen: 'home' });
+
+  // Today → Review: open that plan's review.
+  useEffect(() => {
+    if (!pendingReviewId || loading) return;
+    const id = pendingReviewId;
+    requestReview(undefined);
+    if (plans.some((p) => p.id === id)) setRoute({ screen: 'review', planId: id });
+  }, [pendingReviewId, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Asset Desk → "Decompose": open the next step for that desk (map first, then the first plan missing for the current candles).
   useEffect(() => {

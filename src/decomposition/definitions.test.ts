@@ -38,3 +38,30 @@ describe('Journey 7 through the HQ history', () => {
     expect(resolve('decomp-defs-v9')).toBeUndefined();
   });
 });
+
+describe('readiness settings (Trading HQ)', () => {
+  it('older versions without them get the defaults', async () => {
+    const { PLACEHOLDER_DEFINITIONS, readinessSettings } = await import('./definitions');
+    const old = { ...PLACEHOLDER_DEFINITIONS, readiness: undefined };
+    expect(readinessSettings(old).eventBufferMinutes).toBe(30);
+    expect(readinessSettings(old).correlationGroups.length).toBeGreaterThan(0);
+  });
+  it('a changed buffer or group is listed as a change and saved as a new version', async () => {
+    const { PLACEHOLDER_DEFINITIONS: p, describeDefinitionChanges, prepareDefinitionsRevision } = await import('./definitions');
+    const edited = { ...p, readiness: { eventBufferMinutes: 45, correlationGroups: [['BTC', 'ETH', 'SOL']] } };
+    const changes = describeDefinitionChanges(p, edited);
+    expect(changes).toContain('News buffer: 30 min → 45 min');
+    expect(changes).toContain('Correlation groups changed');
+    expect(prepareDefinitionsRevision(p, edited, 2).version).toBe('decomp-defs-v2');
+  });
+  it('refuses a silly buffer and one-asset groups', async () => {
+    const { PLACEHOLDER_DEFINITIONS: p, validateDefinitions } = await import('./definitions');
+    expect(validateDefinitions({ ...p, readiness: { eventBufferMinutes: -5, correlationGroups: [] } }).join(' ')).toMatch(/News buffer/);
+    expect(validateDefinitions({ ...p, readiness: { eventBufferMinutes: 30, correlationGroups: [['BTC']] } }).join(' ')).toMatch(/at least two/);
+  });
+  it('groups round-trip through the editor text', async () => {
+    const { groupsToText, textToGroups } = await import('./definitions');
+    expect(textToGroups(' btc, eth \n\nxau,xag')).toEqual([['BTC', 'ETH'], ['XAU', 'XAG']]);
+    expect(textToGroups(groupsToText([['BTC', 'ETH']]))).toEqual([['BTC', 'ETH']]);
+  });
+});

@@ -35,6 +35,9 @@ interface Value {
   /** Asset Desk "Decompose" button: the desk to open next time the Decompose page shows. */
   pendingDeskId?: string;
   requestDecompose: (deskId: string | undefined) => void;
+  /** Today → Review: the plan to open straight into its review. */
+  pendingReviewId?: string;
+  requestReview: (planId: string | undefined) => void;
 }
 
 const Ctx = createContext<Value | null>(null);
@@ -51,6 +54,7 @@ export const DecompositionDataProvider: React.FC<{ userId: string; children: Rea
   const [notice, setNotice] = useState<string>();
   const [profiles, setProfiles] = useState<Record<string, FeedProfile>>(readProfiles);
   const [pendingDeskId, requestDecompose] = useState<string>();
+  const [pendingReviewId, requestReview] = useState<string>();
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -124,8 +128,8 @@ export const DecompositionDataProvider: React.FC<{ userId: string; children: Rea
     });
   }, []);
 
-  const value = useMemo(() => ({ structural, plans, loading, notice, reload, mapFor, saveStructure, savePlan, saveReview, profileFor, setProfile, pendingDeskId, requestDecompose, backtests, saveBacktest, closeBacktestRecord }),
-    [structural, plans, loading, notice, reload, mapFor, saveStructure, savePlan, saveReview, profileFor, setProfile, pendingDeskId, backtests, saveBacktest, closeBacktestRecord]);
+  const value = useMemo(() => ({ structural, plans, loading, notice, reload, mapFor, saveStructure, savePlan, saveReview, profileFor, setProfile, pendingDeskId, requestDecompose, pendingReviewId, requestReview, backtests, saveBacktest, closeBacktestRecord }),
+    [structural, plans, loading, notice, reload, mapFor, saveStructure, savePlan, saveReview, profileFor, setProfile, pendingDeskId, pendingReviewId, backtests, saveBacktest, closeBacktestRecord]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 };
 

@@ -1,4 +1,5 @@
-import type { DecompositionDefinitions } from './types';
+import type { DecompositionDefinitions, ReadinessSettings } from './types';
+import { PLACEHOLDER_CORRELATION_GROUPS, PLACEHOLDER_EVENT_BUFFER_MINUTES } from './readiness';
 
 /**
  * PLACEHOLDER definitions, taken from the v0.3 proposal (§3). Not locked.
@@ -28,7 +29,15 @@ export const PLACEHOLDER_DEFINITIONS: DecompositionDefinitions = {
   equilibriumBandPct: 0,
   minRToDraw: 3,
   rStopBasis: 'POI_FAR_EDGE',
+  readiness: { eventBufferMinutes: PLACEHOLDER_EVENT_BUFFER_MINUTES, correlationGroups: PLACEHOLDER_CORRELATION_GROUPS },
 };
+
+/** The readiness settings to use (older versions without them get the defaults). */
+export const readinessSettings = (d: DecompositionDefinitions): ReadinessSettings => d.readiness ?? PLACEHOLDER_DEFINITIONS.readiness!;
+
+/** Correlation groups as one line each, members comma-separated (for the editor). */
+export const groupsToText = (g: string[][]) => g.map((x) => x.join(', ')).join('\n');
+export const textToGroups = (t: string): string[][] => t.split('\n').map((l) => l.split(',').map((m) => m.trim().toUpperCase()).filter(Boolean)).filter((g) => g.length > 0);
 
 /** Problems that make a definitions block unusable (empty = fine). */
 export function validateDefinitions(d: DecompositionDefinitions): string[] {
@@ -43,6 +52,9 @@ export function validateDefinitions(d: DecompositionDefinitions): string[] {
   if (!(d.equalHighsLowsAtr > 0)) problems.push('Equal highs/lows tolerance must be above 0.');
   if (!(d.equilibriumBandPct >= 0 && d.equilibriumBandPct < 50)) problems.push('Equilibrium band must be between 0 and 50%.');
   if (!(d.minRToDraw > 0)) problems.push('Minimum R to the draw must be above 0.');
+  const r = readinessSettings(d);
+  if (!(Number.isInteger(r.eventBufferMinutes) && r.eventBufferMinutes >= 0 && r.eventBufferMinutes <= 240)) problems.push('News buffer must be a whole number of minutes, 0 to 240.');
+  if (r.correlationGroups.some((g) => g.length < 2)) problems.push('Each correlation group needs at least two assets.');
   return problems;
 }
 
@@ -69,6 +81,9 @@ export function describeDefinitionChanges(before: DecompositionDefinitions, afte
   num('Equal highs/lows tolerance', before.equalHighsLowsAtr, after.equalHighsLowsAtr, '× ATR');
   num('Equilibrium band', before.equilibriumBandPct, after.equilibriumBandPct, '%');
   num('Minimum R to the draw', before.minRToDraw, after.minRToDraw, 'R');
+  const rb = readinessSettings(before), ra = readinessSettings(after);
+  num('News buffer', rb.eventBufferMinutes, ra.eventBufferMinutes, ' min');
+  if (groupsToText(rb.correlationGroups) !== groupsToText(ra.correlationGroups)) out.push('Correlation groups changed');
   if (before.rStopBasis !== after.rStopBasis) out.push(`R measured with the stop at ${after.rStopBasis === 'INVALIDATION' ? 'the invalidation' : "the POI's far edge"}`);
   if (before.locked !== after.locked) out.push(after.locked ? 'Locked' : 'Unlocked (placeholder again)');
   return out;

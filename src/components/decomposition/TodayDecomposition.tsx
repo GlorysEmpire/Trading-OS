@@ -2,8 +2,9 @@ import React, { useMemo } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { useTrading } from '../../context/TradingContext';
 import { useDecompositionData } from '../../context/DecompositionDataContext';
+import { useDecompositionDefinitions } from '../../context/DecompositionDefinitionsContext';
 import {
-  PLACEHOLDER_CORRELATION_GROUPS, PLACEHOLDER_EVENT_BUFFER_MINUTES, correlated, dueNow, highImpactAhead, readiness,
+  correlated, dueNow, highImpactAhead, readiness, readinessSettings,
   type DueItem, type ReadinessVerdict,
 } from '../../decomposition';
 import { fromZoneInput } from '../../utils/timeDisplay';
@@ -21,6 +22,8 @@ const VERDICT: Record<ReadinessVerdict, { label: string; cls: string }> = {
 /** Layer 0: "Can I trade now?" From your own rules, session windows, today's calendar and open trades. */
 export const ReadinessCard: React.FC = () => {
   const { tradingHQ, trades, calendarEvents, performanceStats, assets } = useTrading();
+  const { current } = useDecompositionDefinitions();
+  const settings = readinessSettings(current);
   const now = new Date();
   const result = useMemo(() => {
     const todayFocus = tradingHQ.focusRotation.find((d) => d.day === weekdayInZone(now));
@@ -33,14 +36,14 @@ export const ReadinessCard: React.FC = () => {
     const input = {
       lossesToday: performanceStats.lossCountToday, maxDailyLosses: tradingHQ.riskRules.maxDailyLosses,
       inSessionWindow: tradingHQ.sessions.some((s) => isSessionActiveAt(s, now)),
-      upcomingHighImpact: ahead, eventBufferMinutes: PLACEHOLDER_EVENT_BUFFER_MINUTES,
-      openExposure: open, correlationGroups: PLACEHOLDER_CORRELATION_GROUPS,
+      upcomingHighImpact: ahead, eventBufferMinutes: settings.eventBufferMinutes,
+      openExposure: open, correlationGroups: settings.correlationGroups,
     };
     const base = readiness(input);
-    const clashes = focus.filter((d) => open.some((o) => correlated(o.asset, d.symbol, PLACEHOLDER_CORRELATION_GROUPS)));
-    const next = ahead.find((e) => e.minutesAway > PLACEHOLDER_EVENT_BUFFER_MINUTES);
+    const clashes = focus.filter((d) => open.some((o) => correlated(o.asset, d.symbol, settings.correlationGroups)));
+    const next = ahead.find((e) => e.minutesAway > settings.eventBufferMinutes);
     return { base, clashes, next, open: open.length };
-  }, [tradingHQ, trades, calendarEvents, performanceStats.lossCountToday, assets]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tradingHQ, trades, calendarEvents, performanceStats.lossCountToday, assets, settings]); // eslint-disable-line react-hooks/exhaustive-deps
 
   let { verdict } = result.base;
   const reasons = [...result.base.reasons];
@@ -55,7 +58,7 @@ export const ReadinessCard: React.FC = () => {
       <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${v.cls}`}>{v.label}</span>
       <ul className="space-y-1.5 text-sm text-ink-2">{reasons.map((r) => <li key={r}>{r}</li>)}</ul>
       {result.next && verdict === 'READY' && <p className="text-xs text-ink-3">Next high-impact event: {result.next.title} in {result.next.minutesAway} min.</p>}
-      <p className="text-[11px] text-ink-3">News buffer {PLACEHOLDER_EVENT_BUFFER_MINUTES} min and correlation groups are placeholders until set in Trading HQ.</p>
+      <p className="text-[11px] text-ink-3">News buffer {settings.eventBufferMinutes} min · groups from Trading HQ → Decomposition{current.locked ? '' : ' (placeholders until you lock them)'}.</p>
     </div>
   );
 };
@@ -63,7 +66,7 @@ export const ReadinessCard: React.FC = () => {
 /** Only what's due: reviews, the map, then the plans for today's focus (UX rule 1). */
 export const DueNowCard: React.FC = () => {
   const { assets, tradingHQ, setActiveTab } = useTrading();
-  const { structural, plans, loading, profileFor, requestDecompose } = useDecompositionData();
+  const { structural, plans, loading, profileFor, requestDecompose, requestReview } = useDecompositionData();
   const now = new Date().toISOString();
   const due = useMemo(() => {
     const focus = (tradingHQ.focusRotation.find((d) => d.day === weekdayInZone(new Date()))?.assets ?? [])
@@ -72,7 +75,7 @@ export const DueNowCard: React.FC = () => {
       profileFor: (id) => profileFor(id, assets.find((a) => a.id === id)?.category) });
   }, [assets, tradingHQ.focusRotation, structural, plans, profileFor]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const open = (it: DueItem) => { if (it.kind !== 'REVIEW') requestDecompose(it.deskId); setActiveTab('decomposition'); };
+  const open = (it: DueItem) => { if (it.kind === 'REVIEW' && it.planId) requestReview(it.planId); else requestDecompose(it.deskId); setActiveTab('decomposition'); };
   if (loading) return <p className="text-sm text-ink-3">Loading…</p>;
   if (!due.length) return <p className="text-sm text-ink-2">Nothing due right now.</p>;
   return (

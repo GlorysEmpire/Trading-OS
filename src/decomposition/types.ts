@@ -224,6 +224,15 @@ export interface DecompositionDefinitions {
   minRToDraw: number;
   /** How R to the draw is measured from a POI: stop at the POI's far edge, or at the layer's invalidation. */
   rStopBasis: 'POI_FAR_EDGE' | 'INVALIDATION';
+  /** "Can I trade now?" settings (M6). Optional so older saved versions still load; defaults fill in. */
+  readiness?: ReadinessSettings;
+}
+
+export interface ReadinessSettings {
+  /** Minutes before a high-impact event that count as too close to trade. */
+  eventBufferMinutes: number;
+  /** Groups of assets that move together, e.g. [['BTC','ETH']]. */
+  correlationGroups: string[][];
 }
 
 // ---- Derived results ---------------------------------------------------------
