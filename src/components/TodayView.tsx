@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowDown, ArrowUp, CalendarDays, Check, ChevronRight, ClipboardCheck, Crosshair, EyeOff, FlaskConical,
-  GripVertical, LayoutGrid, Plus, ShieldAlert, Sparkles, Star, Wallet, X,
+  GripVertical, Layers, LayoutGrid, Plus, ShieldAlert, Sparkles, Star, Wallet, X,
 } from 'lucide-react';
 import { useTrading } from '../context/TradingContext';
 import { getAuthHeaders } from '../lib/supabaseClient';
@@ -14,13 +14,16 @@ import { formatMoney } from '../utils/accounts';
 import { badgeDefsFor, badgeStates, badgeValues, disciplineDays, disciplineStreak, disciplineToday, planKeptStreak, winStreak, TIER_LABEL } from '../utils/discipline';
 import type { AssetDeskData } from '../types';
 import { ChartImage } from './ChartImage';
+import { DueNowCard, ReadinessCard } from './decomposition/TodayDecomposition';
 import { BadgeCoin, LiquidBar, LiquidOrb, StreakFlame, useCountUp } from './DisciplineVisuals';
 
 // ---- Layout (a view preference, kept in this browser) ----------------------
 
-type CardId = 'plan' | 'setups' | 'starred' | 'open' | 'accounts' | 'progress' | 'calendar' | 'research';
+type CardId = 'readiness' | 'due' | 'plan' | 'setups' | 'starred' | 'open' | 'accounts' | 'progress' | 'calendar' | 'research';
 
 const CARD_META: Record<CardId, { title: string; icon: React.ElementType; wide?: boolean }> = {
+  readiness: { title: 'Can I trade now?', icon: ShieldAlert },
+  due: { title: 'Due now', icon: Layers },
   plan: { title: "Today's plan", icon: ClipboardCheck },
   setups: { title: "Today's setups", icon: Crosshair },
   starred: { title: 'Starred analysis', icon: Star, wide: true },
@@ -31,7 +34,7 @@ const CARD_META: Record<CardId, { title: string; icon: React.ElementType; wide?:
   research: { title: 'Research', icon: FlaskConical },
 };
 
-const DEFAULT_ORDER: CardId[] = ['plan', 'setups', 'starred', 'open', 'accounts', 'progress', 'calendar', 'research'];
+const DEFAULT_ORDER: CardId[] = ['readiness', 'due', 'plan', 'setups', 'starred', 'open', 'accounts', 'progress', 'calendar', 'research'];
 const DEFAULT_HIDDEN: CardId[] = ['calendar', 'research'];
 const LAYOUT_KEY = 'trading_os_today_layout_v1';
 
@@ -43,7 +46,8 @@ function loadLayout(): Layout {
     if (raw) {
       const p = JSON.parse(raw) as Partial<Layout>;
       const known = (p.order ?? []).filter((id): id is CardId => id in CARD_META);
-      const order = [...known, ...DEFAULT_ORDER.filter((id) => !known.includes(id))];
+      const fresh = DEFAULT_ORDER.filter((id) => !known.includes(id));
+      const order = [...fresh.filter((id) => id === 'readiness' || id === 'due'), ...known, ...fresh.filter((id) => id !== 'readiness' && id !== 'due')];
       return { order, hidden: (p.hidden ?? []).filter((id): id is CardId => id in CARD_META) };
     }
   } catch { /* fall through */ }
@@ -178,6 +182,8 @@ export const TodayView: React.FC = () => {
 
   const cardBody = (id: CardId): React.ReactNode => {
     switch (id) {
+      case 'readiness': return <ReadinessCard />;
+      case 'due': return <DueNowCard />;
       case 'plan': return (
         <div className="space-y-4">
           <SessionTimeline sessions={tradingHQ.sessions} nowMinutes={nowMinutes} activeId={activeSession?.id} />

@@ -73,3 +73,15 @@ export function readiness(input: ReadinessInput): Readiness {
   if (verdict === 'READY') reasons.push(`Session open, ${input.maxDailyLosses - input.lossesToday} of ${input.maxDailyLosses} losses left, no correlated exposure.`);
   return { verdict, reasons };
 }
+
+/** Placeholder: minutes before a high-impact event that count as "too close". To be made editable in Trading HQ. */
+export const PLACEHOLDER_EVENT_BUFFER_MINUTES = 30;
+
+/** High-impact events still ahead (or just started) from calendar rows already resolved to instants. Pure. */
+export function highImpactAhead(events: Array<{ title: string; at?: Date; impact?: string }>, now: Date): Array<{ title: string; minutesAway: number }> {
+  return events
+    .filter((e) => e.impact === 'HIGH' && e.at)
+    .map((e) => ({ title: e.title, minutesAway: Math.round((e.at!.getTime() - now.getTime()) / 60_000) }))
+    .filter((e) => e.minutesAway >= 0)
+    .sort((a, b) => a.minutesAway - b.minutesAway);
+}
