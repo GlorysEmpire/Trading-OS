@@ -57,7 +57,7 @@ export const DeskDecompositionStack: React.FC<{ desk: AssetDeskData }> = ({ desk
                         const analysis = latestLayer(map, tf)?.data.analysis;
                         return analysis ? <details className="rounded-lg border border-line p-3" key={tf}>
                           <summary className="cursor-pointer text-sm font-medium capitalize">{tf.toLowerCase()} observations</summary>
-                          <div className="mt-2"><AnalysisSummary analysis={analysis} /></div>
+                          <div className="mt-2"><AnalysisSummary analysis={analysis} timeframe={tf} /></div>
                         </details> : null;
                       })}
                       {l.asOf && <p className="text-xs text-ink-3">Read: {(['MONTHLY', 'WEEKLY', 'DAILY'] as const).filter((tf) => l.asOf?.[tf]).map((tf) => `${tf.toLowerCase()} ${formatTradingTime(l.asOf![tf]!, { view: timeView })}`).join(' · ')}</p>}

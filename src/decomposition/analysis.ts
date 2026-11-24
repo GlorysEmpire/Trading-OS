@@ -3,6 +3,7 @@ import type { DailyLayer, DecompositionDefinitions, LayerData, LiquidityLevel, P
 
 export const ANALYSIS_TIMEFRAMES = ['MONTHLY', 'WEEKLY', 'DAILY'] as const;
 export type AnalysisTimeframe = typeof ANALYSIS_TIMEFRAMES[number];
+type AnalysisLayerData = Extract<LayerData, { timeframe: AnalysisTimeframe }>;
 export const ANALYSIS_LAYERS = [
   { id: 'S1', title: 'Swing Points', question: 'Which highs and lows did price turn from?', purpose: 'Anchor the read to observable turns before naming a trend.', guide: 'Start with two confirmed swing highs and lows, oldest first. A possible turn at the right edge is still unconfirmed.' },
   { id: 'S2', title: 'Structure', question: 'Which swing did price challenge, and where did it close?', purpose: 'Distinguish a break or change of character from a liquidity sweep.', guide: 'Mark the reference swing and the completed candle close. A wick through the level by itself does not confirm a break.' },
@@ -15,7 +16,7 @@ export const ANALYSIS_LAYERS = [
 ] as const;
 export type AnalysisLayerId = typeof ANALYSIS_LAYERS[number]['id'];
 export type Assessment = 'OBSERVED' | 'UNCERTAIN' | 'NOT_APPLICABLE';
-type LayerNotes = { observation?: string; interpretation?: string; hypothesis?: string; assessment?: Assessment };
+type LayerNotes = { observation?: string; interpretation?: string; hypothesis?: string; assessment?: Assessment; answers?: Record<string, string> };
 export type Swing = { id: string; kind: 'HIGH' | 'LOW'; price?: number; date?: string };
 export type ExternalFact = { id: string; source?: string; date?: string; fact?: string };
 export type Analysis = {
@@ -68,7 +69,7 @@ export function legEvidence(s: Analysis['S4']) {
 }
 
 /** New evidence stays on its own revision. Existing consumers read the compatible projection. */
-export function projectAnalysis(timeframe: AnalysisTimeframe, analysis: Analysis, defs: DecompositionDefinitions, previous?: LayerData): LayerData {
+export function projectAnalysis(timeframe: AnalysisTimeframe, analysis: Analysis, defs: DecompositionDefinitions, previous?: LayerData): AnalysisLayerData {
   const { S1, S2, S3, S4, S5, S6 } = analysis;
   const br = usable(S2) ? confirmedBreak(S2) : undefined;
   const trend = usable(S1) ? swingTrend(S1?.swings) : undefined;
@@ -119,4 +120,14 @@ export function analysisDatesValid(analysis: Analysis, cutoff: string) {
   return !(analysis.S1?.swings ?? []).some((s) => s.date && s.date > cutoff.slice(0, 10))
     && (analysis.S8?.facts ?? []).every((f) => f.date && f.source?.trim() && f.fact?.trim()
       && Number.isFinite(Date.parse(f.date + 'Z')) && Date.parse(f.date + 'Z') <= Date.parse(cutoff));
+}
+
+export function hasManualAnswers(analysis: Analysis | undefined) {
+  return ANALYSIS_LAYERS.some(({ id }) => Object.values(analysis?.[id]?.answers ?? {}).some((answer) => answer.trim()));
+}
+
+/** Free-text answers are kept separately from the evidence used by plan and risk gates. */
+export function projectManualAnalysis(timeframe: AnalysisTimeframe, analysis: Analysis, defs: DecompositionDefinitions, previous?: AnalysisLayerData): AnalysisLayerData {
+  const evidence = previous?.timeframe === timeframe ? previous : projectAnalysis(timeframe, {}, defs);
+  return { ...evidence, analysis };
 }

@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { ANALYSIS_LAYERS, ANALYSIS_TIMEFRAMES, analysisDatesValid, analysisGate, confirmedBreak, legEvidence, projectAnalysis, rangeEvidence, swingTrend } from './analysis';
+import { ANALYSIS_LAYERS, ANALYSIS_TIMEFRAMES, analysisDatesValid, analysisGate, confirmedBreak, hasManualAnswers, legEvidence, projectAnalysis, projectManualAnalysis, rangeEvidence, swingTrend } from './analysis';
 import { fixtureDailyBearish, fixtureDecomposition, fixturePeriodRead } from './fixtures';
 import { appendLayerVersion, isIdentified } from './logic';
 import { currentStructuralRef } from './structural';
 import { linkedPlanOptions } from './planLinks';
 import { PLACEHOLDER_DEFINITIONS } from './definitions';
 import type { PeriodPlan } from './types';
+import { formatNotebookText, notebookQuestions } from './notebookQuestions';
 
 const cutoff = '2026-11-24T12:00:00Z';
 
@@ -26,6 +27,31 @@ describe('structured analysis and execution linkage', () => {
     expect(confirmedBreak({ event: 'BOS', direction: 'BULLISH', scope: 'EXTERNAL', level: 100, close: 100 })).toBeUndefined();
     expect(confirmedBreak({ event: 'CHOCH', direction: 'BULLISH', scope: 'EXTERNAL', level: 100, close: 102 })).toMatchObject({ trend: 'BULLISH', lastBos: 100 });
     expect(analysisGate({ S2: { assessment: 'UNCERTAIN' }, S3: { assessment: 'UNCERTAIN' } }, PLACEHOLDER_DEFINITIONS)?.verdict).toBe('LEAVE_CHART');
+  });
+
+  it('preserves the approved Swing Points layout and restates it for each timeframe', () => {
+    expect(Object.keys(notebookQuestions)).toEqual(ANALYSIS_LAYERS.map(({ id }) => id));
+    expect(notebookQuestions.S1.prompts.map(({ label }) => label)).toEqual(['External', 'Internal']);
+    for (const timeframe of ['Monthly', 'Weekly', 'Daily']) {
+      expect(formatNotebookText(notebookQuestions.S1.question!.label, timeframe)).toBe(`What are the swing points on the ${timeframe}?`);
+    }
+    expect(notebookQuestions.S8.prompts.map(({ label }) => label)).toEqual([
+      'What external factors are currently relevant?',
+      'What has changed since the previous analysis?',
+      'What does the data suggest about market participation?',
+      'How does it relate to our existing narrative?',
+    ]);
+  });
+
+  it('saves partial manual answers without replacing verified evidence or inferring a new trade signal', () => {
+    const notes = { S2: { answers: { trend: 'Possibly changing', breaks: 'BOS above 120?' } } };
+    const legacy = fixtureDailyBearish();
+    expect(hasManualAnswers(notes)).toBe(true);
+    expect(hasManualAnswers({ S2: { answers: { trend: ' ' } } })).toBe(false);
+    expect(projectManualAnalysis('DAILY', notes, PLACEHOLDER_DEFINITIONS, legacy)).toEqual({ ...legacy, analysis: notes });
+    expect(projectManualAnalysis('DAILY', notes, PLACEHOLDER_DEFINITIONS)).toMatchObject({
+      analysis: notes, structure: { status: 'INCONCLUSIVE' }, dealingRange: { status: 'INCONCLUSIVE' },
+    });
   });
 
   it('calculates swings, equilibrium and direction-neutral retracement from observations', () => {

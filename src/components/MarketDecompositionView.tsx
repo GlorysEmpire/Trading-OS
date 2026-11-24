@@ -10,7 +10,7 @@ import { weekdayInZone } from '../utils/traderTime';
 import { matchDesk } from '../utils/weekly';
 import type { AssetDeskData } from '../types';
 import { PageTitle } from './PageTitle';
-import { StructuralFlow } from './decomposition/StructuralFlow';
+import { StructuralNotebook } from './decomposition/StructuralNotebook';
 import { PlanFlow } from './decomposition/PlanFlow';
 import { ReviewFlow } from './decomposition/ReviewFlow';
 import { VerdictPill } from './decomposition/SummaryCard';
@@ -93,7 +93,7 @@ export const MarketDecompositionView: React.FC = () => {
   if (route.screen === 'structure') {
     const d = desk(route.deskId);
     const resume = route.resume;
-    return d ? <StructuralFlow deskId={d.id} symbol={d.symbol} onClose={resume ? () => setRoute({ screen: 'plan', deskId: d.id, cadence: resume }) : close} /> : null;
+    return d ? <StructuralNotebook key={d.id} deskId={d.id} symbol={d.symbol} initialTimeframe={resume && CADENCE_TIMEFRAME[resume]} onClose={resume ? () => setRoute({ screen: 'plan', deskId: d.id, cadence: resume }) : close} /> : null;
   }
   if (route.screen === 'plan') {
     const d = desk(route.deskId);
