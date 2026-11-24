@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Layers } from 'lucide-react';
+import { ChevronDown, ChevronRight, FlaskConical, Layers } from 'lucide-react';
 import { useTrading } from '../context/TradingContext';
 import { useDecompositionData } from '../context/DecompositionDataContext';
 import { useDecompositionDefinitions } from '../context/DecompositionDefinitionsContext';
 import {
-  CADENCE_LABEL, accuracyRollup, candleFor, dueNow, latestLayer, summarize, type Cadence, type DueItem,
+  CADENCE_LABEL, accuracyRollup, backtestState, candleFor, dueNow, latestLayer, summarize, type Cadence, type DueItem,
 } from '../decomposition';
 import { weekdayInZone } from '../utils/traderTime';
 import { matchDesk } from '../utils/weekly';
@@ -14,17 +14,20 @@ import { StructuralFlow } from './decomposition/StructuralFlow';
 import { PlanFlow } from './decomposition/PlanFlow';
 import { ReviewFlow } from './decomposition/ReviewFlow';
 import { VerdictPill } from './decomposition/SummaryCard';
+import { BacktestFlow, OutcomeFlow, RESULT_LABEL } from './decomposition/BacktestFlow';
 
 type Route =
   | { screen: 'home' }
   | { screen: 'structure'; deskId: string }
   | { screen: 'plan'; deskId: string; cadence: Cadence }
-  | { screen: 'review'; planId: string };
+  | { screen: 'review'; planId: string }
+  | { screen: 'backtest'; deskId: string }
+  | { screen: 'outcome'; recordId: string };
 
 /** Market Decomposition: what's due, then each asset's map and plans. */
 export const MarketDecompositionView: React.FC = () => {
-  const { assets, tradingHQ } = useTrading();
-  const { structural, plans, loading, notice, mapFor, profileFor, pendingDeskId, requestDecompose } = useDecompositionData();
+  const { assets, tradingHQ, researchQuestions, backtestSamples } = useTrading();
+  const { structural, plans, loading, notice, mapFor, profileFor, pendingDeskId, requestDecompose, backtests } = useDecompositionData();
   const { current: defs, definitionsFor } = useDecompositionDefinitions();
   const [route, setRoute] = useState<Route>({ screen: 'home' });
   const [showAll, setShowAll] = useState(false);
@@ -63,6 +66,14 @@ export const MarketDecompositionView: React.FC = () => {
   if (route.screen === 'plan') {
     const d = desk(route.deskId);
     return d ? <PlanFlow deskId={d.id} symbol={d.symbol} category={d.category} cadence={route.cadence} onClose={close} onOpenStructure={() => setRoute({ screen: 'structure', deskId: d.id })} /> : null;
+  }
+  if (route.screen === 'backtest') {
+    const d = desk(route.deskId);
+    return d ? <BacktestFlow deskId={d.id} symbol={d.symbol} onClose={close} onSaved={(rec) => setRoute({ screen: 'outcome', recordId: rec.id })} /> : null;
+  }
+  if (route.screen === 'outcome') {
+    const rec = backtests.find((r) => r.id === route.recordId);
+    return rec ? <OutcomeFlow record={rec} onClose={close} /> : null;
   }
   if (route.screen === 'review') {
     const p = plans.find((x) => x.id === route.planId);
@@ -117,6 +128,37 @@ export const MarketDecompositionView: React.FC = () => {
         )}
       </section>
 
+      {backtests.length > 0 && (
+        <section className="tos-card p-5">
+          <h2 className="tos-label mb-3 inline-flex items-center gap-1.5"><FlaskConical className="h-3.5 w-3.5" /> Backtests</h2>
+          {(() => {
+            const awaiting = backtests.filter((b) => backtestState(b) !== 'DONE');
+            const done = backtests.filter((b) => backtestState(b) === 'DONE');
+            const unsampled = done.filter((b) => !backtestSamples.some((s) => s.decompositionRecordId === b.id));
+            const byRq = new Map<string, number>();
+            done.forEach((b) => byRq.set(b.researchQuestionId ?? '', (byRq.get(b.researchQuestionId ?? '') ?? 0) + 1));
+            return <div className="space-y-3">
+              {[...awaiting, ...unsampled].length > 0 && <ul className="space-y-2">
+                {[...awaiting, ...unsampled].map((b) => {
+                  const d = latestLayer(b, 'DAILY');
+                  return <li key={b.id}><button onClick={() => setRoute({ screen: 'outcome', recordId: b.id })} className="flex w-full items-center justify-between gap-2 rounded-xl bg-raised px-3 py-2 text-left text-sm ring-1 ring-inset ring-line hover:ring-accent/50">
+                    <span className="text-ink">{b.symbol}{d ? ` · read ${d.asOf.slice(0, 10)}` : ''}</span>
+                    <span className="text-xs font-semibold text-ink-2">{backtestState(b) === 'NEEDS_READ' ? 'Read missing' : backtestState(b) === 'DONE' ? 'Create sample' : 'Record outcome'} <ChevronRight className="inline h-3.5 w-3.5" /></span>
+                  </button></li>;
+                })}
+              </ul>}
+              {done.length > 0 && <div className="flex flex-wrap gap-2 text-xs text-ink-2">
+                {[...byRq].map(([id, count]) => {
+                  const q = researchQuestions.find((r) => r.id === id);
+                  return <span key={id || 'none'} className="rounded-full bg-well px-2.5 py-1 ring-1 ring-inset ring-line">{q ? q.code : 'No question'} · {count} closed</span>;
+                })}
+                <span className="rounded-full bg-well px-2.5 py-1 ring-1 ring-inset ring-line">Last: {RESULT_LABEL[done[0].outcome!.result].toLowerCase()}</span>
+              </div>}
+            </div>;
+          })()}
+        </section>
+      )}
+
       {(accuracy.byCadence.DAY || accuracy.byCadence.WEEK || accuracy.byCadence.MONTH) && (
         <section className="tos-card p-5">
           <h2 className="tos-label mb-3">Measured accuracy</h2>
@@ -155,7 +197,10 @@ export const MarketDecompositionView: React.FC = () => {
             <p className="mt-1 text-sm text-ink-2">{s ? s.sentence : map ? 'Map started; add the Daily layer.' : 'No structural map yet.'}</p>
             {map && <p className="mt-0.5 text-xs text-ink-3">Map revision {map.layers.length}{latestLayer(map, 'DAILY') ? ` · Daily read ${new Date(latestLayer(map, 'DAILY')!.asOf).toLocaleDateString()}` : ''}</p>}
           </div>
-          <button onClick={() => setRoute({ screen: 'structure', deskId: a.id })} className="rounded-xl bg-raised px-3 py-1.5 text-xs font-medium text-ink-2 ring-1 ring-inset ring-line hover:text-ink">{map ? 'Update map' : 'Build map'}</button>
+          <div className="flex gap-2">
+            <button onClick={() => setRoute({ screen: 'backtest', deskId: a.id })} className="rounded-xl bg-raised px-3 py-1.5 text-xs font-medium text-ink-3 ring-1 ring-inset ring-line hover:text-ink">Backtest</button>
+            <button onClick={() => setRoute({ screen: 'structure', deskId: a.id })} className="rounded-xl bg-raised px-3 py-1.5 text-xs font-medium text-ink-2 ring-1 ring-inset ring-line hover:text-ink">{map ? 'Update map' : 'Build map'}</button>
+          </div>
         </div>
         {map && latestLayer(map, 'DAILY') && (
           <div className="mt-3 flex flex-wrap gap-2">

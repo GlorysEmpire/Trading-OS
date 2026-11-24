@@ -13,3 +13,4 @@ export * from './plans';
 export * from './feeds';
 export * from './due';
 export * from './desk';
+export * from './backtest';

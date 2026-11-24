@@ -169,6 +169,12 @@ export interface BacktestOutcome {
   result: 'REACHED_TARGET' | 'HIT_INVALIDATION' | 'NEITHER';
   /** Which POI (if any) price reacted from. */
   reactedPoiId?: string;
+  /** How deep the retracement actually went. */
+  depthReached?: Depth;
+  /** Daily candles from the locked read to the outcome. */
+  candlesToOutcome?: number;
+  /** The Daily layer version the outcome is judged against (the locked prediction). */
+  predictionLayerId?: string;
   notes?: string;
 }
 

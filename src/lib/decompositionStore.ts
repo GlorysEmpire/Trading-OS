@@ -187,3 +187,13 @@ export async function insertReview(supabase: SupabaseClient, userId: string, pla
 }
 
 export const newPlanId = newId;
+
+// ---- Backtests (M5) ------------------------------------------------------------------
+
+/** Records a backtest's outcome once (database function; refuses a second time or without a Daily read). */
+export async function recordBacktestOutcome(supabase: SupabaseClient, recordId: string, outcome: Omit<NonNullable<StructuralRecord['outcome']>, 'recordedAt'>): Promise<NonNullable<StructuralRecord['outcome']>> {
+  const { data, error } = await supabase.rpc('trading_os_record_backtest_outcome', { p_record_id: recordId, p_outcome: outcome });
+  if (error?.code === '42883' || error?.code === 'PGRST202') throw new Error('Backtest outcomes need a one-time database update before they can be saved.');
+  if (error) fail(error);
+  return data as NonNullable<StructuralRecord['outcome']>;
+}

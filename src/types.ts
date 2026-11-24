@@ -378,6 +378,8 @@ export interface BacktestSample {
   outcomeScreenshot?: string;
   screenshots?: Array<{ id: string; url: string; title: string }>;
   notes: string;
+  /** Set when the sample was created from a backtest decomposition (M5). */
+  decompositionRecordId?: string;
 }
 
 export interface PsychologyEntry {

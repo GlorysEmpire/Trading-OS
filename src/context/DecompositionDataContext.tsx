@@ -1,9 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import {
-  createStructuralRecord, insertPeriodPlan, insertReview, loadPeriodPlans, loadStructuralRecords, saveStructuralUpdate,
+  createStructuralRecord, insertPeriodPlan, insertReview, loadPeriodPlans, loadStructuralRecords, recordBacktestOutcome, saveStructuralUpdate,
 } from '../lib/decompositionStore';
-import { FEED_PRESETS, type FeedProfile, type LayerData, type PeriodPlan, type PeriodReview, type StructuralRecord } from '../decomposition';
+import { FEED_PRESETS, closeBacktest, type BacktestOutcome, type FeedProfile, type LayerData, type PeriodPlan, type PeriodReview, type StructuralRecord } from '../decomposition';
 import type { AssetCategory } from '../types';
 
 /**
@@ -26,6 +26,12 @@ interface Value {
   /** The chart feed used for a desk's candles (remembered per desk in this browser). */
   profileFor: (deskId: string, category?: AssetCategory) => FeedProfile;
   setProfile: (deskId: string, profile: FeedProfile) => void;
+  /** BACKTEST records (newest first). */
+  backtests: StructuralRecord[];
+  /** Starts a new replay read: a new BACKTEST record whose saved layers are locked predictions. */
+  saveBacktest: (input: { deskId: string; symbol: string; researchQuestionId?: string; layers: Array<{ asOf: string; data: LayerData }>; definitionsVersion: string }) => Promise<StructuralRecord>;
+  /** Records the outcome once (checked here and by the database). */
+  closeBacktestRecord: (rec: StructuralRecord, outcome: Omit<BacktestOutcome, 'recordedAt' | 'predictionLayerId'>) => Promise<StructuralRecord>;
   /** Asset Desk "Decompose" button: the desk to open next time the Decompose page shows. */
   pendingDeskId?: string;
   requestDecompose: (deskId: string | undefined) => void;
@@ -75,6 +81,23 @@ export const DecompositionDataProvider: React.FC<{ userId: string; children: Rea
     return saved;
   }, [mapFor, userId]);
 
+  const backtests = useMemo(() => structural.filter((r) => r.mode === 'BACKTEST').sort((a, b) => b.createdAt.localeCompare(a.createdAt)), [structural]);
+
+  const saveBacktest: Value['saveBacktest'] = useCallback(async ({ deskId, symbol, researchQuestionId, layers, definitionsVersion }) => {
+    const rec = await createStructuralRecord(supabase, userId, { deskId, symbol, mode: 'BACKTEST', researchQuestionId });
+    const saved = await saveStructuralUpdate(supabase, userId, rec, layers, definitionsVersion);
+    setStructural((all) => [...all.filter((r) => r.id !== saved.id), saved]);
+    return saved;
+  }, [userId]);
+
+  const closeBacktestRecord: Value['closeBacktestRecord'] = useCallback(async (rec, outcome) => {
+    const checked = closeBacktest(rec, { ...outcome, recordedAt: new Date().toISOString() }); // contract rules first
+    const stored = await recordBacktestOutcome(supabase, rec.id, { ...outcome, predictionLayerId: checked.outcome!.predictionLayerId });
+    const saved = { ...rec, outcome: stored };
+    setStructural((all) => all.map((r) => (r.id === saved.id ? saved : r)));
+    return saved;
+  }, []);
+
   const savePlan = useCallback(async (plan: PeriodPlan) => {
     const saved = await insertPeriodPlan(supabase, userId, plan);
     setPlans((all) => [saved, ...all]);
@@ -101,8 +124,8 @@ export const DecompositionDataProvider: React.FC<{ userId: string; children: Rea
     });
   }, []);
 
-  const value = useMemo(() => ({ structural, plans, loading, notice, reload, mapFor, saveStructure, savePlan, saveReview, profileFor, setProfile, pendingDeskId, requestDecompose }),
-    [structural, plans, loading, notice, reload, mapFor, saveStructure, savePlan, saveReview, profileFor, setProfile, pendingDeskId]);
+  const value = useMemo(() => ({ structural, plans, loading, notice, reload, mapFor, saveStructure, savePlan, saveReview, profileFor, setProfile, pendingDeskId, requestDecompose, backtests, saveBacktest, closeBacktestRecord }),
+    [structural, plans, loading, notice, reload, mapFor, saveStructure, savePlan, saveReview, profileFor, setProfile, pendingDeskId, backtests, saveBacktest, closeBacktestRecord]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 };
 

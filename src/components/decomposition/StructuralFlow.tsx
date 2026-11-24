@@ -57,10 +57,13 @@ function clean<T extends Record<string, AnyStep | undefined>>(draft: T): T {
   return Object.fromEntries(Object.entries(draft).filter(([, s]) => s).map(([k, s]) => [k, s!.status === 'IDENTIFIED' ? s : { status: s!.status, ...(s!.note ? { note: s!.note } : {}) }])) as T;
 }
 
-export const StructuralFlow: React.FC<{ deskId: string; symbol: string; onClose: () => void }> = ({ deskId, symbol, onClose }) => {
-  const { mapFor, saveStructure, notice } = useDecompositionData();
+/** In backtest mode the read starts blank (no present-day map), uses the replay time, and saving locks it as the prediction. */
+export interface BacktestSetup { asOf: string; researchQuestionId?: string; onSaved: (rec: StructuralRecord) => void }
+
+export const StructuralFlow: React.FC<{ deskId: string; symbol: string; onClose: () => void; backtest?: BacktestSetup }> = ({ deskId, symbol, onClose, backtest }) => {
+  const { mapFor, saveStructure, saveBacktest, notice } = useDecompositionData();
   const { current: defs, definitionsFor } = useDecompositionDefinitions();
-  const existing = mapFor(deskId);
+  const existing = backtest ? undefined : mapFor(deskId);
   const [drafts, setDrafts] = useState<Drafts>(() => initialDrafts(existing));
   const [skipMonthly, setSkipMonthly] = useState(false);
   const [i, setI] = useState(0);
@@ -83,7 +86,7 @@ export const StructuralFlow: React.FC<{ deskId: string; symbol: string; onClose:
 
   // ---- Preview of what would be saved ---------------------------------------
   const layersToSave = (): Array<{ asOf: string; data: LayerData }> => {
-    const now = new Date().toISOString();
+    const now = backtest?.asOf ?? new Date().toISOString();
     const out: Array<{ asOf: string; data: LayerData }> = [];
     for (const t of TFS) {
       if (t === 'MONTHLY' && skipMonthly) continue;
@@ -95,7 +98,7 @@ export const StructuralFlow: React.FC<{ deskId: string; symbol: string; onClose:
   };
   const preview = useMemo(() => {
     if (phase !== 'summary' && phase !== 'gate') return undefined;
-    const base: StructuralRecord = existing ?? { id: 'preview', deskId, symbol, mode: 'LIVE', createdAt: new Date().toISOString(), layers: [] };
+    const base: StructuralRecord = existing ?? { id: 'preview', deskId, symbol, mode: backtest ? 'BACKTEST' : 'LIVE', createdAt: new Date().toISOString(), layers: [] };
     try {
       const rec = updateStructure(base, layersToSave().map((l, k) => ({ id: `preview-${k}`, ...l })), { createdAt: new Date().toISOString(), definitionsVersion: defs.version });
       return { rec, changed: true };
@@ -107,8 +110,13 @@ export const StructuralFlow: React.FC<{ deskId: string; symbol: string; onClose:
   const save = async () => {
     setSaving(true); setMessage(undefined);
     try {
-      await saveStructure({ deskId, symbol, layers: layersToSave(), definitionsVersion: defs.version });
-      onClose();
+      if (backtest) {
+        const rec = await saveBacktest({ deskId, symbol, researchQuestionId: backtest.researchQuestionId, layers: layersToSave(), definitionsVersion: defs.version });
+        backtest.onSaved(rec);
+      } else {
+        await saveStructure({ deskId, symbol, layers: layersToSave(), definitionsVersion: defs.version });
+        onClose();
+      }
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'Could not save.');
     } finally {
@@ -116,7 +124,7 @@ export const StructuralFlow: React.FC<{ deskId: string; symbol: string; onClose:
     }
   };
 
-  const title = `${symbol} · Structural map`;
+  const title = backtest ? `${symbol} · Backtest read · ${backtest.asOf.slice(0, 10)}` : `${symbol} · Structural map`;
 
   if (phase === 'gate') {
     return (
@@ -130,10 +138,11 @@ export const StructuralFlow: React.FC<{ deskId: string; symbol: string; onClose:
   if (phase === 'summary' && preview) {
     const s = summarize(preview.rec, definitionsFor, defs);
     return (
-      <StepFrame title={title} stepLabel="Summary" progress={1} question={preview.changed ? 'Save the structural map?' : 'Nothing changed.'}
-        why={preview.changed ? 'Only the timeframes you changed become new versions; older versions are kept.' : 'The existing map stays in use. No new version is saved.'}
+      <StepFrame title={title} stepLabel="Summary" progress={1}
+        question={backtest ? 'Lock these predictions?' : preview.changed ? 'Save the structural map?' : 'Nothing changed.'}
+        why={backtest ? 'Once locked, this read cannot change. Step the replay forward only after locking, then record what price did.' : preview.changed ? 'Only the timeframes you changed become new versions; older versions are kept.' : 'The existing map stays in use. No new version is saved.'}
         onClose={onClose} onBack={() => { setPhase('steps'); setI(steps.length - 1); }}
-        onNext={preview.changed ? save : onClose} nextLabel={preview.changed ? (saving ? 'Saving…' : 'Save new version') : 'Done'} nextDisabled={saving || !!notice && preview.changed}>
+        onNext={preview.changed ? save : onClose} nextLabel={preview.changed ? (saving ? 'Saving…' : backtest ? 'Lock predictions' : 'Save new version') : 'Done'} nextDisabled={saving || !!notice && preview.changed}>
         <SummaryCard summary={s} />
         {notice && preview.changed && <GateNote title="Can't save yet">{notice}</GateNote>}
         {message && <GateNote title="Not saved">{message}</GateNote>}
