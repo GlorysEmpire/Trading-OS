@@ -1,0 +1,111 @@
+import React, { useMemo, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
+import { useTrading } from '../../context/TradingContext';
+import { useDecompositionData } from '../../context/DecompositionDataContext';
+import { useDecompositionDefinitions } from '../../context/DecompositionDefinitionsContext';
+import { deskStack, latestLayer, periodStepsFor, summarize, type StackLine } from '../../decomposition';
+import type { AssetDeskData } from '../../types';
+import { formatTradingTime } from '../../utils/timeDisplay';
+import { SummaryCard, VerdictPill } from './SummaryCard';
+import { fmtPrice } from './ui';
+
+/** Asset Desk: structure → month → week → today, one line each; tap a line for the full record (UX rule 7). */
+export const DeskDecompositionStack: React.FC<{ desk: AssetDeskData }> = ({ desk }) => {
+  const { setActiveTab, timeView } = useTrading();
+  const { mapFor, plans, profileFor, requestDecompose, notice } = useDecompositionData();
+  const { current, definitionsFor } = useDecompositionDefinitions();
+  const [open, setOpen] = useState<string>();
+  const map = mapFor(desk.id);
+  const lines = useMemo(() => deskStack({ deskId: desk.id, symbol: desk.symbol, map, plans, now: new Date().toISOString(), profile: profileFor(desk.id, desk.category), definitionsFor, current }),
+    [desk.id, desk.symbol, desk.category, map, plans, profileFor, definitionsFor, current]);
+  const decompose = () => { requestDecompose(desk.id); setActiveTab('decomposition'); };
+
+  return (
+    <section className="tos-card overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-4 pb-2">
+        <div>
+          <p className="tos-label">From your decomposition</p>
+          <h3 className="text-base font-semibold text-ink">Structure and plans</h3>
+        </div>
+      </div>
+      {notice && <p className="px-4 pb-2 text-xs text-ink-3">{notice}</p>}
+      <ul className="divide-y divide-line">
+        {lines.map((l) => {
+          const key = l.planId ?? l.key;
+          const expanded = open === key && !l.missing;
+          return (
+            <li key={key}>
+              <button onClick={() => (l.missing ? decompose() : setOpen(expanded ? undefined : key))} className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-raised">
+                <span className="w-28 shrink-0">
+                  <span className="block text-sm font-semibold text-ink">{l.title}</span>
+                  {l.when && <span className="block text-[11px] text-ink-3">{l.when}</span>}
+                </span>
+                <span className="min-w-0 flex-1 text-sm">{l.missing ? <span className="text-ink-3">{l.missing} · <span className="text-accent">Decompose</span></span> : <LineSummary l={l} />}</span>
+                {!l.missing && <ChevronDown className={`mt-0.5 h-4 w-4 shrink-0 text-ink-3 transition ${expanded ? 'rotate-180' : ''}`} />}
+              </button>
+              {expanded && (
+                <div className="px-4 pb-4">
+                  {l.key === 'STRUCTURE' && map ? (
+                    <div className="space-y-3">
+                      <SummaryCard summary={summarize(map, definitionsFor, current)} />
+                      {l.asOf && <p className="text-xs text-ink-3">Read: {(['MONTHLY', 'WEEKLY', 'DAILY'] as const).filter((tf) => l.asOf?.[tf]).map((tf) => `${tf.toLowerCase()} ${formatTradingTime(l.asOf![tf]!, { view: timeView })}`).join(' · ')}</p>}
+                    </div>
+                  ) : <PlanDetail planId={l.planId!} />}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {map && latestLayer(map, 'DAILY') === undefined && <p className="px-4 pb-3 text-xs text-ink-3">The map has no Daily layer yet.</p>}
+    </section>
+  );
+};
+
+const LineSummary: React.FC<{ l: StackLine }> = ({ l }) => {
+  const bits: string[] = [];
+  if (l.draw !== undefined) bits.push(`draw ${fmtPrice(l.draw)}`);
+  if (l.poiA) bits.push(`A ${fmtPrice(l.poiA.low)}–${fmtPrice(l.poiA.high)}`);
+  if (l.poiB) bits.push(`B ${fmtPrice(l.poiB.low)}–${fmtPrice(l.poiB.high)}`);
+  if (l.invalidation !== undefined) bits.push(`invalid ${fmtPrice(l.invalidation)}`);
+  return (
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      {l.bias && <span className={`font-semibold ${l.bias === 'BEARISH' ? 'text-rose-300' : l.bias === 'BULLISH' ? 'text-emerald-300' : 'text-ink-2'}`}>{l.bias.toLowerCase()}</span>}
+      <span className="text-ink-2 tabular-nums">{bits.join(' · ') || 'No levels yet'}</span>
+      {l.verdict && <VerdictPill verdict={l.verdict} />}
+    </span>
+  );
+};
+
+/** The full plan, answers in process order (read-only here). */
+const PlanDetail: React.FC<{ planId: string }> = ({ planId }) => {
+  const { plans } = useDecompositionData();
+  const plan = plans.find((p) => p.id === planId);
+  if (!plan) return null;
+  const r = plan.read as Record<string, { status: string; value?: unknown } | undefined>;
+  const show = (key: string, v: unknown): string => {
+    if (v === undefined || v === null) return '';
+    if (typeof v === 'string') return v;
+    if (key === 'formation') { const f = v as { primary?: { low: number; high: number }; backup?: { low: number; high: number }; depth?: string }; return [f.primary && `A ${fmtPrice(f.primary.low)}–${fmtPrice(f.primary.high)}`, f.backup && `B ${fmtPrice(f.backup.low)}–${fmtPrice(f.backup.high)}`, f.depth?.toLowerCase()].filter(Boolean).join(' · '); }
+    if (key === 'draw') { const d = v as { target: number; kind: string }; return `${fmtPrice(d.target)} (${d.kind.toLowerCase()})`; }
+    if (key === 'invalidation') return (v as { rule: string }).rule;
+    if (key === 'liquidity') { const l = v as { levels: Array<{ price: number; swept: boolean }> }; return `${l.levels.length} levels, ${l.levels.filter((x) => x.swept).length} swept`; }
+    if (key === 'entryModels') return `${(v as unknown[]).length} model${(v as unknown[]).length === 1 ? '' : 's'}`;
+    if (typeof v === 'object') return Object.values(v as Record<string, unknown>).filter((x) => typeof x === 'string' || typeof x === 'number').map((x) => String(x).toLowerCase()).join(' · ');
+    return String(v);
+  };
+  return (
+    <dl className="space-y-1.5 text-sm">
+      {periodStepsFor(plan.cadence).map((s) => {
+        const step = r[s.key];
+        return (
+          <div key={s.key} className="flex gap-3">
+            <dt className="w-8 shrink-0 text-xs text-ink-3">{s.code}</dt>
+            <dd className="text-ink-2">{!step ? <span className="text-ink-3">—</span> : step.status !== 'IDENTIFIED' ? <span className="text-ink-3">{step.status.toLowerCase().replace('_', ' ')}</span> : show(s.key, step.value)}</dd>
+          </div>
+        );
+      })}
+      {plan.review && <div className="mt-2 rounded-xl bg-raised p-2.5 text-xs text-ink-2 ring-1 ring-inset ring-line">Reviewed: prediction {plan.review.prediction.toLowerCase()}, process {plan.review.process.toLowerCase()} · {plan.review.lesson}</div>}
+    </dl>
+  );
+};

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Layers } from 'lucide-react';
 import { useTrading } from '../context/TradingContext';
 import { useDecompositionData } from '../context/DecompositionDataContext';
@@ -24,7 +24,7 @@ type Route =
 /** Market Decomposition: what's due, then each asset's map and plans. */
 export const MarketDecompositionView: React.FC = () => {
   const { assets, tradingHQ } = useTrading();
-  const { structural, plans, loading, notice, mapFor, profileFor } = useDecompositionData();
+  const { structural, plans, loading, notice, mapFor, profileFor, pendingDeskId, requestDecompose } = useDecompositionData();
   const { current: defs, definitionsFor } = useDecompositionDefinitions();
   const [route, setRoute] = useState<Route>({ screen: 'home' });
   const [showAll, setShowAll] = useState(false);
@@ -40,6 +40,21 @@ export const MarketDecompositionView: React.FC = () => {
 
   const desk = (id: string) => assets.find((a) => a.id === id);
   const close = () => setRoute({ screen: 'home' });
+
+  // Asset Desk → "Decompose": open the next step for that desk (map first, then the first plan missing for the current candles).
+  useEffect(() => {
+    if (!pendingDeskId || loading) return;
+    const d = desk(pendingDeskId);
+    requestDecompose(undefined);
+    if (!d) return;
+    const map = mapFor(d.id);
+    if (!map || !latestLayer(map, 'DAILY')) { setRoute({ screen: 'structure', deskId: d.id }); return; }
+    const missing = (['MONTH', 'WEEK', 'DAY'] as Cadence[]).find((c) => {
+      const candle = candleFor(c, new Date().toISOString(), profile(d.id), d.symbol);
+      return !plans.some((x) => x.deskId === d.id && x.cadence === c && x.mode === 'LIVE' && x.candle.feed === candle.feed && Date.parse(x.candle.openTime) === Date.parse(candle.openTime));
+    });
+    setRoute(missing ? { screen: 'plan', deskId: d.id, cadence: missing } : { screen: 'structure', deskId: d.id });
+  }, [pendingDeskId, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (route.screen === 'structure') {
     const d = desk(route.deskId);

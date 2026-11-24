@@ -113,3 +113,12 @@ describe('kindOptions', () => {
     expect(opts.filter((o) => o === 'Equal highs')).toHaveLength(1);
   });
 });
+
+describe('map levels on the ladder (M4)', () => {
+  it('adds read-only map rows and labels desk-typed rows as legacy notes', async () => {
+    const { buildLadder } = await import('./levelsLadder');
+    const desk = { liquidityZones: [{ id: 'z', level: '95', type: 'EQL', status: 'UNTOUCHED', notes: 'Old' }], activePOIs: [], externalLevels: [] } as never;
+    const ladder = buildLadder(desk, new Date('2026-11-24T00:00:00Z'), { legacy: true, mapLevels: [{ id: 'D-poi-a', name: 'POI A', kind: 'POI · FVG', low: 112, high: 114, source: 'Map · Daily' }] });
+    expect(ladder.rows.map((r) => [r.origin, r.priceText, r.source])).toEqual([['map', '112-114', 'Map · Daily'], ['liquidity', '95', 'Legacy note']]);
+  });
+});

@@ -50,6 +50,8 @@ export interface Scenario {
   thesis: string;
   confirmationConditions: string[];
   invalidationConditions: string[];
+  /** POIs from the structural map this scenario trades from (links, not retyped prices). */
+  poiIds?: string[];
 }
 
 export interface AssetChartScreenshot {

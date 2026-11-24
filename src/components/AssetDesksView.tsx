@@ -26,6 +26,10 @@ import { LevelsLadder } from './LevelsLadder';
 import { DeskAnalysisLifecycle } from './DeskAnalysisLifecycle';
 import { DeskAnalysisFinishDialog } from './DeskAnalysisFinishDialog';
 import type { DeskAnalysisScope } from '../lib/deskAnalysisHistoryStore';
+import { DeskDecompositionStack } from './decomposition/DeskDecompositionStack';
+import { useDecompositionData } from '../context/DecompositionDataContext';
+import { mapLevels, mapPois, resolvePoi } from '../decomposition';
+import { fmtPrice } from './decomposition/ui';
 
 const PLACEMENT_LABEL: Record<DeskChartPlacement, string> = {
   narrative: 'Narrative',
@@ -38,7 +42,8 @@ const PLACEMENT_LABEL: Record<DeskChartPlacement, string> = {
 const inputClass = 'bg-raised border border-slate-700 rounded px-2.5 py-1.5 text-slate-200 outline-none focus:border-cyan-500 font-sans';
 
 export const AssetDesksView: React.FC = () => {
-  const { assets, selectedAssetId, setSelectedAssetId, updateAssetDesk, createInstrument, updateInstrument, archiveInstrument, desksLoading, desksError, pendingSetups, deskTabRequest, setDeskTabRequest, calendarEvents } = useTrading();
+  const { assets, selectedAssetId, setSelectedAssetId, updateAssetDesk, createInstrument, updateInstrument, archiveInstrument, desksLoading, desksError, pendingSetups, deskTabRequest, setDeskTabRequest, calendarEvents, setActiveTab } = useTrading();
+  const { mapFor, requestDecompose } = useDecompositionData();
 
   const currentDesk = assets.find(a => a.id === selectedAssetId) || assets[0];
   const pendingCount = currentDesk ? pendingSetups.filter((p) => p.deskId === currentDesk.id && p.status === 'PENDING').length : 0;
@@ -70,6 +75,7 @@ export const AssetDesksView: React.FC = () => {
   const [scenarioThesis, setScenarioThesis] = useState('');
   const [scenarioConfirm, setScenarioConfirm] = useState('');
   const [scenarioInvalidate, setScenarioInvalidate] = useState('');
+  const [scenarioPoiIds, setScenarioPoiIds] = useState<string[]>([]);
 
   // Chart/screenshot attachments
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -183,8 +189,9 @@ export const AssetDesksView: React.FC = () => {
     });
   };
   /** Charts shown next to a block of text, with their own upload area. */
-  const renderPlacedCharts = (placement: DeskChartPlacement) => {
+  const renderPlacedCharts = (placement: DeskChartPlacement, readOnly = false) => {
     const list = chartsAt(placement);
+    if (readOnly) return list.length ? <div className="pt-1"><ImageThumbGrid images={list.map((c) => c.url)} onView={(i) => openLightbox(list, i)} /></div> : null;
     return (
       <div className="space-y-1.5 pt-1">
         <ImageThumbGrid
@@ -214,11 +221,13 @@ export const AssetDesksView: React.FC = () => {
       thesis: scenarioThesis.trim(),
       confirmationConditions: scenarioConfirm.split('\n').map(s => s.trim()).filter(Boolean),
       invalidationConditions: scenarioInvalidate.split('\n').map(s => s.trim()).filter(Boolean),
+      ...(scenarioPoiIds.length ? { poiIds: scenarioPoiIds } : {}),
     };
     updateAssetDesk(currentDesk.id, { scenarios: [...currentDesk.scenarios, newScenario] });
     setScenarioThesis('');
     setScenarioConfirm('');
     setScenarioInvalidate('');
+    setScenarioPoiIds([]);
     setShowAddScenario(false);
   };
   const deleteScenario = (id: string) => updateAssetDesk(currentDesk.id, { scenarios: currentDesk.scenarios.filter(s => s.id !== id) });
@@ -321,6 +330,7 @@ export const AssetDesksView: React.FC = () => {
             <option value="RE-ACCUMULATION">Re-accumulation</option>
             <option value="NEUTRAL">NEUTRAL (Range Bound)</option>
           </select>
+          <button onClick={() => { requestDecompose(currentDesk.id); setActiveTab('decomposition'); }} className="tos-cta inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold"><Layers className="w-3.5 h-3.5" /> Decompose</button>
           <details className="relative">
             <summary className="list-none cursor-pointer rounded-lg border border-line px-3 py-1.5 text-xs text-ink-3 hover:bg-raised hover:text-ink">Market options</summary>
             <div className="absolute right-0 top-full mt-2 z-20 w-44 rounded-xl border border-line bg-panel p-1.5 shadow-xl">
@@ -356,7 +366,7 @@ export const AssetDesksView: React.FC = () => {
           onChange={event => setActiveSubTab(event.target.value as DeskTab)}
           className={`ml-auto rounded-lg border border-line bg-panel px-3 py-2 text-xs outline-none ${(['wyckoff', 'scenarios'] as DeskTab[]).includes(activeSubTab) ? 'text-cyan-300' : 'text-ink-3'}`}>
           <option value="" disabled>More analysis</option>
-          <option value="wyckoff">Wyckoff development</option>
+          {(currentDesk.wyckoffDevelopment.phase || currentDesk.wyckoffDevelopment.eventsIdentified.length > 0) && <option value="wyckoff">Legacy Wyckoff notes</option>}
           <option value="scenarios">Scenarios</option>
         </select>
       </div>
@@ -364,6 +374,7 @@ export const AssetDesksView: React.FC = () => {
       {/* 1. Overview */}
       {activeSubTab === 'overview' && (
         <div className="space-y-4">
+          <DeskDecompositionStack desk={currentDesk} />
           <MarketContextStrip
             desk={currentDesk}
             calendarEvents={calendarEvents}
@@ -405,37 +416,23 @@ export const AssetDesksView: React.FC = () => {
             {renderPlacedCharts('narrative')}
           </div>
 
-          <div className="bg-panel border border-slate-800 rounded-xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-xs font-bold text-slate-200 uppercase flex items-center gap-2">
-                <Layers className="w-4 h-4 text-purple-400" />
-                High timeframe (HTF) market structure
-              </span>
-              {editingHTF ? (
-                <button onClick={saveHTF} className="text-xs font-mono text-cyan-400 hover:text-cyan-300 font-bold">Save HTF Structure</button>
-              ) : (
-                <button onClick={startEditHTF} className="text-xs font-mono text-slate-400 hover:text-slate-200 flex items-center gap-1">
-                  <Edit3 className="w-3 h-3" /> Edit
-                </button>
-              )}
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-              {(['monthly', 'weekly', 'daily', 'h4'] as const).map(tf => (
-                <div key={tf} className="p-3 rounded bg-raised border border-slate-800 space-y-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">{tf === 'h4' ? '4-hour (H4)' : tf} TIMEFRAME:</span>
-                    {!editingHTF && <button onClick={() => setFinishScope(tf)} className="text-[10px] text-ink-3 hover:text-cyan-300">Finish</button>}
+          {((['monthly', 'weekly', 'daily', 'h4'] as const).some(tf => currentDesk.htfStructure[tf]?.trim() || (currentDesk.charts || []).some(c => c.placement === tf))) && (
+            <details className="bg-panel border border-slate-800 rounded-xl p-4">
+              <summary className="cursor-pointer list-none flex items-center justify-between gap-2">
+                <span className="text-sm font-semibold text-ink-2">Legacy structure notes <span className="text-xs font-normal text-ink-3">· read-only, kept from before decomposition</span></span>
+                <span className="text-xs text-ink-3">Show</span>
+              </summary>
+              <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                {(['monthly', 'weekly', 'daily', 'h4'] as const).filter(tf => currentDesk.htfStructure[tf]?.trim() || (currentDesk.charts || []).some(c => c.placement === tf)).map(tf => (
+                  <div key={tf} className="p-3 rounded bg-raised border border-slate-800 space-y-1">
+                    <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">{tf === 'h4' ? '4-hour (H4)' : tf}</span>
+                    <p className="text-slate-200 font-sans whitespace-pre-line">{currentDesk.htfStructure[tf] || <span className="text-slate-500">No text.</span>}</p>
+                    {renderPlacedCharts(tf, true)}
                   </div>
-                  {editingHTF ? (
-                    <textarea rows={2} value={htfDraft[tf]} onChange={e => setHtfDraft({ ...htfDraft, [tf]: e.target.value })} className="w-full bg-well border border-slate-700 rounded p-2 text-slate-100 font-sans text-xs outline-none focus:border-cyan-500" />
-                  ) : (
-                    <p className="text-slate-200 font-sans">{currentDesk.htfStructure[tf] || <span className="text-slate-500">Not filled in yet.</span>}</p>
-                  )}
-                  {renderPlacedCharts(tf)}
-                </div>
-              ))}
-            </div>
-          </div>
+                ))}
+              </div>
+            </details>
+          )}
         </div>
       )}
 
@@ -443,56 +440,23 @@ export const AssetDesksView: React.FC = () => {
 
       {/* 2. Levels ladder (liquidity, POIs and outside levels) */}
       {activeSubTab === 'levels' && (
-        <LevelsLadder desk={currentDesk} allDesks={assets} onUpdate={(patch) => updateAssetDesk(currentDesk.id, patch)} />
+        <LevelsLadder desk={currentDesk} allDesks={assets} onUpdate={(patch) => updateAssetDesk(currentDesk.id, patch)} mapLevels={mapLevels(mapFor(currentDesk.id))} legacyReadOnly />
       )}
 
-      {/* 3. Wyckoff Development */}
+      {/* 3. Wyckoff Development — legacy, read-only (Wyckoff will come from the 4H layer once it is built) */}
       {activeSubTab === 'wyckoff' && (
         <div className="bg-panel border border-slate-800 rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-            <span className="font-mono text-xs font-bold text-slate-200 uppercase flex items-center gap-2">
-              <Activity className="w-4 h-4 text-emerald-400" />
-              Wyckoff schematic development & event tracker
-            </span>
-            {editingWyckoff ? (
-              <button onClick={saveWyckoff} className="text-xs font-mono text-cyan-400 hover:text-cyan-300 font-bold">Save</button>
-            ) : (
-              <button onClick={startEditWyckoff} className="text-xs font-mono text-slate-400 hover:text-slate-200 flex items-center gap-1">
-                <Edit3 className="w-3 h-3" /> Edit
-              </button>
-            )}
+            <span className="text-sm font-semibold text-ink-2 flex items-center gap-2"><Activity className="w-4 h-4 text-emerald-400" /> Legacy Wyckoff notes</span>
+            <span className="text-xs text-ink-3">Read-only, kept from before decomposition</span>
           </div>
-
-          {editingWyckoff ? (
-            <input value={wyckoffPhaseDraft} onChange={e => setWyckoffPhaseDraft(e.target.value)} placeholder="Current phase (e.g. Phase B)" className={`${inputClass} w-full`} />
-          ) : (
-            <span className="text-xs font-mono text-emerald-400 font-semibold">Current Phase: {currentDesk.wyckoffDevelopment.phase || 'Not set'}</span>
-          )}
-
-          <div className="p-3 bg-raised border-l-4 border-cyan-500 rounded-r text-xs font-sans text-slate-300">
-            <strong className="text-cyan-300 font-mono text-[11px] uppercase block mb-0.5">Semantic rule: AR = automatic reaction</strong>
-            {editingWyckoff ? (
-              <textarea rows={2} value={wyckoffNotesDraft} onChange={e => setWyckoffNotesDraft(e.target.value)} className="w-full bg-well border border-slate-700 rounded p-2 text-slate-100 mt-1 outline-none focus:border-cyan-500" />
-            ) : (
-              currentDesk.wyckoffDevelopment.notes
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <span className="text-[11px] font-mono text-slate-400 uppercase">Identified events in structure:</span>
-            <div className="flex flex-wrap gap-2">
-              {currentDesk.wyckoffDevelopment.eventsIdentified.map((ev, i) => (
-                <span key={i} className="px-3 py-1 rounded bg-raised border border-slate-700 text-slate-200 text-xs font-mono flex items-center gap-1.5">
-                  ✓ {ev}
-                  <button onClick={() => removeWyckoffEvent(i)} className="text-slate-500 hover:text-rose-400">×</button>
-                </span>
-              ))}
-              {currentDesk.wyckoffDevelopment.eventsIdentified.length === 0 && <span className="text-xs font-mono text-slate-500">None recorded yet.</span>}
-            </div>
-            <div className="flex items-center gap-2 pt-1">
-              <input value={newEvent} onChange={e => setNewEvent(e.target.value)} placeholder="e.g. Selling Climax (SC) at …" className={`${inputClass} flex-1`} />
-              <button onClick={addWyckoffEvent} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 font-mono text-xs rounded border border-slate-700 transition">+ Add</button>
-            </div>
+          <span className="text-xs font-mono text-emerald-400 font-semibold">Phase: {currentDesk.wyckoffDevelopment.phase || 'Not set'}</span>
+          <p className="p-3 bg-raised border-l-4 border-cyan-500 rounded-r text-xs font-sans text-slate-300 whitespace-pre-line">{currentDesk.wyckoffDevelopment.notes}</p>
+          <div className="flex flex-wrap gap-2">
+            {currentDesk.wyckoffDevelopment.eventsIdentified.map((ev, i) => (
+              <span key={i} className="px-3 py-1 rounded bg-raised border border-slate-700 text-slate-200 text-xs font-mono">✓ {ev}</span>
+            ))}
+            {currentDesk.wyckoffDevelopment.eventsIdentified.length === 0 && <span className="text-xs font-mono text-slate-500">No events recorded.</span>}
           </div>
         </div>
       )}
@@ -518,6 +482,17 @@ export const AssetDesksView: React.FC = () => {
                 <textarea rows={2} placeholder="Thesis" value={scenarioThesis} onChange={e => setScenarioThesis(e.target.value)} className={`${inputClass} w-full`} />
                 <textarea rows={2} placeholder="Confirmation conditions (one per line)" value={scenarioConfirm} onChange={e => setScenarioConfirm(e.target.value)} className={`${inputClass} w-full`} />
                 <textarea rows={2} placeholder="Invalidation conditions (one per line)" value={scenarioInvalidate} onChange={e => setScenarioInvalidate(e.target.value)} className={`${inputClass} w-full`} />
+                {mapPois(mapFor(currentDesk.id)).length > 0 && (
+                  <div className="space-y-1.5">
+                    <span className="block text-ink-3">Trades from (tap POIs on your map)</span>
+                    <div className="flex flex-wrap gap-2">
+                      {mapPois(mapFor(currentDesk.id)).map(({ id, label, poi }) => (
+                        <button key={id} type="button" onClick={() => setScenarioPoiIds(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id])} aria-pressed={scenarioPoiIds.includes(id)}
+                          className={`rounded-lg px-2.5 py-1.5 ring-1 ring-inset ${scenarioPoiIds.includes(id) ? 'bg-accent/15 text-ink ring-accent/60' : 'bg-raised text-ink-2 ring-line'}`}>{label} {fmtPrice(poi.low)}–{fmtPrice(poi.high)}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <button type="submit" className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold rounded-lg transition">Save Scenario</button>
               </form>
             )}
@@ -537,6 +512,14 @@ export const AssetDesksView: React.FC = () => {
                     </div>
                   </div>
                   <p className="text-slate-200 font-sans font-medium">{sc.thesis}</p>
+                  {(sc.poiIds ?? []).length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {(sc.poiIds ?? []).map(id => {
+                        const hit = resolvePoi(mapFor(currentDesk.id), id);
+                        return <span key={id} className="rounded-md bg-well px-2 py-0.5 text-[11px] text-ink-2 ring-1 ring-inset ring-line" title={hit && !hit.current ? 'From an earlier version of the map' : undefined}>{hit ? `${hit.poi.side === 'SELL' ? 'Sell' : 'Buy'} ${fmtPrice(hit.poi.low)}–${fmtPrice(hit.poi.high)}${hit.current ? '' : ' (earlier map)'}` : 'POI no longer on the map'}</span>;
+                      })}
+                    </div>
+                  )}
                   <div className="space-y-1 pt-2 border-t border-slate-800/80">
                     <span className="text-[10px] font-mono text-emerald-400 uppercase font-bold">Confirmation Conditions:</span>
                     <ul className="list-disc list-inside text-slate-300 text-[11px] space-y-0.5">

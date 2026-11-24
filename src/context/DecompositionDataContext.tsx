@@ -26,6 +26,9 @@ interface Value {
   /** The chart feed used for a desk's candles (remembered per desk in this browser). */
   profileFor: (deskId: string, category?: AssetCategory) => FeedProfile;
   setProfile: (deskId: string, profile: FeedProfile) => void;
+  /** Asset Desk "Decompose" button: the desk to open next time the Decompose page shows. */
+  pendingDeskId?: string;
+  requestDecompose: (deskId: string | undefined) => void;
 }
 
 const Ctx = createContext<Value | null>(null);
@@ -41,6 +44,7 @@ export const DecompositionDataProvider: React.FC<{ userId: string; children: Rea
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<string>();
   const [profiles, setProfiles] = useState<Record<string, FeedProfile>>(readProfiles);
+  const [pendingDeskId, requestDecompose] = useState<string>();
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -97,8 +101,8 @@ export const DecompositionDataProvider: React.FC<{ userId: string; children: Rea
     });
   }, []);
 
-  const value = useMemo(() => ({ structural, plans, loading, notice, reload, mapFor, saveStructure, savePlan, saveReview, profileFor, setProfile }),
-    [structural, plans, loading, notice, reload, mapFor, saveStructure, savePlan, saveReview, profileFor, setProfile]);
+  const value = useMemo(() => ({ structural, plans, loading, notice, reload, mapFor, saveStructure, savePlan, saveReview, profileFor, setProfile, pendingDeskId, requestDecompose }),
+    [structural, plans, loading, notice, reload, mapFor, saveStructure, savePlan, saveReview, profileFor, setProfile, pendingDeskId]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 };
 

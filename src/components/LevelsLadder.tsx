@@ -2,7 +2,7 @@ import { getTimeView, viewZone, zoneLabel } from '../utils/timeDisplay';
 import React, { useMemo, useState } from 'react';
 import { GitMerge, Plus, Trash2, X } from 'lucide-react';
 import type { ActivePOI, AssetDeskData, ExternalLevel, LiquidityZone } from '../types';
-import { buildLadder, DEFAULT_BAND_PCT, kindLabel, kindOptions, parsePriceRange, type LadderRow } from '../utils/levelsLadder';
+import { buildLadder, type MapLadderLevel, DEFAULT_BAND_PCT, kindLabel, kindOptions, parsePriceRange, type LadderRow } from '../utils/levelsLadder';
 import { contextId, fieldAge, formatAsOfNY, isoToNyInput, nyInputToIso } from '../utils/marketContext';
 
 /** The zone trading times are shown and typed in right now. */
@@ -37,12 +37,16 @@ interface Props {
   desk: AssetDeskData;
   allDesks: AssetDeskData[];
   onUpdate: (patch: Partial<AssetDeskData>) => void;
+  /** Levels from the structural map (read-only here; edited through Decompose). */
+  mapLevels?: MapLadderLevel[];
+  /** Desk-typed liquidity and POIs are legacy notes: shown, not edited. Outside levels stay editable. */
+  legacyReadOnly?: boolean;
 }
 
 /** MC-2: your levels and outside levels in one price-sorted list. */
-export const LevelsLadder: React.FC<Props> = ({ desk, allDesks, onUpdate }) => {
+export const LevelsLadder: React.FC<Props> = ({ desk, allDesks, onUpdate, mapLevels, legacyReadOnly }) => {
   const now = new Date();
-  const ladder = useMemo(() => buildLadder(desk), [desk]);
+  const ladder = useMemo(() => buildLadder(desk, now, { mapLevels, legacy: legacyReadOnly }), [desk, mapLevels, legacyReadOnly]); // eslint-disable-line react-hooks/exhaustive-deps
   const [draft, setDraft] = useState<Draft | null>(null);
   const [show, setShow] = useState<'all' | 'mine' | 'external' | 'confluence'>('all');
   const [band, setBand] = useState(String(desk.confluenceBandPct ?? DEFAULT_BAND_PCT));
@@ -121,7 +125,7 @@ export const LevelsLadder: React.FC<Props> = ({ desk, allDesks, onUpdate }) => {
   const empty = ladder.rows.length === 0 && ladder.unpriced.length === 0;
 
   const renderRow = (r: LadderRow) => {
-    const editable = r.origin !== 'quick';
+    const editable = r.origin === 'external' || (!legacyReadOnly && (r.origin === 'liquidity' || r.origin === 'poi'));
     return (
       <div
         key={r.key}
@@ -132,7 +136,7 @@ export const LevelsLadder: React.FC<Props> = ({ desk, allDesks, onUpdate }) => {
           {editable ? (
             <button type="button" onClick={() => openEdit(r)} className="block max-w-full truncate text-left text-[13.5px] text-ink hover:text-sky-400" title="Edit level">{r.name}</button>
           ) : (
-            <span className="block truncate text-[13.5px] text-ink" title="Edit under Analysis">{r.name}</span>
+            <span className="block truncate text-[13.5px] text-ink" title={r.origin === 'map' ? 'From your structural map: change it in Decompose' : r.origin === 'quick' ? 'Edit under Analysis' : 'Legacy note: read-only'}>{r.name}</span>
           )}
           {r.confluence.length > 0 && (
             <span className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full border border-amber-600 bg-amber-950/40 px-2 py-0.5 text-[11.5px] font-semibold text-amber-300">
@@ -143,7 +147,7 @@ export const LevelsLadder: React.FC<Props> = ({ desk, allDesks, onUpdate }) => {
         </div>
         <span className="text-xs text-ink-2 md:col-auto col-start-2">{r.kind}</span>
         <span className="col-start-2 md:col-auto">
-          {r.origin === 'liquidity' && r.status ? (
+          {r.origin === 'liquidity' && r.status && !legacyReadOnly ? (
             <button type="button" onClick={() => cycleStatus(r)} title="Untouched → Swept → Engineered" className="rounded-full border border-sky-500 bg-raised px-2 py-0.5 text-[11.5px] font-semibold text-sky-300">
               {r.status.charAt(0) + r.status.slice(1).toLowerCase()}
             </button>
@@ -201,8 +205,8 @@ export const LevelsLadder: React.FC<Props> = ({ desk, allDesks, onUpdate }) => {
               <option value="confluence">Confluence only</option>
             </select>
           </div>
-          <button type="button" onClick={() => setDraft(blankDraft('liquidity'))} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-sky-500">
-            <Plus className="h-4 w-4" /> Add level
+          <button type="button" onClick={() => setDraft(blankDraft(legacyReadOnly ? 'external' : 'liquidity'))} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-sky-500">
+            <Plus className="h-4 w-4" /> {legacyReadOnly ? 'Add outside level' : 'Add level'}
           </button>
         </div>
       </div>
@@ -211,7 +215,7 @@ export const LevelsLadder: React.FC<Props> = ({ desk, allDesks, onUpdate }) => {
         <span>Price</span><span>Level</span><span>Kind</span><span>Whose</span><span>Source · as of</span>
       </div>
 
-      {empty && <p className="px-4 py-6 text-sm text-ink-3">No levels yet. Add your liquidity and POIs, then outside levels such as cost bases or option strikes.</p>}
+      {empty && <p className="px-4 py-6 text-sm text-ink-3">{legacyReadOnly ? 'No levels yet. Your liquidity and POIs come from your structural map (Decompose). Add outside levels here, such as cost bases or option strikes.' : 'No levels yet. Add your liquidity and POIs, then outside levels such as cost bases or option strikes.'}</p>}
       {rows.map((r, i) => (
         <React.Fragment key={r.key}>
           {priceAt === i && priceRow}
@@ -227,7 +231,7 @@ export const LevelsLadder: React.FC<Props> = ({ desk, allDesks, onUpdate }) => {
         </div>
       )}
 
-      {draft && <LevelForm draft={draft} allDesks={allDesks} onCancel={() => setDraft(null)} onSave={saveDraft} onRemove={removeDraft} />}
+      {draft && <LevelForm draft={draft} allDesks={allDesks} externalOnly={legacyReadOnly} onCancel={() => setDraft(null)} onSave={saveDraft} onRemove={removeDraft} />}
     </section>
   );
 };
@@ -238,7 +242,8 @@ const LevelForm: React.FC<{
   onCancel: () => void;
   onSave: (d: Draft) => void;
   onRemove: (d: Draft) => void;
-}> = ({ draft, allDesks, onCancel, onSave, onRemove }) => {
+  externalOnly?: boolean;
+}> = ({ draft, allDesks, onCancel, onSave, onRemove, externalOnly }) => {
   const [d, setD] = useState(draft);
   const set = (patch: Partial<Draft>) => setD((prev) => ({ ...prev, ...patch }));
   const kinds = d.whose === 'liquidity' ? kindOptions(allDesks, 'liquidity') : d.whose === 'external' ? kindOptions(allDesks, 'external') : ['Order block', 'FVG', 'Breaker block'];
@@ -258,7 +263,7 @@ const LevelForm: React.FC<{
           <button type="button" aria-label="Close" onClick={onCancel} className="rounded-lg p-1.5 text-ink-3 hover:bg-raised hover:text-ink"><X className="h-4 w-4" /></button>
         </div>
 
-        {isNew && (
+        {isNew && !externalOnly && (
           <div role="radiogroup" aria-label="Whose level" className="flex flex-wrap gap-2">
             {([['liquidity', 'My liquidity'], ['poi', 'My POI'], ['external', 'External level']] as [Whose, string][]).map(([w, label]) => (
               <button key={w} type="button" role="radio" aria-checked={d.whose === w} onClick={() => set({ whose: w, kind: '' })}

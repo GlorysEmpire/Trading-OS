@@ -34,7 +34,7 @@ export function parsePriceRange(text: string | undefined | null): PriceRange | n
   return { low: Math.min(...values), high: Math.max(...values) };
 }
 
-export type LevelOrigin = 'liquidity' | 'poi' | 'quick' | 'external';
+export type LevelOrigin = 'liquidity' | 'poi' | 'quick' | 'external' | 'map';
 
 export interface LadderRow {
   /** `${origin}:${id}` — unique across the ladder. */
@@ -105,17 +105,24 @@ export interface Ladder {
   bandPct: number;
 }
 
-export function buildLadder(desk: AssetDeskData, now: Date = new Date()): Ladder {
+/** A level from the structural map (decomposition). Shown read-only. */
+export interface MapLadderLevel { id: string; name: string; kind: string; low: number; high: number; source: string }
+
+export function buildLadder(desk: AssetDeskData, now: Date = new Date(), opts: { mapLevels?: MapLadderLevel[]; legacy?: boolean } = {}): Ladder {
   const bandPct = desk.confluenceBandPct && desk.confluenceBandPct > 0 ? desk.confluenceBandPct : DEFAULT_BAND_PCT;
   const all: LadderRow[] = [];
   const push = (row: Omit<LadderRow, 'key' | 'range' | 'confluence'>) =>
     all.push({ ...row, key: `${row.origin}:${row.id}`, range: parsePriceRange(row.priceText), confluence: [] });
 
+  const deskSource = opts.legacy ? 'Legacy note' : 'Desk';
+  for (const l of opts.mapLevels ?? []) {
+    push({ origin: 'map', id: l.id, name: l.name, kind: l.kind, mine: true, priceText: l.low === l.high ? String(l.low) : `${l.low}-${l.high}`, source: l.source, stale: false, aiDraft: false });
+  }
   for (const z of desk.liquidityZones) {
-    push({ origin: 'liquidity', id: z.id, name: z.notes || kindLabel(z.type), kind: kindLabel(z.type), mine: true, priceText: z.level, source: 'Desk', stale: false, aiDraft: false, status: z.status });
+    push({ origin: 'liquidity', id: z.id, name: z.notes || kindLabel(z.type), kind: kindLabel(z.type), mine: true, priceText: z.level, source: deskSource, stale: false, aiDraft: false, status: z.status });
   }
   for (const p of desk.activePOIs) {
-    push({ origin: 'poi', id: p.id, name: p.name, kind: p.type ? `POI · ${p.type}` : 'POI', mine: true, priceText: p.priceRange, source: p.timeframe ? `Desk · ${p.timeframe}` : 'Desk', stale: false, aiDraft: false, status: p.active ? undefined : 'Inactive' });
+    push({ origin: 'poi', id: p.id, name: p.name, kind: p.type ? `POI · ${p.type}` : 'POI', mine: true, priceText: p.priceRange, source: p.timeframe ? `${deskSource} · ${p.timeframe}` : deskSource, stale: false, aiDraft: false, status: p.active ? undefined : 'Inactive' });
   }
   const q = desk.quickLevels;
   if (q?.high24h?.trim()) push({ origin: 'quick', id: 'high24h', name: '24h high', kind: 'Range', mine: true, priceText: q.high24h, source: 'Desk', stale: false, aiDraft: false });

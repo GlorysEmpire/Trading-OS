@@ -12,3 +12,4 @@ export * from './daily';
 export * from './plans';
 export * from './feeds';
 export * from './due';
+export * from './desk';
