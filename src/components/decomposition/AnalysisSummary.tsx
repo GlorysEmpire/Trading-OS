@@ -1,12 +1,12 @@
 import { ANALYSIS_LAYERS, type Analysis, type AnalysisTimeframe } from '../../decomposition/analysis';
-import { formatNotebookText, notebookQuestions, NOTEBOOK_TIMEFRAME_LABELS } from '../../decomposition/notebookQuestions';
+import { answeredNotebookPrompts, formatNotebookText, NOTEBOOK_TIMEFRAME_LABELS } from '../../decomposition/notebookQuestions';
 import { fmtPrice } from './ui';
 
 export function AnalysisSummary({ analysis, timeframe }: { analysis: Analysis; timeframe?: AnalysisTimeframe }) {
   return <ul className="divide-y divide-line rounded-lg border border-line">
     {ANALYSIS_LAYERS.map(({ id, title }) => {
       const item = analysis[id];
-      const prompts = timeframe ? notebookQuestions[id].prompts.filter((prompt) => item?.answers?.[prompt.id]?.trim()) : [];
+      const prompts = timeframe ? answeredNotebookPrompts(id, item?.answers) : [];
       const details = id === 'S1' ? analysis.S1?.swings?.map((s) => `${s.kind.toLowerCase()} ${fmtPrice(s.price)}`).join(' · ')
         : id === 'S2' ? analysis.S2?.event
         : id === 'S3' && analysis.S3 ? `${fmtPrice(analysis.S3.low)} – ${fmtPrice(analysis.S3.high)}`

@@ -6,7 +6,7 @@ import { currentStructuralRef } from './structural';
 import { linkedPlanOptions } from './planLinks';
 import { PLACEHOLDER_DEFINITIONS } from './definitions';
 import type { PeriodPlan } from './types';
-import { formatNotebookText, notebookQuestions } from './notebookQuestions';
+import { answeredNotebookPrompts, formatNotebookText, notebookQuestions, questionsForNotebookLayer } from './notebookQuestions';
 
 const cutoff = '2026-11-24T12:00:00Z';
 
@@ -52,6 +52,15 @@ describe('structured analysis and execution linkage', () => {
     expect(projectManualAnalysis('DAILY', notes, PLACEHOLDER_DEFINITIONS)).toMatchObject({
       analysis: notes, structure: { status: 'INCONCLUSIVE' }, dealingRange: { status: 'INCONCLUSIVE' },
     });
+  });
+
+  it('gives Bitcoin five independent S8 prompts and keeps earlier answers readable', () => {
+    expect(questionsForNotebookLayer('S8', true).prompts.map(({ label }) => label))
+      .toEqual(['Spot demand', 'Derivatives', 'On-chain', 'Macro', 'Market participation']);
+    expect(questionsForNotebookLayer('S8', false)).toBe(notebookQuestions.S8);
+    expect(questionsForNotebookLayer('S7', true)).toBe(notebookQuestions.S7);
+    expect(answeredNotebookPrompts('S8', { 'btc-participation': 'Fresh capital', participation: 'Earlier participation note' }).map(({ id }) => id))
+      .toEqual(['btc-participation', 'participation']);
   });
 
   it('calculates swings, equilibrium and direction-neutral retracement from observations', () => {

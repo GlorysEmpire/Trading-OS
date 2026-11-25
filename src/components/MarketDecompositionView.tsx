@@ -93,7 +93,8 @@ export const MarketDecompositionView: React.FC = () => {
   if (route.screen === 'structure') {
     const d = desk(route.deskId);
     const resume = route.resume;
-    return d ? <StructuralNotebook key={d.id} deskId={d.id} symbol={d.symbol} initialTimeframe={resume && CADENCE_TIMEFRAME[resume]} onClose={resume ? () => setRoute({ screen: 'plan', deskId: d.id, cadence: resume }) : close} /> : null;
+    return d ? <StructuralNotebook key={d.id} deskId={d.id} symbol={d.symbol} bitcoin={!!matchDesk([d], 'BTC')}
+      initialTimeframe={resume && CADENCE_TIMEFRAME[resume]} onClose={resume ? () => setRoute({ screen: 'plan', deskId: d.id, cadence: resume }) : close} /> : null;
   }
   if (route.screen === 'plan') {
     const d = desk(route.deskId);

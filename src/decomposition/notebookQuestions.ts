@@ -78,5 +78,27 @@ export const notebookQuestions: Record<AnalysisLayerId, LayerQuestions> = {
   },
 };
 
+const bitcoinExternalData: LayerQuestions = {
+  purpose: 'Investigate these five areas independently before forming a conclusion.',
+  prompts: [
+    { id: 'spot-demand', label: 'Spot demand', purpose: 'ETF flows, Coinbase premium and spot CVD.' },
+    { id: 'derivatives', label: 'Derivatives', purpose: 'Open interest, funding and liquidations.' },
+    { id: 'on-chain', label: 'On-chain', purpose: 'Exchange flows and stablecoin liquidity.' },
+    { id: 'macro', label: 'Macro', purpose: 'Treasury yields, Fed rate expectations and upcoming economic releases.' },
+    { id: 'btc-participation', label: 'Market participation', purpose: 'Whether the rebound is attracting fresh capital or primarily driven by short covering.' },
+  ],
+};
+
+export function questionsForNotebookLayer(id: AnalysisLayerId, bitcoin: boolean) {
+  return id === 'S8' && bitcoin ? bitcoinExternalData : notebookQuestions[id];
+}
+
+export function answeredNotebookPrompts(id: AnalysisLayerId, answers: Record<string, string> | undefined) {
+  if (!answers) return [];
+  // Historical Bitcoin reads can contain answers from either S8 prompt set.
+  const prompts = id === 'S8' ? [...bitcoinExternalData.prompts, ...notebookQuestions.S8.prompts] : notebookQuestions[id].prompts;
+  return prompts.filter((prompt) => answers[prompt.id]?.trim());
+}
+
 export const formatNotebookText = (text: string, timeframe: string) => text.replaceAll('{timeframe}', timeframe);
 export const NOTEBOOK_TIMEFRAME_LABELS: Record<AnalysisTimeframe, string> = { MONTHLY: 'Monthly', WEEKLY: 'Weekly', DAILY: 'Daily' };

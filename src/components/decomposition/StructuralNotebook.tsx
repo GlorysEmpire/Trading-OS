@@ -5,7 +5,7 @@ import { useDecompositionData } from '../../context/DecompositionDataContext';
 import { useDecompositionDefinitions } from '../../context/DecompositionDefinitionsContext';
 import { ANALYSIS_LAYERS, ANALYSIS_TIMEFRAMES, hasManualAnswers, projectManualAnalysis, type Analysis, type AnalysisTimeframe } from '../../decomposition/analysis';
 import { latestLayer } from '../../decomposition/logic';
-import { formatNotebookText, notebookQuestions, NOTEBOOK_TIMEFRAME_LABELS } from '../../decomposition/notebookQuestions';
+import { formatNotebookText, questionsForNotebookLayer, NOTEBOOK_TIMEFRAME_LABELS } from '../../decomposition/notebookQuestions';
 import { structureChanged } from '../../decomposition/structural';
 import { useLocalDraft } from '../../utils/useLocalDraft';
 import { Choice } from './ui';
@@ -16,9 +16,10 @@ type NotebookDraft = {
   layer: number;
 };
 
-export function StructuralNotebook({ deskId, symbol, initialTimeframe = 'WEEKLY', onClose }: {
+export function StructuralNotebook({ deskId, symbol, bitcoin, initialTimeframe = 'WEEKLY', onClose }: {
   deskId: string;
   symbol: string;
+  bitcoin: boolean;
   initialTimeframe?: AnalysisTimeframe;
   onClose: () => void;
 }) {
@@ -37,7 +38,7 @@ export function StructuralNotebook({ deskId, symbol, initialTimeframe = 'WEEKLY'
   const { timeframe, layer } = draft;
   const step = ANALYSIS_LAYERS[layer] ?? ANALYSIS_LAYERS[0];
   const next = ANALYSIS_LAYERS[layer + 1];
-  const questions = notebookQuestions[step.id];
+  const questions = questionsForNotebookLayer(step.id, bitcoin);
   const timeframeLabel = NOTEBOOK_TIMEFRAME_LABELS[timeframe];
   const prior = (tf: AnalysisTimeframe) => previous && latestLayer(previous, tf)?.data;
   const read = draft.reads[timeframe] ?? prior(timeframe)?.analysis ?? {};
