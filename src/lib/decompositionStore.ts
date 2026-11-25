@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { toSupabaseError } from './supabaseErrors';
+import { candleReadMatchesPeriod } from '../decomposition/candlestick';
 import {
   updateStructure, type Cadence, type DecompositionMode, type LayerData, type LayerTimeframe, type LayerVersion, type PeriodGateCheck,
   type PeriodPlan, type PeriodReview, type StructuralRecord, type StructuralVersionRef,
@@ -167,6 +168,25 @@ export async function insertPeriodPlan(supabase: SupabaseClient, userId: string,
 export async function savePlanRead(supabase: SupabaseClient, userId: string, plan: PeriodPlan): Promise<void> {
   const { error } = await supabase.from('trading_os_period_plans').update({ read: plan.read }).eq('id', plan.id).eq('user_id', userId);
   if (error) fail(error);
+}
+
+/** Attach a forward candle read without replacing a newer plan edit or a closed forecast. */
+export async function attachCandlestickRead(
+  supabase: SupabaseClient, userId: string, plan: PeriodPlan,
+  candlestickDecomposition: NonNullable<PeriodPlan['read']['candlestickDecomposition']>,
+): Promise<PeriodPlan['read']> {
+  const { asOf } = candlestickDecomposition;
+  if (plan.review || plan.mode !== 'LIVE' || !(Date.parse(asOf) < Date.parse(plan.candle.closeTime ?? ''))) {
+    throw new Error('This candle is closed. Its forecast can no longer change.');
+  }
+  if (!candleReadMatchesPeriod(candlestickDecomposition, plan.candle)) throw new Error('The completed candle evidence does not match this plan.');
+  const read = { ...plan.read, candlestickDecomposition };
+  const { data, error } = await supabase.from('trading_os_period_plans').update({ read })
+    .eq('id', plan.id).eq('user_id', userId).eq('read', JSON.stringify(plan.read)).gt('candle_close', asOf)
+    .select('read').maybeSingle();
+  if (error) fail(error);
+  if (!data) throw new Error('The plan changed while you were editing. Refresh the desk to attach this draft.');
+  return data.read as PeriodPlan['read'];
 }
 
 /** Records the candle close time once, when the chart prints it. */

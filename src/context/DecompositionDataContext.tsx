@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import {
-  createStructuralRecord, insertPeriodPlan, insertReview, loadPeriodPlans, loadStructuralRecords, recordBacktestOutcome, saveStructuralUpdate,
+  attachCandlestickRead, createStructuralRecord, insertPeriodPlan, insertReview, loadPeriodPlans, loadStructuralRecords, recordBacktestOutcome, saveStructuralUpdate,
 } from '../lib/decompositionStore';
 import { FEED_PRESETS, closeBacktest, type BacktestOutcome, type Cadence, type FeedProfile, type LayerData, type PeriodPlan, type PeriodReview, type StructuralRecord } from '../decomposition';
 import type { AssetCategory } from '../types';
@@ -22,6 +22,7 @@ interface Value {
   mapFor: (deskId: string) => StructuralRecord | undefined;
   saveStructure: (input: { deskId: string; symbol: string; layers: Array<{ asOf: string; data: LayerData }>; definitionsVersion: string }) => Promise<StructuralRecord>;
   savePlan: (plan: PeriodPlan) => Promise<PeriodPlan>;
+  saveCandlestick: (plan: PeriodPlan, read: NonNullable<PeriodPlan['read']['candlestickDecomposition']>) => Promise<void>;
   saveReview: (plan: PeriodPlan, review: PeriodReview) => Promise<PeriodPlan>;
   /** The chart feed used for a desk's candles (remembered per desk in this browser). */
   profileFor: (deskId: string, category?: AssetCategory) => FeedProfile;
@@ -115,6 +116,11 @@ export const DecompositionDataProvider: React.FC<{ userId: string; children: Rea
     return saved;
   }, [userId]);
 
+  const saveCandlestick: Value['saveCandlestick'] = useCallback(async (plan, candleRead) => {
+    const read = await attachCandlestickRead(supabase, userId, plan, candleRead);
+    setPlans((all) => all.map((current) => current.id === plan.id ? { ...current, read } : current));
+  }, [userId]);
+
   const saveReview = useCallback(async (plan: PeriodPlan, review: PeriodReview) => {
     const saved = await insertReview(supabase, userId, plan, review);
     setPlans((all) => all.map((p) => (p.id === saved.id ? saved : p)));
@@ -136,10 +142,10 @@ export const DecompositionDataProvider: React.FC<{ userId: string; children: Rea
   }, []);
 
   const value = useMemo(() => ({
-    structural, plans, loading, notice, reload, mapFor, saveStructure, savePlan, saveReview, profileFor, setProfile,
+    structural, plans, loading, notice, reload, mapFor, saveStructure, savePlan, saveCandlestick, saveReview, profileFor, setProfile,
     pendingDeskId: pendingDecomposition?.deskId, pendingCadence: pendingDecomposition?.cadence, requestDecompose,
     pendingReviewId, requestReview, pendingPlanId, requestPlanView, backtests, saveBacktest, closeBacktestRecord,
-  }), [structural, plans, loading, notice, reload, mapFor, saveStructure, savePlan, saveReview, profileFor, setProfile,
+  }), [structural, plans, loading, notice, reload, mapFor, saveStructure, savePlan, saveCandlestick, saveReview, profileFor, setProfile,
     pendingDecomposition, requestDecompose, pendingReviewId, pendingPlanId, backtests, saveBacktest, closeBacktestRecord]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 };

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { useTrading } from '../../context/TradingContext';
 import { useDecompositionData } from '../../context/DecompositionDataContext';
@@ -9,6 +9,7 @@ import { formatTradingTime } from '../../utils/timeDisplay';
 import { SummaryCard, VerdictPill } from './SummaryCard';
 import { fmtPrice } from './ui';
 import { AnalysisSummary } from './AnalysisSummary';
+import { CandlestickNarrative, CandlestickSection } from './CandlestickSection';
 
 /** Asset Desk: structure → month → week → today, one line each; tap a line for the full record (UX rule 7). */
 export const DeskDecompositionStack: React.FC<{ desk: AssetDeskData }> = ({ desk }) => {
@@ -17,8 +18,8 @@ export const DeskDecompositionStack: React.FC<{ desk: AssetDeskData }> = ({ desk
   const { current, definitionsFor } = useDecompositionDefinitions();
   const [open, setOpen] = useState<string>();
   const map = mapFor(desk.id);
-  const lines = useMemo(() => deskStack({ deskId: desk.id, symbol: desk.symbol, map, plans, now: new Date().toISOString(), profile: profileFor(desk.id, desk.category), definitionsFor, current }),
-    [desk.id, desk.symbol, desk.category, map, plans, profileFor, definitionsFor, current]);
+  const now = new Date().toISOString();
+  const lines = deskStack({ deskId: desk.id, symbol: desk.symbol, map, plans, now, profile: profileFor(desk.id, desk.category), definitionsFor, current });
   const decompose = (key: StackLine['key']) => {
     requestDecompose(desk.id, key === 'STRUCTURE' ? undefined : key);
     setActiveTab('decomposition');
@@ -62,9 +63,10 @@ export const DeskDecompositionStack: React.FC<{ desk: AssetDeskData }> = ({ desk
                       })}
                       {l.asOf && <p className="text-xs text-ink-3">Read: {(['MONTHLY', 'WEEKLY', 'DAILY'] as const).filter((tf) => l.asOf?.[tf]).map((tf) => `${tf.toLowerCase()} ${formatTradingTime(l.asOf![tf]!, { view: timeView })}`).join(' · ')}</p>}
                     </div>
-                  ) : <PlanDetail planId={l.planId!} />}
+                  ) : <PlanDetail planId={l.planId!} showCandlestick={false} />}
                 </div>
               )}
+              {l.key !== 'STRUCTURE' && <CandlestickSection desk={desk} cadence={l.key} now={now} />}
             </li>
           );
         })}
@@ -90,7 +92,7 @@ export const LineSummary: React.FC<{ l: StackLine }> = ({ l }) => {
 };
 
 /** The full plan, answers in process order (read-only here). */
-export const PlanDetail: React.FC<{ planId: string }> = ({ planId }) => {
+export const PlanDetail: React.FC<{ planId: string; showCandlestick?: boolean }> = ({ planId, showCandlestick = true }) => {
   const { plans } = useDecompositionData();
   const plan = plans.find((p) => p.id === planId);
   if (!plan) return null;
@@ -106,7 +108,8 @@ export const PlanDetail: React.FC<{ planId: string }> = ({ planId }) => {
     if (typeof v === 'object') return Object.values(v as Record<string, unknown>).filter((x) => typeof x === 'string' || typeof x === 'number').map((x) => String(x).toLowerCase()).join(' · ');
     return String(v);
   };
-  return (
+  return <>
+    {showCandlestick && plan.read.candlestickDecomposition && <CandlestickNarrative read={plan.read.candlestickDecomposition} />}
     <dl className="space-y-1.5 text-sm">
       {plan.read.completedCandle && <div className="rounded-lg border border-line bg-raised p-3">
         <dt className="font-semibold">Previous completed candle · {plan.read.completedCandle.candle.feed}</dt>
@@ -129,5 +132,5 @@ export const PlanDetail: React.FC<{ planId: string }> = ({ planId }) => {
       })}
       {plan.review && <div className="mt-2 rounded-xl bg-raised p-2.5 text-xs text-ink-2 ring-1 ring-inset ring-line">Reviewed: prediction {plan.review.prediction.toLowerCase()}, process {plan.review.process.toLowerCase()} · {plan.review.lesson}</div>}
     </dl>
-  );
+  </>;
 };

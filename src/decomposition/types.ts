@@ -14,6 +14,7 @@
 
 import type { Analysis } from './analysis';
 import type { compareCandles, RecordedCandle } from './candleEvidence';
+import type { CandlestickRead } from './candlestick';
 
 export type StepStatus = 'IDENTIFIED' | 'INCONCLUSIVE' | 'NOT_APPLICABLE';
 
@@ -434,6 +435,7 @@ export interface PeriodPlan {
 }
 
 export interface PeriodEvidence {
+  candlestickDecomposition?: CandlestickRead;
   completedCandle?: RecordedCandle;
   comparisonCandle?: RecordedCandle;
   comparison?: NonNullable<ReturnType<typeof compareCandles>>;

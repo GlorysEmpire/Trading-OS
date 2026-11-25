@@ -18,6 +18,7 @@ import { AnalysisText } from './AnalysisInputs';
 import { compareCandles, recordCompletedCandle, type Ohlc } from '../../decomposition/candleEvidence';
 import { useAuth } from '../../context/AuthContext';
 import { useLocalDraft } from '../../utils/useLocalDraft';
+import { candleDraftKey, candleReadMatchesPeriod, completedCandleDraft } from '../../decomposition/candlestick';
 
 type Read = PeriodPlan['read'];
 type Screen = 'gate' | 'candle' | PeriodStepKey | 'summary';
@@ -54,9 +55,14 @@ export const PlanFlow: React.FC<{ deskId: string; symbol: string; category?: Ass
   const originalProfile = profileFor(deskId, category);
   const originalCandle = candleFor(cadence, asOf, originalProfile, symbol);
   const key = JSON.stringify(['tos-plan-v1', user?.id, deskId, cadence, originalCandle.openTime]);
-  const { draft, update, clear, localError } = useLocalDraft<PlanDraft>(key, () => ({
-    idx: 0, profile: originalProfile, read: prefill(base), previous: {}, comparison: {}, reasons: [],
-  }));
+  const { draft, update, clear, localError } = useLocalDraft<PlanDraft>(key, () => {
+    const candleRead = completedCandleDraft(candleDraftKey(user?.id, deskId, cadence, originalCandle, originalProfile));
+    const observations = candleRead && candleReadMatchesPeriod(candleRead, originalCandle) ? candleRead.observations : [];
+    return {
+      idx: 0, profile: originalProfile, read: prefill(base), reasons: [],
+      previous: observations[0]?.evidence?.prices ?? {}, comparison: observations[1]?.evidence?.prices ?? {},
+    };
+  });
   const { profile, changed, reasons, answeredAt, stands, read, idx } = draft;
   const patchDraft = (patch: Partial<PlanDraft>) => update((current) => ({ ...current, ...patch }));
   const setIdx = (value: number) => patchDraft({ idx: value });
@@ -166,7 +172,9 @@ export const PlanFlow: React.FC<{ deskId: string; symbol: string; category?: Ass
     let plan: PeriodPlan | undefined;
     let error: string | undefined;
     try {
-      const savedRead = { ...read, completedCandle, comparisonCandle, comparison };
+      const candidate = completedCandleDraft(candleDraftKey(user?.id, deskId, cadence, candle, profile));
+      const candlestickDecomposition = candidate && candleReadMatchesPeriod(candidate, candle) ? candidate : undefined;
+      const savedRead = { ...read, completedCandle, comparisonCandle, comparison, candlestickDecomposition };
       plan = { ...startPeriodPlan({ id: newPlanId(), cadence, candle, createdAt: new Date().toISOString(), structural: map, gate: gateCheck, parent, definitionsVersion: defs.version }), read: savedRead };
     } catch (e) { error = e instanceof Error ? e.message : String(e); }
     const gate = plan ? evaluatePeriodPlan(map, plan, defs) : undefined;

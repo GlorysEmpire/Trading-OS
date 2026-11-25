@@ -114,6 +114,15 @@ export function previousCandle(cadence: Cadence, at: string, profile: FeedProfil
   return candleFor(cadence, new Date(Date.parse(current.openTime) - 60_000).toISOString(), profile, symbol);
 }
 
+/** During a scheduled closure, the next opening is the candle the read is for. */
+export function currentOrUpcomingCandle(cadence: Cadence, at: string, profile: FeedProfile, symbol: string): PeriodCandle {
+  const candle = candleFor(cadence, at, profile, symbol);
+  const close = Date.parse(candle.closeTime ?? '');
+  if (profile.calendar !== 'FX_WEEKDAYS' || !(close <= Date.parse(at))) return candle;
+  const nextDate = weekday(tradingDate(close, profile), 1);
+  return candleFor(cadence, new Date(openOfDate(nextDate, profile)).toISOString(), profile, symbol);
+}
+
 /** Plain label for a candle, e.g. "Week of Nov 23" / "Nov 24" / "November 2026". */
 export function candleLabel(cadence: Cadence, c: PeriodCandle, profile: FeedProfile): string {
   const t = Date.parse(c.openTime) + (opensEveningBefore(profile) ? DAY : 0) + 60_000;

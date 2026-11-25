@@ -9,13 +9,14 @@ import { describe, expect, it } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   insertPeriodPlan, insertReview, layerFromRow, layerToRow, loadPeriodPlans, loadStructuralRecords, newLayers, planFromRow, planToRow,
-  createStructuralRecord, saveStructuralUpdate, savePlanRead,
+  attachCandlestickRead, createStructuralRecord, saveStructuralUpdate, savePlanRead,
 } from './decompositionStore';
 import {
   PLACEHOLDER_DEFINITIONS as DEFS, answerPeriodStep, appendLayerVersion, evaluatePeriodPlan, startPeriodPlan, summarize,
   type PeriodPlan,
 } from '../decomposition';
 import { fixtureDailyBearish, fixtureDecomposition, fixturePeriodRead, fixtureWeeklyBearish } from '../decomposition/fixtures';
+import { candleObservation, type CandlestickRead } from '../decomposition/candlestick';
 
 const UID = 'user-1';
 
@@ -29,7 +30,8 @@ function fakeSupabase() {
     let pendingUpdate: Record<string, unknown> | null = null;
     const api: Record<string, unknown> = {
       select: () => api,
-      eq: (c: string, v: unknown) => { filters.push((r) => r[c] === v); return api; },
+      eq: (c: string, v: unknown) => { filters.push((r) => c === 'read' ? JSON.stringify(r[c]) === v : r[c] === v); return api; },
+      gt: (c: string, v: string) => { filters.push((r) => Date.parse(r[c] as string) > Date.parse(v)); return api; },
       in: (c: string, vs: unknown[]) => { filters.push((r) => vs.includes(r[c])); return api; },
       order: () => api,
       insert: (row: Record<string, unknown>) => {
@@ -47,6 +49,11 @@ function fakeSupabase() {
       },
       update: (patch: Record<string, unknown>) => { pendingUpdate = patch; return api; },
       single: () => Promise.resolve(api._err ? { data: null, error: api._err } : { data: pendingInsert?.[0] ?? null, error: null }),
+      maybeSingle: () => {
+        const row = rows.find((r) => filters.every((f) => f(r)));
+        if (row && pendingUpdate) Object.assign(row, pendingUpdate);
+        return Promise.resolve({ data: row ?? null, error: null });
+      },
       then: (resolve: (v: unknown) => void) => {
         if (api._err) return resolve({ data: null, error: api._err });
         if (pendingUpdate) { rows.filter((r) => filters.every((f) => f(r))).forEach((r) => Object.assign(r, pendingUpdate)); return resolve({ error: null }); }
@@ -107,9 +114,22 @@ describe('Journey 1 through the store: map → daily plan → summary, no retypi
     expect(loadedPlan.read).toEqual(plan.read);
     expect(evaluatePeriodPlan(loadedRec, loadedPlan, DEFS)).toMatchObject({ verdict: 'WATCH_POI', reason: 'Wait for price at POI A (17R to the draw).' });
 
+    const candle = { ...plan.candle, openTime: '2026-11-21T00:00:00Z', closeTime: plan.candle.openTime };
+    const candleRead: CandlestickRead = {
+      asOf: '2026-11-22T12:00:00Z', observations: [candleObservation(candle, { prices: { open: 10, high: 12, low: 9, close: 11 } }, plan.candle.openTime)],
+      answers: { invalidation: 'Prior low' }, narrative: 'Test candle narrative.',
+    };
+    const attached = await attachCandlestickRead(client, UID, loadedPlan, candleRead);
+    expect(attached).toEqual({ ...loadedPlan.read, candlestickDecomposition: candleRead });
+    await expect(attachCandlestickRead(client, UID, loadedPlan, candleRead)).rejects.toThrow(/plan changed/);
+    const [withCandleRead] = await loadPeriodPlans(client, UID);
+    expect(evaluatePeriodPlan(loadedRec, withCandleRead, DEFS)).toEqual(evaluatePeriodPlan(loadedRec, loadedPlan, DEFS));
+
     const reviewed = await insertReview(client, UID, loadedPlan, { savedAt: 'x', prediction: 'WRONG', process: 'CORRECT', lesson: 'Waited for the inducement.' });
     const [again] = await loadPeriodPlans(client, UID);
     expect(again.review).toEqual(reviewed.review);
+    expect(again.read).toEqual(attached);
+    await expect(attachCandlestickRead(client, UID, again, candleRead)).rejects.toThrow(/forecast can no longer change/);
   });
   it('newLayers returns only what an update added', () => {
     const a = appendLayerVersion(fixtureDecomposition(), { id: 'l1', asOf: 'x', createdAt: 'x', definitionsVersion: 'v', data: fixtureWeeklyBearish() });

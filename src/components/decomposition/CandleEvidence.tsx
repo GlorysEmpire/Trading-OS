@@ -3,7 +3,9 @@ import { PriceField, fmtPrice } from './ui';
 
 const fields = ['open', 'high', 'low', 'close'] as const;
 
-export function CandleEvidence({ label, prices, change }: { label: string; prices: Partial<Ohlc>; change: (prices: Partial<Ohlc>) => void }) {
+export function CandleEvidence({ label, prices, change, showMetrics = true }: {
+  label: string; prices: Partial<Ohlc>; change: (prices: Partial<Ohlc>) => void; showMetrics?: boolean;
+}) {
   const complete = fields.every((field) => prices[field] !== undefined);
   const evidence = complete ? measureCandle(prices as Ohlc) : undefined;
   return (
@@ -15,7 +17,7 @@ export function CandleEvidence({ label, prices, change }: { label: string; price
       </div>
       <div aria-live="polite">
         {complete && !evidence && <p className="mt-2 text-rose-300">High and low must contain the open and close.</p>}
-        {evidence && <dl className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
+        {evidence && showMetrics && <dl className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
           {[
             ['Range', fmtPrice(evidence.range)],
             ['Body', `${fmtPrice(evidence.body)} (${evidence.bodyPercent.toFixed(0)}%)`],
